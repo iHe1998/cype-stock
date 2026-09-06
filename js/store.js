@@ -13,6 +13,12 @@ VLM.store = (function () {
 
   const MAX_SNAPSHOTS = 60;   // ~2 meses de importaciones diarias
 
+  // Versión del esquema de los datos guardados. Se sube cuando cambia la forma
+  // de los productos. Los datos reales se migran (se reclasifican al cargar);
+  // los datos de ejemplo de una versión vieja se descartan, para que el demo
+  // no quede pegado con productos y laboratorios de otra época.
+  const VERSION = 2;
+
   const CFG_DEFAULT = {
     diasCritico:   7,    // <= N días de cobertura => CRÍTICO
     diasBajo:      15,   // <= N días de cobertura => BAJO
@@ -69,6 +75,7 @@ VLM.store = (function () {
     try {
       // las fechas se serializan a ISO; se rehidratan al cargar
       localStorage.setItem(KEY_DATA, JSON.stringify({
+        v: VERSION,
         productos: state.productos,
         meta: state.meta
       }));
@@ -145,11 +152,25 @@ VLM.store = (function () {
     try {
       const d = JSON.parse(localStorage.getItem(KEY_DATA) || 'null');
       if (d && Array.isArray(d.productos)) {
-        state.productos = d.productos.map(p => {
-          if (p.vencimiento) p.vencimiento = new Date(p.vencimiento);
-          return p;
-        });
-        state.meta = Object.assign(state.meta, d.meta || {});
+        const viejo = d.v !== VERSION;
+        // las primeras versiones del demo no marcaban meta.demo, sólo el nombre
+        const esDemo = !!(d.meta && (d.meta.demo || d.meta.archivo === 'Datos de ejemplo'));
+
+        if (viejo && esDemo) {
+          // datos de ejemplo de una versión anterior: se descartan
+          try { localStorage.removeItem(KEY_DATA); } catch (e2) {}
+          state.historial = state.historial.filter(s => !s.demo);
+        } else {
+          state.productos = d.productos.map(p => {
+            if (p.vencimiento) p.vencimiento = new Date(p.vencimiento);
+            // Reclasificar SIEMPRE: los productos guardados por una versión
+            // anterior no traen gestionado/ambito/conservacion, y sin esto
+            // quedarían todos como "fuera del catálogo".
+            return VLM.labs.clasificar(p, state.labs);
+          });
+          state.meta = Object.assign(state.meta, d.meta || {});
+          if (viejo) guardar();   // reescribir ya migrado
+        }
       }
     } catch (e) {
       console.warn('Datos guardados ilegibles', e);

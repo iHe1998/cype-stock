@@ -78,10 +78,17 @@ Write-Host "`n  -> dist\vlm-stock.html  ($kb KB)" -ForegroundColor Green
 if ($Demo) {
   $auto = @'
 <script>
-/* build -Demo: carga los datos de ejemplo al abrir */
+/* build -Demo: carga los datos de ejemplo al abrir.
+   Refresca tambien cuando lo guardado ya es una demo, para que este archivo
+   muestre siempre el ejemplo de ESTA version y no el que quedo en el
+   localStorage de una version anterior. Un import real sobrevive. */
 window.addEventListener('load', function () {
   setTimeout(function () {
-    if (window.VLM && VLM.store && !VLM.store.hayDatos()) VLM.app.cargarDemo();
+    var S = window.VLM && VLM.store;
+    if (!S) return;
+    if (!S.hayDatos() || S.state.meta.demo || S.state.meta.archivo === 'Datos de ejemplo') {
+      VLM.app.cargarDemo();
+    }
   }, 60);
 });
 </script>
