@@ -245,6 +245,22 @@ VLM.analytics = (function () {
   }
 
   /**
+   * Proporción de SKU que comparten dos snapshots.
+   * Si dos importaciones consecutivas casi no se solapan no son comparables
+   * (cambió el formato del export, se cargó otro archivo, vino incompleto):
+   * restarlas daría un consumo enorme y falso, así que ese tramo se descarta.
+   */
+  const SOLAPE_MINIMO = 0.5;
+
+  function solape(a, b) {
+    const ka = Object.keys(a.porSku), kb = Object.keys(b.porSku);
+    if (!ka.length || !kb.length) return 0;
+    let comunes = 0;
+    ka.forEach(k => { if (b.porSku[k] !== undefined) comunes++; });
+    return comunes / Math.min(ka.length, kb.length);
+  }
+
+  /**
    * Consumo real entre importaciones consecutivas.
    *
    * Una baja de stock es consumo; una suba es reposición. Se calculan por
@@ -259,13 +275,14 @@ VLM.analytics = (function () {
     const res = {
       periodos: [], totalConsumido: 0, totalRepuesto: 0,
       dias: 0, promedioDiario: 0, snapshots: (historial || []).length,
-      suficiente: h.length >= 2
+      saltados: 0, suficiente: h.length >= 2
     };
     if (!res.suficiente) return res;
 
     const desde = h.length - 1 - (dias || 30);
     for (let i = Math.max(1, desde); i < h.length; i++) {
       const prev = h[i - 1], cur = h[i];
+      if (solape(prev, cur) < SOLAPE_MINIMO) { res.saltados++; continue; }
       let consumido = 0, repuesto = 0;
       const codigos = Object.keys(cur.porSku);
       codigos.forEach(cod => {
@@ -311,6 +328,7 @@ VLM.analytics = (function () {
     const acum = {}, dias = {};
     for (let i = desde; i < h.length; i++) {
       const prev = h[i - 1], cur = h[i];
+      if (solape(prev, cur) < SOLAPE_MINIMO) continue;
       const nd = diasEntre(prev, cur);
       Object.keys(cur.porSku).forEach(cod => {
         const antes = prev.porSku[cod];

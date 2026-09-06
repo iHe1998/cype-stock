@@ -113,10 +113,12 @@ VLM.views = (function () {
       kpi('❄ Cadena de frío en alerta', U.fmt(res.alertaZona.frio),
           'de ' + res.porZona.frio + ' SKU refrigerados',
           res.alertaZona.frio > 0 ? 'k-crit' : 'k-ok') +
-      kpi('Consumido en el período', hist.suficiente ? U.fmtCompact(hist.totalConsumido) : '—',
-          hist.suficiente
-            ? U.fmt(hist.promedioDiario, true) + ' uds/día en ' + hist.dias + ' días'
-            : 'hacen falta 2 importaciones', 'k-info') +
+      (hist.activo
+        ? kpi('Consumido en el período', hist.suficiente ? U.fmtCompact(hist.totalConsumido) : '—',
+              hist.suficiente
+                ? U.fmt(hist.promedioDiario, true) + ' uds/día en ' + hist.dias + ' días'
+                : 'hacen falta 2 importaciones', 'k-info')
+        : '') +
       '</div>';
 
     /* --- cuadrantes ámbito × conservación --- */
@@ -130,23 +132,32 @@ VLM.views = (function () {
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       '</div>';
 
-    /* --- historial real de consumo --- */
-    html += '<h3 class="section-title">Historial de consumo</h3>';
-    if (!hist.suficiente) {
-      html += avisoHistorial(hist);
-    } else {
-      html += '<div class="grid grid-2">' +
-        cardChart('Consumo por día', 'unidades que salieron, calculadas por diferencia de stock', 'chHist', 300) +
-        cardChart('Consumido por laboratorio', 'período completo', 'chConsumoLab', 300) +
-        '</div>';
+    /* --- historial real de consumo (sólo si está activado) --- */
+    if (hist.activo) {
+      html += '<h3 class="section-title">Historial de consumo</h3>';
+      if (!hist.suficiente) {
+        html += avisoHistorial(hist);
+      } else {
+        html += '<div class="grid grid-2">' +
+          cardChart('Consumo por día', 'unidades que salieron, calculadas por diferencia de stock', 'chHist', 300) +
+          cardChart('Consumido por laboratorio', 'período completo', 'chConsumoLab', 300) +
+          '</div>';
+      }
     }
 
     /* --- análisis de detalle: cuándo se agota cada producto --- */
+    // ojo: un producto agotado tiene cobertura 0, que es finita. Lo que define
+    // si se puede analizar el agotamiento es que haya consumo conocido.
+    const hayCobertura = items.some(p => p.consumoDiario > 0);
     html += '<h3 class="section-title">Análisis de detalle</h3>';
-    html += '<div class="grid grid-2">' +
-      cardChart('¿Cuándo se agota cada producto?', 'SKU por tramo, según el consumo observado', 'chQuiebres', 300) +
-      cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
-      '</div>';
+    if (hayCobertura) {
+      html += '<div class="grid grid-2">' +
+        cardChart('¿Cuándo se agota cada producto?', 'SKU por tramo, según el consumo observado', 'chQuiebres', 300) +
+        cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
+        '</div>';
+    } else {
+      html += avisoSinConsumo(hist);
+    }
 
     /* --- top urgentes --- */
     if (urgentes.length) {
@@ -160,12 +171,35 @@ VLM.views = (function () {
     /* --- montaje de gráficos --- */
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
-    C.quiebres($('#chQuiebres', el), tramos);
-    C.menorCobertura($('#chCobertura', el), items, cfg, false, 10);
-    if (hist.suficiente) {
+    if (hayCobertura) {
+      C.quiebres($('#chQuiebres', el), tramos);
+      C.menorCobertura($('#chCobertura', el), items, cfg, false, 10);
+    }
+    if (hist.activo && hist.suficiente) {
       C.historial($('#chHist', el), hist);
       C.consumoLab($('#chConsumoLab', el), consLabs);
     }
+  }
+
+  /**
+   * No hay ningún dato de consumo: ni columna en la planilla ni historial.
+   * Sin eso no se puede saber cuándo se agota nada.
+   */
+  function avisoSinConsumo(hist) {
+    return '<div class="notice">' +
+      '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
+        '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
+      '<div><strong>No se puede calcular cuándo se agota cada producto.</strong><br>' +
+      'Hace falta saber cuánto se consume, y no hay de dónde sacarlo: la planilla no trae ' +
+      'columna de consumo' +
+      (hist.activo ? ' y todavía no hay suficientes importaciones en el historial.'
+                   : ' y el historial de consumo está desactivado.') +
+      '<br><span class="small muted">' +
+      (hist.activo
+        ? 'Importá una vez por día: desde la segunda importación aparece la cobertura.'
+        : 'Podés activarlo en ⚙ Configuración → Historial de consumo, o agregar una ' +
+          'columna de consumo a la planilla. Mientras tanto, las alertas salen del stock mínimo.') +
+      '</span></div></div>';
   }
 
   /** Explica por qué todavía no hay historial y cómo se construye. */

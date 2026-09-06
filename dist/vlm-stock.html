@@ -960,22 +960,32 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       </div>
 
       <h3 class="section-title">Historial de consumo</h3>
-      <p class="muted small">El consumo se calcula restando importaciones sucesivas.
-        Importá la planilla una vez por día para que el historial sea preciso.</p>
-      <div class="cfg-grid">
-        <label class="field">
-          <span>Días a promediar para el consumo diario</span>
-          <input type="number" id="cfgVentanaConsumo" min="2" max="90" step="1">
-        </label>
-        <label class="field">
-          <span>Días que muestra el gráfico</span>
-          <input type="number" id="cfgDiasHistorial" min="7" max="90" step="1">
-        </label>
-      </div>
-      <div class="cfg-actions" style="margin-top:10px">
-        <span class="muted small" id="histInfo"></span>
-        <div class="spacer"></div>
-        <button class="btn btn-danger" id="btnClearHist">Borrar historial</button>
+      <label class="field field-check">
+        <input type="checkbox" id="cfgHistorialActivo">
+        <span>Guardar una foto del stock en cada importación</span>
+      </label>
+      <p class="muted small" style="margin:8px 0 0">
+        Es la única forma de saber cuánto se consume si la planilla no trae una columna de
+        consumo: la app resta importaciones sucesivas. Hacen falta <strong>al menos 2
+        importaciones</strong> para que aparezca algo, y conviene importar una vez por día.
+        Sin esto no hay días de cobertura ni fecha estimada de quiebre.
+      </p>
+      <div id="histOpciones" hidden>
+        <div class="cfg-grid" style="margin-top:12px">
+          <label class="field">
+            <span>Días a promediar para el consumo diario</span>
+            <input type="number" id="cfgVentanaConsumo" min="2" max="90" step="1">
+          </label>
+          <label class="field">
+            <span>Días que muestra el gráfico</span>
+            <input type="number" id="cfgDiasHistorial" min="7" max="90" step="1">
+          </label>
+        </div>
+        <div class="cfg-actions" style="margin-top:10px">
+          <span class="muted small" id="histInfo"></span>
+          <div class="spacer"></div>
+          <button class="btn btn-danger" id="btnClearHist">Borrar historial</button>
+        </div>
       </div>
 
       <h3 class="section-title">Modo TV</h3>
@@ -1428,6 +1438,11 @@ VLM.store = (function () {
     diasBajo:      15,   // <= N días de cobertura => BAJO
     diasObjetivo:  30,   // stock objetivo al reponer, en días de consumo
     factorBajo:    1.5,  // stock <= min * factor => BAJO
+    // El historial guarda una foto del stock en cada importación para poder
+    // calcular el consumo por diferencia. Apagado por defecto: sin al menos
+    // dos importaciones no aporta nada, y acumular datos sin necesidad sólo
+    // agrega problemas. Se prende desde Configuración.
+    historialActivo: false,
     ventanaConsumo: 30,  // días de historial que se promedian para el consumo diario
     diasHistorial: 30,   // días que muestra el gráfico de historial
     diasMes:       30,   // divisor consumo mensual -> diario
@@ -1567,7 +1582,18 @@ VLM.store = (function () {
   function setProductos(productos, meta) {
     state.productos = productos;
     state.meta = Object.assign({ importadoEn: Date.now() }, meta || {});
-    agregarSnapshot(productos, state.meta);
+
+    // La primera importación real barre el historial de la demo: si no, los
+    // SKU inventados "desaparecen" de la planilla y se contarían como un
+    // consumo gigante el primer día.
+    if (state.cfg.historialActivo) {
+      const esDemo = !!(meta && meta.demo);
+      if (!esDemo && state.historial.some(s => s.demo)) {
+        state.historial = state.historial.filter(s => !s.demo);
+        VLM.util.toast('Se descartó el historial de los datos de ejemplo');
+      }
+      agregarSnapshot(productos, state.meta, esDemo);
+    }
     guardar();
     emit('datos');
   }
@@ -1578,7 +1604,7 @@ VLM.store = (function () {
    * entre fotos), porque la planilla sólo trae el stock del momento.
    * Dos importaciones del mismo día se pisan: vale la última.
    */
-  function agregarSnapshot(productos, meta) {
+  function agregarSnapshot(productos, meta, esDemo) {
     const ahora = new Date();
     const dia = ahora.getFullYear() + '-' +
       String(ahora.getMonth() + 1).padStart(2, '0') + '-' +
@@ -1597,7 +1623,8 @@ VLM.store = (function () {
       archivo: (meta && meta.archivo) || null,
       skus: productos.length,
       total: total,
-      porSku: porSku
+      porSku: porSku,
+      demo: !!esDemo
     };
 
     const i = state.historial.findIndex(s => s.dia === dia);
@@ -2196,6 +2223,22 @@ VLM.analytics = (function () {
   }
 
   /**
+   * Proporción de SKU que comparten dos snapshots.
+   * Si dos importaciones consecutivas casi no se solapan no son comparables
+   * (cambió el formato del export, se cargó otro archivo, vino incompleto):
+   * restarlas daría un consumo enorme y falso, así que ese tramo se descarta.
+   */
+  const SOLAPE_MINIMO = 0.5;
+
+  function solape(a, b) {
+    const ka = Object.keys(a.porSku), kb = Object.keys(b.porSku);
+    if (!ka.length || !kb.length) return 0;
+    let comunes = 0;
+    ka.forEach(k => { if (b.porSku[k] !== undefined) comunes++; });
+    return comunes / Math.min(ka.length, kb.length);
+  }
+
+  /**
    * Consumo real entre importaciones consecutivas.
    *
    * Una baja de stock es consumo; una suba es reposición. Se calculan por
@@ -2210,13 +2253,14 @@ VLM.analytics = (function () {
     const res = {
       periodos: [], totalConsumido: 0, totalRepuesto: 0,
       dias: 0, promedioDiario: 0, snapshots: (historial || []).length,
-      suficiente: h.length >= 2
+      saltados: 0, suficiente: h.length >= 2
     };
     if (!res.suficiente) return res;
 
     const desde = h.length - 1 - (dias || 30);
     for (let i = Math.max(1, desde); i < h.length; i++) {
       const prev = h[i - 1], cur = h[i];
+      if (solape(prev, cur) < SOLAPE_MINIMO) { res.saltados++; continue; }
       let consumido = 0, repuesto = 0;
       const codigos = Object.keys(cur.porSku);
       codigos.forEach(cod => {
@@ -2262,6 +2306,7 @@ VLM.analytics = (function () {
     const acum = {}, dias = {};
     for (let i = desde; i < h.length; i++) {
       const prev = h[i - 1], cur = h[i];
+      if (solape(prev, cur) < SOLAPE_MINIMO) continue;
       const nd = diasEntre(prev, cur);
       Object.keys(cur.porSku).forEach(cod => {
         const antes = prev.porSku[cod];
@@ -2791,10 +2836,12 @@ VLM.views = (function () {
       kpi('❄ Cadena de frío en alerta', U.fmt(res.alertaZona.frio),
           'de ' + res.porZona.frio + ' SKU refrigerados',
           res.alertaZona.frio > 0 ? 'k-crit' : 'k-ok') +
-      kpi('Consumido en el período', hist.suficiente ? U.fmtCompact(hist.totalConsumido) : '—',
-          hist.suficiente
-            ? U.fmt(hist.promedioDiario, true) + ' uds/día en ' + hist.dias + ' días'
-            : 'hacen falta 2 importaciones', 'k-info') +
+      (hist.activo
+        ? kpi('Consumido en el período', hist.suficiente ? U.fmtCompact(hist.totalConsumido) : '—',
+              hist.suficiente
+                ? U.fmt(hist.promedioDiario, true) + ' uds/día en ' + hist.dias + ' días'
+                : 'hacen falta 2 importaciones', 'k-info')
+        : '') +
       '</div>';
 
     /* --- cuadrantes ámbito × conservación --- */
@@ -2808,23 +2855,32 @@ VLM.views = (function () {
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       '</div>';
 
-    /* --- historial real de consumo --- */
-    html += '<h3 class="section-title">Historial de consumo</h3>';
-    if (!hist.suficiente) {
-      html += avisoHistorial(hist);
-    } else {
-      html += '<div class="grid grid-2">' +
-        cardChart('Consumo por día', 'unidades que salieron, calculadas por diferencia de stock', 'chHist', 300) +
-        cardChart('Consumido por laboratorio', 'período completo', 'chConsumoLab', 300) +
-        '</div>';
+    /* --- historial real de consumo (sólo si está activado) --- */
+    if (hist.activo) {
+      html += '<h3 class="section-title">Historial de consumo</h3>';
+      if (!hist.suficiente) {
+        html += avisoHistorial(hist);
+      } else {
+        html += '<div class="grid grid-2">' +
+          cardChart('Consumo por día', 'unidades que salieron, calculadas por diferencia de stock', 'chHist', 300) +
+          cardChart('Consumido por laboratorio', 'período completo', 'chConsumoLab', 300) +
+          '</div>';
+      }
     }
 
     /* --- análisis de detalle: cuándo se agota cada producto --- */
+    // ojo: un producto agotado tiene cobertura 0, que es finita. Lo que define
+    // si se puede analizar el agotamiento es que haya consumo conocido.
+    const hayCobertura = items.some(p => p.consumoDiario > 0);
     html += '<h3 class="section-title">Análisis de detalle</h3>';
-    html += '<div class="grid grid-2">' +
-      cardChart('¿Cuándo se agota cada producto?', 'SKU por tramo, según el consumo observado', 'chQuiebres', 300) +
-      cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
-      '</div>';
+    if (hayCobertura) {
+      html += '<div class="grid grid-2">' +
+        cardChart('¿Cuándo se agota cada producto?', 'SKU por tramo, según el consumo observado', 'chQuiebres', 300) +
+        cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
+        '</div>';
+    } else {
+      html += avisoSinConsumo(hist);
+    }
 
     /* --- top urgentes --- */
     if (urgentes.length) {
@@ -2838,12 +2894,35 @@ VLM.views = (function () {
     /* --- montaje de gráficos --- */
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
-    C.quiebres($('#chQuiebres', el), tramos);
-    C.menorCobertura($('#chCobertura', el), items, cfg, false, 10);
-    if (hist.suficiente) {
+    if (hayCobertura) {
+      C.quiebres($('#chQuiebres', el), tramos);
+      C.menorCobertura($('#chCobertura', el), items, cfg, false, 10);
+    }
+    if (hist.activo && hist.suficiente) {
       C.historial($('#chHist', el), hist);
       C.consumoLab($('#chConsumoLab', el), consLabs);
     }
+  }
+
+  /**
+   * No hay ningún dato de consumo: ni columna en la planilla ni historial.
+   * Sin eso no se puede saber cuándo se agota nada.
+   */
+  function avisoSinConsumo(hist) {
+    return '<div class="notice">' +
+      '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
+        '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
+      '<div><strong>No se puede calcular cuándo se agota cada producto.</strong><br>' +
+      'Hace falta saber cuánto se consume, y no hay de dónde sacarlo: la planilla no trae ' +
+      'columna de consumo' +
+      (hist.activo ? ' y todavía no hay suficientes importaciones en el historial.'
+                   : ' y el historial de consumo está desactivado.') +
+      '<br><span class="small muted">' +
+      (hist.activo
+        ? 'Importá una vez por día: desde la segunda importación aparece la cobertura.'
+        : 'Podés activarlo en ⚙ Configuración → Historial de consumo, o agregar una ' +
+          'columna de consumo a la planilla. Mientras tanto, las alertas salen del stock mínimo.') +
+      '</span></div></div>';
   }
 
   /** Explica por qué todavía no hay historial y cómo se construye. */
@@ -3542,7 +3621,8 @@ VLM.app = (function () {
     const cfg = S.state.cfg, ui = S.state.ui;
     if (!calculados) {
       // el consumo diario sale del historial cuando la planilla no lo trae
-      const consumoHist = A.consumoPorSku(S.state.historial, cfg.ventanaConsumo);
+      const consumoHist = cfg.historialActivo
+        ? A.consumoPorSku(S.state.historial, cfg.ventanaConsumo) : null;
       calculados = A.calcular(S.state.productos, cfg, consumoHist);
     }
     let items = calculados;
@@ -3552,7 +3632,12 @@ VLM.app = (function () {
 
   /** Historial de consumo real, ya recortado a la ventana configurada. */
   function historialActual() {
-    return A.historialConsumo(S.state.historial, S.state.cfg.diasHistorial);
+    if (!S.state.cfg.historialActivo) {
+      return { activo: false, suficiente: false, periodos: [], snapshots: 0 };
+    }
+    const h = A.historialConsumo(S.state.historial, S.state.cfg.diasHistorial);
+    h.activo = true;
+    return h;
   }
 
   /* ============================================================
@@ -3925,13 +4010,14 @@ VLM.app = (function () {
     const mapa = P.autoMapear(DEMO[0]);
     const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs);
     S.limpiarHistorial();
-    sembrarHistorialDemo(r.productos, 21);
+    if (S.state.cfg.historialActivo) sembrarHistorialDemo(r.productos, 21);
     S.setProductos(r.productos, {
       archivo: 'Datos de ejemplo',
       hoja: 'demo',
       filas: r.productos.length,
       importadoEn: Date.now(),
-      mapeo: mapa
+      mapeo: mapa,
+      demo: true
     });
     U.toast('Cargados ' + r.productos.length + ' productos de ejemplo', 'ok');
   }
@@ -3961,7 +4047,8 @@ VLM.app = (function () {
         archivo: 'Datos de ejemplo',
         skus: productos.length,
         total: Object.keys(stock).reduce((s, k) => s + stock[k], 0),
-        porSku: Object.assign({}, stock)
+        porSku: Object.assign({}, stock),
+        demo: true
       });
       // retroceder un día: sumar lo consumido y descontar reposiciones
       productos.forEach(p => {
@@ -3982,6 +4069,7 @@ VLM.app = (function () {
     ['cfgDiasBajo', 'diasBajo', 'int'],
     ['cfgDiasObjetivo', 'diasObjetivo', 'int'],
     ['cfgFactorBajo', 'factorBajo', 'float'],
+    ['cfgHistorialActivo', 'historialActivo', 'bool'],
     ['cfgVentanaConsumo', 'ventanaConsumo', 'int'],
     ['cfgDiasHistorial', 'diasHistorial', 'int'],
     ['cfgTvSegundos', 'tvSegundos', 'int'],
@@ -4001,6 +4089,9 @@ VLM.app = (function () {
   }
 
   function actualizarHistInfo() {
+    const activo = S.state.cfg.historialActivo;
+    $('#histOpciones').hidden = !activo;
+    if (!activo) return;
     const h = S.state.historial;
     const el = $('#histInfo');
     if (!h.length) { el.textContent = 'Sin importaciones guardadas todavía.'; return; }
@@ -4090,6 +4181,10 @@ VLM.app = (function () {
         else v = parseInt(e.target.value, 10);
         if (tipo !== 'bool' && (!isFinite(v) || v < 0)) { e.target.value = S.state.cfg[clave]; return; }
         S.setCfg({ [clave]: v });
+        if (clave === 'historialActivo') {
+          actualizarHistInfo();
+          if (v) U.toast('Historial activado. Se guarda desde la próxima importación.', 'ok');
+        }
       });
     });
 

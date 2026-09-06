@@ -52,7 +52,8 @@ VLM.app = (function () {
     const cfg = S.state.cfg, ui = S.state.ui;
     if (!calculados) {
       // el consumo diario sale del historial cuando la planilla no lo trae
-      const consumoHist = A.consumoPorSku(S.state.historial, cfg.ventanaConsumo);
+      const consumoHist = cfg.historialActivo
+        ? A.consumoPorSku(S.state.historial, cfg.ventanaConsumo) : null;
       calculados = A.calcular(S.state.productos, cfg, consumoHist);
     }
     let items = calculados;
@@ -62,7 +63,12 @@ VLM.app = (function () {
 
   /** Historial de consumo real, ya recortado a la ventana configurada. */
   function historialActual() {
-    return A.historialConsumo(S.state.historial, S.state.cfg.diasHistorial);
+    if (!S.state.cfg.historialActivo) {
+      return { activo: false, suficiente: false, periodos: [], snapshots: 0 };
+    }
+    const h = A.historialConsumo(S.state.historial, S.state.cfg.diasHistorial);
+    h.activo = true;
+    return h;
   }
 
   /* ============================================================
@@ -435,13 +441,14 @@ VLM.app = (function () {
     const mapa = P.autoMapear(DEMO[0]);
     const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs);
     S.limpiarHistorial();
-    sembrarHistorialDemo(r.productos, 21);
+    if (S.state.cfg.historialActivo) sembrarHistorialDemo(r.productos, 21);
     S.setProductos(r.productos, {
       archivo: 'Datos de ejemplo',
       hoja: 'demo',
       filas: r.productos.length,
       importadoEn: Date.now(),
-      mapeo: mapa
+      mapeo: mapa,
+      demo: true
     });
     U.toast('Cargados ' + r.productos.length + ' productos de ejemplo', 'ok');
   }
@@ -471,7 +478,8 @@ VLM.app = (function () {
         archivo: 'Datos de ejemplo',
         skus: productos.length,
         total: Object.keys(stock).reduce((s, k) => s + stock[k], 0),
-        porSku: Object.assign({}, stock)
+        porSku: Object.assign({}, stock),
+        demo: true
       });
       // retroceder un día: sumar lo consumido y descontar reposiciones
       productos.forEach(p => {
@@ -492,6 +500,7 @@ VLM.app = (function () {
     ['cfgDiasBajo', 'diasBajo', 'int'],
     ['cfgDiasObjetivo', 'diasObjetivo', 'int'],
     ['cfgFactorBajo', 'factorBajo', 'float'],
+    ['cfgHistorialActivo', 'historialActivo', 'bool'],
     ['cfgVentanaConsumo', 'ventanaConsumo', 'int'],
     ['cfgDiasHistorial', 'diasHistorial', 'int'],
     ['cfgTvSegundos', 'tvSegundos', 'int'],
@@ -511,6 +520,9 @@ VLM.app = (function () {
   }
 
   function actualizarHistInfo() {
+    const activo = S.state.cfg.historialActivo;
+    $('#histOpciones').hidden = !activo;
+    if (!activo) return;
     const h = S.state.historial;
     const el = $('#histInfo');
     if (!h.length) { el.textContent = 'Sin importaciones guardadas todavía.'; return; }
@@ -600,6 +612,10 @@ VLM.app = (function () {
         else v = parseInt(e.target.value, 10);
         if (tipo !== 'bool' && (!isFinite(v) || v < 0)) { e.target.value = S.state.cfg[clave]; return; }
         S.setCfg({ [clave]: v });
+        if (clave === 'historialActivo') {
+          actualizarHistInfo();
+          if (v) U.toast('Historial activado. Se guarda desde la próxima importación.', 'ok');
+        }
       });
     });
 

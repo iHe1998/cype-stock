@@ -18,6 +18,11 @@ VLM.store = (function () {
     diasBajo:      15,   // <= N días de cobertura => BAJO
     diasObjetivo:  30,   // stock objetivo al reponer, en días de consumo
     factorBajo:    1.5,  // stock <= min * factor => BAJO
+    // El historial guarda una foto del stock en cada importación para poder
+    // calcular el consumo por diferencia. Apagado por defecto: sin al menos
+    // dos importaciones no aporta nada, y acumular datos sin necesidad sólo
+    // agrega problemas. Se prende desde Configuración.
+    historialActivo: false,
     ventanaConsumo: 30,  // días de historial que se promedian para el consumo diario
     diasHistorial: 30,   // días que muestra el gráfico de historial
     diasMes:       30,   // divisor consumo mensual -> diario
@@ -157,7 +162,18 @@ VLM.store = (function () {
   function setProductos(productos, meta) {
     state.productos = productos;
     state.meta = Object.assign({ importadoEn: Date.now() }, meta || {});
-    agregarSnapshot(productos, state.meta);
+
+    // La primera importación real barre el historial de la demo: si no, los
+    // SKU inventados "desaparecen" de la planilla y se contarían como un
+    // consumo gigante el primer día.
+    if (state.cfg.historialActivo) {
+      const esDemo = !!(meta && meta.demo);
+      if (!esDemo && state.historial.some(s => s.demo)) {
+        state.historial = state.historial.filter(s => !s.demo);
+        VLM.util.toast('Se descartó el historial de los datos de ejemplo');
+      }
+      agregarSnapshot(productos, state.meta, esDemo);
+    }
     guardar();
     emit('datos');
   }
@@ -168,7 +184,7 @@ VLM.store = (function () {
    * entre fotos), porque la planilla sólo trae el stock del momento.
    * Dos importaciones del mismo día se pisan: vale la última.
    */
-  function agregarSnapshot(productos, meta) {
+  function agregarSnapshot(productos, meta, esDemo) {
     const ahora = new Date();
     const dia = ahora.getFullYear() + '-' +
       String(ahora.getMonth() + 1).padStart(2, '0') + '-' +
@@ -187,7 +203,8 @@ VLM.store = (function () {
       archivo: (meta && meta.archivo) || null,
       skus: productos.length,
       total: total,
-      porSku: porSku
+      porSku: porSku,
+      demo: !!esDemo
     };
 
     const i = state.historial.findIndex(s => s.dia === dia);

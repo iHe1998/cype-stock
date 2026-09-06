@@ -117,6 +117,9 @@ frío y Xeloda o Tamiflu en ambiente) y aparece en los dos cuadrantes.
 
 ## Historial de consumo
 
+> **Desactivado por defecto.** Se prende en **⚙ Configuración → Historial de consumo**.
+> Mientras esté apagado la app no guarda nada y el panel no lo menciona.
+
 La planilla es una **foto del stock del momento**: dice cuánto hay, no cuánto salió.
 Para saber el consumo real, la app **guarda un snapshot en cada importación** y resta.
 
@@ -133,6 +136,10 @@ si pasás una semana entre importaciones, el número queda corto.
 
 - Se necesitan **al menos 2 importaciones** para que aparezca cualquier cálculo de consumo.
 - Dos importaciones el mismo día se pisan: vale la última.
+- La primera importación real **descarta el historial de los datos de ejemplo**: si no, los
+  SKU inventados desaparecerían de la planilla y contarían como un consumo enorme.
+- Si dos importaciones consecutivas comparten menos de la mitad de los SKU, ese tramo se
+  descarta en vez de inventar un consumo falso (pasa si cambia el formato del export).
 - Se guardan hasta **60 snapshots**. Si el navegador se queda sin espacio, la app va
   descartando los más viejos antes que perder todo, y avisa.
 - El historial se borra desde **⚙ Configuración → Historial de consumo**.
