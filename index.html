@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VLM Stock · Panel de Control</title>
+<meta name="description" content="Panel de control de stock para torre de picking vertical (VLM)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0f14'/%3E%3Crect x='7' y='6' width='18' height='4' rx='1' fill='%2338bdf8'/%3E%3Crect x='7' y='13' width='18' height='4' rx='1' fill='%2322c55e'/%3E%3Crect x='7' y='20' width='18' height='4' rx='1' fill='%23f59e0b'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ============ TOPBAR ============ -->
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-ico" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="4" y="3" width="24" height="26" rx="3" class="bi-body"/>
+      <rect x="8" y="7" width="16" height="3.5" rx="1" class="bi-a"/>
+      <rect x="8" y="14" width="16" height="3.5" rx="1" class="bi-b"/>
+      <rect x="8" y="21" width="16" height="3.5" rx="1" class="bi-c"/>
+    </svg>
+    <div class="brand-txt">
+      <strong>VLM Stock</strong>
+      <span id="brandSub">Torre de picking vertical</span>
+    </div>
+  </div>
+
+  <div class="topbar-status">
+    <span class="dot" id="statusDot"></span>
+    <span id="statusText">Sin datos cargados</span>
+  </div>
+
+  <div class="topbar-actions">
+    <button class="btn btn-primary" id="btnImport">
+      <svg viewBox="0 0 24 24" class="ico"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+      Cargar Excel
+    </button>
+    <button class="btn" id="btnTV" title="Modo televisor">
+      <svg viewBox="0 0 24 24" class="ico"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/></svg>
+      Modo TV
+    </button>
+    <button class="btn btn-icon" id="btnSettings" title="Configuración">
+      <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="3"/><path d="M19.9 14.6a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.8 1.1v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.8-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.8h-.2a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.8-1.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.8 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.8h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+    </button>
+    <button class="btn btn-icon" id="btnTheme" title="Cambiar tema">
+      <svg viewBox="0 0 24 24" class="ico"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- ============ NAV ============ -->
+<nav class="tabs" id="tabs">
+  <button class="tab is-active" data-view="dashboard">Resumen</button>
+  <button class="tab" data-view="labs">Laboratorios</button>
+  <button class="tab" data-view="repo">Reposición</button>
+  <button class="tab" data-view="inv">Inventario</button>
+</nav>
+
+<!-- ============ MAIN ============ -->
+<main id="app">
+
+  <!-- Empty state -->
+  <section id="empty" class="empty">
+    <div class="empty-art">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <rect x="18" y="10" width="84" height="100" rx="6" class="es-body"/>
+        <rect x="27" y="22" width="66" height="12" rx="2" class="es-r1"/>
+        <rect x="27" y="40" width="66" height="12" rx="2" class="es-r2"/>
+        <rect x="27" y="58" width="66" height="12" rx="2" class="es-r3"/>
+        <rect x="27" y="76" width="66" height="12" rx="2" class="es-r4"/>
+        <rect x="27" y="94" width="40" height="8" rx="2" class="es-r5"/>
+      </svg>
+    </div>
+    <h1>Cargá el stock de tu VLM</h1>
+    <p>Importá una planilla Excel (<code>.xlsx</code>, <code>.xls</code>) o CSV con los productos.
+       La app detecta las columnas sola y podés ajustar el mapeo antes de importar.</p>
+    <div class="empty-actions">
+      <button class="btn btn-primary btn-lg" id="btnImport2">Cargar archivo Excel</button>
+      <button class="btn btn-lg" id="btnDemo">Ver con datos de ejemplo</button>
+    </div>
+    <p class="empty-hint">¿No tenés el formato? <a href="#" id="btnTemplate">Descargar plantilla .xlsx</a></p>
+  </section>
+
+  <!-- Views -->
+  <section id="view-dashboard" class="view" hidden></section>
+  <section id="view-labs" class="view" hidden></section>
+  <section id="view-repo" class="view" hidden></section>
+  <section id="view-inv" class="view" hidden></section>
+
+</main>
+
+<!-- ============ TV MODE ============ -->
+<div id="tvMode" class="tv" hidden>
+  <div class="tv-head">
+    <div class="tv-brand">
+      <span class="tv-dot"></span>
+      <strong>VLM · Stock en tiempo real</strong>
+    </div>
+    <div class="tv-meta">
+      <span id="tvSlideName">—</span>
+      <span class="tv-sep">·</span>
+      <span id="tvClock">--:--</span>
+      <button class="btn btn-icon tv-exit" id="tvExit" title="Salir (Esc)">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="tv-body" id="tvBody"></div>
+  <div class="tv-progress"><div class="tv-progress-bar" id="tvBar"></div></div>
+</div>
+
+<!-- ============ IMPORT MODAL ============ -->
+<div class="modal" id="modalImport" hidden>
+  <div class="modal-box modal-lg">
+    <header class="modal-head">
+      <h2>Importar planilla</h2>
+      <button class="btn btn-icon" data-close><svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </header>
+
+    <div class="modal-body">
+      <!-- step 1: file -->
+      <div id="impStep1">
+        <div class="dropzone" id="dropzone">
+          <svg viewBox="0 0 24 24" class="dz-ico"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          <p><strong>Arrastrá el archivo acá</strong> o hacé clic para elegirlo</p>
+          <span class="muted">.xlsx · .xlsm · .xls · .csv</span>
+          <input type="file" id="fileInput" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        </div>
+      </div>
+
+      <!-- step 2: mapping -->
+      <div id="impStep2" hidden>
+        <div class="imp-grid">
+          <label class="field">
+            <span>Hoja</span>
+            <select id="selSheet"></select>
+          </label>
+          <label class="field">
+            <span>Fila de encabezados</span>
+            <input type="number" id="inpHeaderRow" min="1" value="1">
+          </label>
+          <div class="imp-file"><span class="muted">Archivo:</span> <strong id="impFileName">—</strong></div>
+        </div>
+
+        <h3 class="section-title">Mapeo de columnas</h3>
+        <p class="muted small">Asociá cada campo de la app con la columna de tu planilla. Los campos con * son obligatorios.</p>
+        <div class="map-list" id="mapList"></div>
+
+        <h3 class="section-title">Vista previa <span class="muted small" id="prevCount"></span></h3>
+        <div class="table-wrap preview-wrap"><table class="table" id="prevTable"></table></div>
+      </div>
+    </div>
+
+    <footer class="modal-foot">
+      <span class="muted small" id="impMsg"></span>
+      <div class="spacer"></div>
+      <button class="btn" data-close>Cancelar</button>
+      <button class="btn btn-primary" id="btnDoImport" hidden>Importar datos</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal" id="modalSettings" hidden>
+  <div class="modal-box">
+    <header class="modal-head">
+      <h2>Configuración</h2>
+      <button class="btn btn-icon" data-close><svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </header>
+    <div class="modal-body">
+      <h3 class="section-title">Umbrales de alerta</h3>
+      <div class="cfg-grid">
+        <label class="field">
+          <span>Días de cobertura · CRÍTICO ≤</span>
+          <input type="number" id="cfgDiasCritico" min="0" step="1">
+        </label>
+        <label class="field">
+          <span>Días de cobertura · BAJO ≤</span>
+          <input type="number" id="cfgDiasBajo" min="0" step="1">
+        </label>
+        <label class="field">
+          <span>Días objetivo de stock (reposición)</span>
+          <input type="number" id="cfgDiasObjetivo" min="1" step="1">
+        </label>
+        <label class="field">
+          <span>Factor sobre stock mínimo para "bajo"</span>
+          <input type="number" id="cfgFactorBajo" min="1" step="0.1">
+        </label>
+      </div>
+
+      <h3 class="section-title">Proyección</h3>
+      <div class="cfg-grid">
+        <label class="field">
+          <span>Horizonte de proyección (días)</span>
+          <input type="number" id="cfgHorizonte" min="7" max="180" step="1">
+        </label>
+        <label class="field">
+          <span>Días por mes (consumo mensual → diario)</span>
+          <input type="number" id="cfgDiasMes" min="1" max="31" step="1">
+        </label>
+      </div>
+
+      <h3 class="section-title">Modo TV</h3>
+      <div class="cfg-grid">
+        <label class="field">
+          <span>Segundos por pantalla</span>
+          <input type="number" id="cfgTvSegundos" min="5" max="120" step="1">
+        </label>
+        <label class="field field-check">
+          <input type="checkbox" id="cfgTvSoloCriticos">
+          <span>Priorizar sólo productos críticos</span>
+        </label>
+      </div>
+
+      <h3 class="section-title">Datos</h3>
+      <div class="cfg-actions">
+        <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>
+        <button class="btn btn-danger" id="btnClearData">Borrar datos cargados</button>
+      </div>
+    </div>
+    <footer class="modal-foot">
+      <div class="spacer"></div>
+      <button class="btn btn-primary" data-close>Listo</button>
+    </footer>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/store.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/analytics.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/views.js"></script>
+<script src="js/tv.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
