@@ -47,6 +47,12 @@ VLM.parser = (function () {
       hint: 'Salidas del último mes o promedio mensual',
       alias: ['consumo mensual', 'consumo mes', 'cons mensual', 'salidas mes', 'salidas', 'egresos mes', 'demanda mensual', 'promedio mensual', 'consumo 30 dias', 'venta mensual', 'movimiento mensual'] },
 
+    { id: 'conservacion', label: 'Conservación', req: false, tipo: 'texto',
+      hint: 'Frío o ambiente; si falta se usa el default del laboratorio',
+      alias: ['conservacion', 'cadena de frio', 'cadena frio', 'temperatura', 'refrigerado',
+              'termolabil', 'condicion de conservacion', 'tipo de conservacion',
+              'condiciones de conservacion', 'almacenamiento', 'frio'] },
+
     { id: 'lote', label: 'Lote', req: false, tipo: 'texto',
       hint: '',
       alias: ['lote', 'batch', 'partida', 'nro lote'] },
@@ -164,14 +170,22 @@ VLM.parser = (function () {
      ------------------------------------------------------------ */
 
   /**
-   * Convierte la matriz + mapeo en registros normalizados.
-   * @returns { productos, descartadas, avisos }
+   * Convierte la matriz + mapeo en registros normalizados y los clasifica
+   * contra el catálogo de laboratorios (ámbito VLM/externo y conservación).
+   * @returns { productos, descartadas, avisos, noListados }
    */
-  function normalizar(matriz, filaHeader, mapa, cfg) {
+  function normalizar(matriz, filaHeader, mapa, cfg, catalogo) {
     const productos = [];
     const avisos = [];
     let descartadas = 0;
     const diasMes = (cfg && cfg.diasMes) || 30;
+    catalogo = catalogo || VLM.labs.catalogoDefault();
+
+    // encabezado de la columna de conservación: cambia cómo se lee un "SI"
+    const filaHeaders = matriz[filaHeader] || [];
+    const idxCons = mapa.conservacion;
+    const headerCons = (idxCons === undefined || idxCons === null)
+      ? '' : U.norm(filaHeaders[idxCons]);
 
     const get = (fila, campoId) => {
       const idx = mapa[campoId];
@@ -199,10 +213,11 @@ VLM.parser = (function () {
 
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
-      productos.push({
+      productos.push(VLM.labs.clasificar({
         codigo:        String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1)),
         descripcion:   String(desc === null ? '' : desc).trim() || '(sin descripción)',
         laboratorio:   lab,
+        zonaPlanilla:  VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons),
         ubicacion:     String(get(fila, 'ubicacion') || '').trim(),
         stock:         stock,
         stockMin:      U.toNum(get(fila, 'stockMin')) || 0,
@@ -213,8 +228,17 @@ VLM.parser = (function () {
         lote:          String(get(fila, 'lote') || '').trim(),
         vencimiento:   U.toDate(get(fila, 'vencimiento')),
         precio:        U.toNum(get(fila, 'precio')) || 0
-      });
+      }, catalogo));
     }
+
+    // --- laboratorios de la planilla que no están en el catálogo ---
+    const noListados = {};
+    productos.forEach(p => {
+      if (p.gestionado) return;
+      if (!noListados[p.laboratorio]) noListados[p.laboratorio] = 0;
+      noListados[p.laboratorio]++;
+    });
+    const nombresNoListados = Object.keys(noListados);
 
     if (!productos.length) avisos.push('No se pudo leer ninguna fila válida. Revisá la fila de encabezados y el mapeo.');
     if (descartadas > 0)   avisos.push(descartadas + ' fila(s) omitidas por estar vacías o sin stock numérico.');
@@ -224,23 +248,32 @@ VLM.parser = (function () {
     if (mapa.stockMin === undefined && mapa.consumoDiario === undefined && mapa.consumoMensual === undefined) {
       avisos.push('Sin stock mínimo ni consumo: las alertas de faltante quedarán vacías.');
     }
-    return { productos, descartadas, avisos };
+    if (mapa.conservacion === undefined) {
+      avisos.push('Sin columna de conservación: se usa el valor por defecto de cada laboratorio (editable en Configuración).');
+    }
+    if (nombresNoListados.length) {
+      avisos.push(nombresNoListados.length + ' laboratorio(s) fuera del catálogo: ' +
+        nombresNoListados.slice(0, 4).join(', ') +
+        (nombresNoListados.length > 4 ? '…' : '') + '.');
+    }
+    return { productos, descartadas, avisos, noListados, nombresNoListados };
   }
 
   /* ------------------------------------------------------------
      Plantilla descargable
      ------------------------------------------------------------ */
   function generarPlantilla() {
-    const headers = ['Codigo', 'Descripcion', 'Laboratorio', 'Ubicacion', 'Stock',
+    const headers = ['Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ubicacion', 'Stock',
                      'Stock Minimo', 'Stock Maximo', 'Consumo Mensual', 'Lote', 'Vencimiento', 'Precio'];
     const filas = [
-      ['A-1001', 'Amoxicilina 500mg x21 comp', 'Bago',     'B01-C03', 340, 120, 600, 280, 'L2451', '2027-04-30', 1250],
-      ['A-1002', 'Ibuprofeno 400mg x20 comp',  'Bago',     'B01-C04',  85, 150, 700, 420, 'L2455', '2027-01-31',  890],
-      ['A-1003', 'Paracetamol 500mg x30 comp', 'Roemmers', 'B01-C05',1240, 300,1500, 610, 'L3312', '2028-02-28',  760]
+      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320,  95, 'AZ4411', '2027-08-31', 2480000],
+      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40,  14, 'RO8801', '2027-05-31', 4120000],
+      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60,  22, 'AM9901', '2027-06-30', 1240000],
+      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200,  72, 'BS1101', '2027-04-30',  148000]
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers].concat(filas));
-    ws['!cols'] = [{ wch: 10 }, { wch: 34 }, { wch: 16 }, { wch: 12 }, { wch: 8 },
-                   { wch: 12 }, { wch: 14 }, { wch: 15 }, { wch: 10 }, { wch: 13 }, { wch: 10 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 32 }, { wch: 20 }, { wch: 13 }, { wch: 11 }, { wch: 8 },
+                   { wch: 12 }, { wch: 14 }, { wch: 15 }, { wch: 10 }, { wch: 13 }, { wch: 11 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Stock VLM');
     XLSX.writeFile(wb, 'plantilla_vlm.xlsx');

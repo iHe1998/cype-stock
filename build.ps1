@@ -24,7 +24,7 @@ $dist = Join-Path $root 'dist'
 
 # Orden de carga: las librerias van antes que los modulos de la app.
 $libs    = @('xlsx.full.min.js', 'chart.umd.min.js')
-$modulos = @('util', 'store', 'parser', 'analytics', 'charts', 'views', 'tv', 'app')
+$modulos = @('util', 'labs', 'store', 'parser', 'analytics', 'charts', 'views', 'tv', 'app')
 
 function Read-Utf8($ruta) {
   if (-not (Test-Path $ruta)) { throw "No se encontro el archivo: $ruta" }

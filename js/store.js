@@ -8,6 +8,7 @@ VLM.store = (function () {
   const KEY_DATA = 'vlm.datos.v1';
   const KEY_CFG  = 'vlm.config.v1';
   const KEY_UI   = 'vlm.ui.v1';
+  const KEY_LABS = 'vlm.labs.v1';
 
   const CFG_DEFAULT = {
     diasCritico:   7,    // <= N días de cobertura => CRÍTICO
@@ -17,7 +18,11 @@ VLM.store = (function () {
     horizonte:     30,   // días de la curva de proyección
     diasMes:       30,   // divisor consumo mensual -> diario
     tvSegundos:    20,
-    tvSoloCriticos: false
+    tvSoloCriticos: false,
+    // qué hacer con laboratorios que no están en el catálogo:
+    // 'excluir' los deja fuera de KPIs y vistas (pero se informa cuántos son),
+    // 'incluir' los muestra como no gestionados.
+    labsNoListados: 'excluir'
   };
 
   const state = {
@@ -30,11 +35,14 @@ VLM.store = (function () {
       mapeo: null
     },
     cfg: Object.assign({}, CFG_DEFAULT),
+    labs: [],           // catálogo de laboratorios (ver labs.js)
     ui: {
       tema: 'dark',
       vista: 'dashboard',
       filtroLab: null,
       filtroEstado: null,
+      filtroAmbito: null,   // 'vlm' | 'externo' | null (todos)
+      filtroZona: null,     // 'frio' | 'ambiente' | null (todas)
       busqueda: '',
       orden: { campo: 'diasCobertura', dir: 'asc' }
     }
@@ -72,11 +80,21 @@ VLM.store = (function () {
     } catch (e) {}
   }
 
+  function guardarLabs() {
+    try { localStorage.setItem(KEY_LABS, JSON.stringify(state.labs)); } catch (e) {}
+  }
+
   function cargar() {
     try {
       const cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null');
       if (cfg) Object.assign(state.cfg, CFG_DEFAULT, cfg);
     } catch (e) {}
+    try {
+      const labs = JSON.parse(localStorage.getItem(KEY_LABS) || 'null');
+      state.labs = (labs && labs.length) ? labs : VLM.labs.catalogoDefault();
+    } catch (e) {
+      state.labs = VLM.labs.catalogoDefault();
+    }
     try {
       const ui = JSON.parse(localStorage.getItem(KEY_UI) || 'null');
       if (ui) Object.assign(state.ui, ui);
@@ -118,6 +136,17 @@ VLM.store = (function () {
     emit('cfg');
   }
 
+  /** Reemplaza el catálogo de laboratorios y reclasifica los productos. */
+  function setLabs(labs) {
+    state.labs = labs;
+    guardarLabs();
+    emit('labs');
+  }
+
+  function resetLabs() {
+    setLabs(VLM.labs.catalogoDefault());
+  }
+
   function setUi(parcial, silencioso) {
     Object.assign(state.ui, parcial);
     guardarUi();
@@ -129,6 +158,6 @@ VLM.store = (function () {
   return {
     state, CFG_DEFAULT,
     on, emit, cargar, guardar,
-    setProductos, limpiar, setCfg, setUi, hayDatos
+    setProductos, limpiar, setCfg, setUi, setLabs, resetLabs, hayDatos
   };
 })();

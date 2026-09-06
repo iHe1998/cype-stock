@@ -24,14 +24,36 @@ VLM.app = (function () {
     aplicarTema(S.state.ui.tema);
     wireTopbar();
     wireTabs();
+    wireZonebar();
     wireImport();
     wireSettings();
     S.on(motivo => {
+      if (motivo === 'labs') reclasificar();
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
       render();
     });
     render();
     setInterval(actualizarEstado, 60000);
+  }
+
+  /** Reaplica el catálogo de laboratorios sobre los productos ya cargados. */
+  function reclasificar() {
+    const cat = S.state.labs;
+    S.state.productos.forEach(p => VLM.labs.clasificar(p, cat));
+    S.guardar();
+    calculados = null;
+  }
+
+  /**
+   * Productos que se muestran: calculados, sin los laboratorios fuera del
+   * catálogo (si así está configurado) y filtrados por ámbito y conservación.
+   */
+  function itemsVisibles() {
+    const cfg = S.state.cfg, ui = S.state.ui;
+    if (!calculados) calculados = A.calcular(S.state.productos, cfg);
+    let items = calculados;
+    if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
+    return A.filtrarPorZona(items, ui);
   }
 
   /* ============================================================
@@ -41,12 +63,14 @@ VLM.app = (function () {
     const hay = S.hayDatos();
     $('#empty').hidden = hay;
     $('#tabs').hidden = !hay;
+    $('#zonebar').hidden = !hay;
     $$('.view').forEach(v => v.hidden = true);
     actualizarEstado();
     if (!hay) return;
 
     const cfg = S.state.cfg;
-    if (!calculados) calculados = A.calcular(S.state.productos, cfg);
+    const items = itemsVisibles();
+    sincronizarZonebar(items);
 
     const vista = S.state.ui.vista;
     $$('.tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === vista));
@@ -54,11 +78,17 @@ VLM.app = (function () {
     if (!el) return;
     el.hidden = false;
 
+    if (!items.length) {
+      el.innerHTML = '<div class="no-results"><strong>Ningún producto coincide con el filtro</strong><br>' +
+        '<span class="small">Probá con “Todo” y “Todas” en la barra de arriba.</span></div>';
+      return;
+    }
+
     try {
-      if (vista === 'dashboard') V.dashboard(el, calculados, cfg);
-      else if (vista === 'labs')  V.laboratorios(el, calculados, cfg);
-      else if (vista === 'repo')  V.reposicion(el, calculados, cfg);
-      else if (vista === 'inv')   V.inventario(el, calculados, cfg);
+      if (vista === 'dashboard') V.dashboard(el, items, cfg);
+      else if (vista === 'labs')  V.laboratorios(el, items, cfg);
+      else if (vista === 'repo')  V.reposicion(el, items, cfg);
+      else if (vista === 'inv')   V.inventario(el, items, cfg);
     } catch (e) {
       console.error(e);
       el.innerHTML = '<div class="no-results"><strong>Error al dibujar la vista</strong><br>' +
@@ -73,7 +103,34 @@ VLM.app = (function () {
       S.setUi({ filtroLab: c.dataset.lab, filtroEstado: null, vista: 'repo' });
     }));
 
-    if (VLM.tv.activo) VLM.tv.refrescar(calculados, cfg);
+    if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+  }
+
+  /* ---------- barra de ámbito / conservación ---------- */
+
+  function wireZonebar() {
+    $$('#zonebar .seg').forEach(seg => {
+      const clave = seg.dataset.key;
+      U.$$('.seg-btn', seg).forEach(btn => btn.addEventListener('click', () => {
+        S.setUi({ [clave]: btn.dataset.val || null });
+      }));
+    });
+  }
+
+  function sincronizarZonebar(items) {
+    const ui = S.state.ui;
+    $$('#zonebar .seg').forEach(seg => {
+      const actual = ui[seg.dataset.key] || '';
+      U.$$('.seg-btn', seg).forEach(btn =>
+        btn.classList.toggle('is-active', btn.dataset.val === actual));
+    });
+
+    const total = S.state.productos.length;
+    const excluidos = S.state.cfg.labsNoListados === 'excluir'
+      ? S.state.productos.filter(p => !p.gestionado).length : 0;
+    let txt = items.length + ' de ' + total + ' productos';
+    if (excluidos) txt += ' · ' + excluidos + ' fuera del catálogo de laboratorios';
+    $('#zoneCount').textContent = txt;
   }
 
   function actualizarEstado() {
@@ -108,8 +165,7 @@ VLM.app = (function () {
       render();
     });
     $('#btnTV').addEventListener('click', () => {
-      if (!calculados) calculados = A.calcular(S.state.productos, S.state.cfg);
-      VLM.tv.entrar(calculados, S.state.cfg);
+      VLM.tv.entrar(itemsVisibles(), S.state.cfg);
     });
     $('#tvExit').addEventListener('click', () => VLM.tv.salir());
 
@@ -270,7 +326,7 @@ VLM.app = (function () {
   }
 
   function pintarPreview() {
-    const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg);
+    const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs);
     imp.resultado = r;
     const muestra = r.productos.slice(0, 8);
     $('#prevCount').textContent = r.productos.length
@@ -297,7 +353,7 @@ VLM.app = (function () {
 
   function confirmarImport() {
     if (!validarMapeo()) return;
-    const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg);
+    const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs);
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
     S.setProductos(r.productos, {
@@ -316,37 +372,58 @@ VLM.app = (function () {
      DATOS DE EJEMPLO
      ============================================================ */
   const DEMO = [
-    ['Codigo','Descripcion','Laboratorio','Ubicacion','Stock','Stock Minimo','Stock Maximo','Consumo Mensual','Lote','Vencimiento','Precio'],
-    ['A-1001','Amoxicilina 500mg x21 comp','Bago','B01-C03',340,120,600,280,'L2451','2027-04-30',1250],
-    ['A-1002','Ibuprofeno 400mg x20 comp','Bago','B01-C04',85,150,700,420,'L2455','2027-01-31',890],
-    ['A-1003','Paracetamol 500mg x30 comp','Roemmers','B01-C05',1240,300,1500,610,'L3312','2028-02-28',760],
-    ['A-1004','Enalapril 10mg x30 comp','Roemmers','B02-C01',42,100,500,190,'L3319','2026-11-30',980],
-    ['A-1005','Losartan 50mg x30 comp','Elea','B02-C02',610,200,900,340,'L7781','2027-09-30',1420],
-    ['A-1006','Metformina 850mg x30 comp','Elea','B02-C03',150,180,800,360,'L7788','2027-06-30',1130],
-    ['A-1007','Atorvastatina 20mg x30 comp','Gador','B02-C04',880,250,1200,410,'L5502','2028-05-31',2100],
-    ['A-1008','Levotiroxina 100mcg x50 comp','Gador','B03-C01',95,120,600,230,'L5510','2027-03-31',1650],
-    ['A-1009','Omeprazol 20mg x30 caps','Raffo','B03-C02',720,200,1000,380,'L9021','2027-12-31',940],
-    ['A-1010','Amlodipina 5mg x30 comp','Raffo','B03-C03',26,90,450,175,'L9033','2026-10-31',1080],
-    ['A-1011','Salbutamol aerosol 200 dosis','Roche','B03-C04',58,60,300,145,'L1140','2027-08-31',4300],
-    ['A-1012','Insulina Glargina 100UI lapicera','Roche','B04-C01',34,40,180,95,'L1155','2026-12-15',18900],
-    ['A-1013','Clopidogrel 75mg x30 comp','Pfizer','B04-C02',410,150,700,260,'L6620','2028-01-31',2650],
-    ['A-1014','Sertralina 50mg x30 comp','Pfizer','B04-C03',192,140,600,290,'L6631','2027-07-31',1780],
-    ['A-1015','Rivaroxaban 20mg x28 comp','Bayer','B04-C04',64,80,350,155,'L4410','2027-05-31',9800],
-    ['A-1016','Aspirina Prevent 100mg x60','Bayer','B05-C01',1520,400,2000,520,'L4422','2029-03-31',680],
-    ['A-1017','Diclofenac 75mg amp x5','Novartis','B05-C02',210,120,600,240,'L8815','2027-02-28',1340],
-    ['A-1018','Valsartan 160mg x28 comp','Novartis','B05-C03',7,70,400,180,'L8829','2026-09-30',2380],
-    ['A-1019','Clexane 40mg jeringa x2','Sanofi','B05-C04',118,60,300,130,'L2207','2027-10-31',12400],
-    ['A-1020','Ramipril 5mg x30 comp','Sanofi','B06-C01',455,150,700,215,'L2219','2028-04-30',1290],
-    ['A-1021','Dexametasona 8mg amp x3','Bago','B06-C02',0,50,250,110,'L2470','2027-11-30',1560],
-    ['A-1022','Ceftriaxona 1g amp','Roemmers','B06-C03',88,100,500,320,'L3341','2027-04-30',3200],
-    ['A-1023','Ondansetron 8mg amp x5','Elea','B06-C04',265,80,400,140,'L7799','2028-03-31',2950],
-    ['A-1024','Hidroclorotiazida 25mg x30','Gador','B07-C01',690,180,800,210,'L5528','2028-06-30',720],
-    ['A-1025','Furosemida 40mg x30 comp','Raffo','B07-C02',132,150,650,275,'L9044','2027-09-30',860]
+    ['Codigo','Descripcion','Laboratorio','Conservacion','Ubicacion','Stock','Stock Minimo','Stock Maximo','Consumo Mensual','Lote','Vencimiento','Precio'],
+
+    // --- ASTRAZENECA · VLM ---
+    ['AZ-101','Tagrisso 80mg x30 comp','ASTRAZENECA','Ambiente','B01-C01',140,60,320,95,'AZ4411','2027-08-31',2480000],
+    ['AZ-102','Forxiga 10mg x28 comp','ASTRAZENECA','Ambiente','B01-C02',62,80,400,150,'AZ4418','2027-11-30',38500],
+    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','Ambiente','B01-C03',410,120,600,185,'AZ4423','2028-02-28',29800],
+    ['AZ-104','Symbicort 160/4.5 turbuhaler','ASTRAZENECA','Ambiente','B01-C04',228,90,450,140,'AZ4430','2027-06-30',46200],
+    ['AZ-105','Imfinzi 500mg vial','ASTRAZENECA','Frio','CF-A1',18,12,60,26,'AZ7702','2027-03-31',3950000],
+    ['AZ-106','Faslodex 250mg jeringa x2','ASTRAZENECA','Frio','CF-A2',34,20,90,38,'AZ7715','2027-09-30',890000],
+
+    // --- ROCHE · VLM ---
+    ['RO-201','Herceptin 440mg vial','ROCHE','Frio','CF-B1',4,10,40,14,'RO8801','2027-05-31',4120000],
+    ['RO-202','MabThera 500mg vial','ROCHE','Frio','CF-B2',11,10,45,17,'RO8809','2027-07-31',3480000],
+    ['RO-203','Avastin 400mg vial','ROCHE','Frio','CF-B3',26,14,60,22,'RO8814','2028-01-31',2760000],
+    ['RO-204','Actemra 400mg vial','ROCHE','Frio','CF-B4',31,12,50,15,'RO8820','2027-10-31',1980000],
+    ['RO-205','Xeloda 500mg x120 comp','ROCHE','Ambiente','B02-C01',96,45,220,68,'RO3310','2028-04-30',312000],
+    ['RO-206','Tamiflu 75mg x10 caps','ROCHE','Ambiente','B02-C02',315,100,500,120,'RO3318','2027-12-31',68400],
+
+    // --- SANOFI AVENTIS · VLM ---
+    ['SA-301','Lantus SoloStar 100UI x5','SANOFI AVENTIS','Frio','CF-C1',0,20,90,45,'SA5501','2027-02-28',186000],
+    ['SA-302','Toujeo SoloStar 300UI x3','SANOFI AVENTIS','Frio','CF-C2',22,18,80,36,'SA5508','2027-04-30',214000],
+    ['SA-303','Plavix 75mg x28 comp','SANOFI AVENTIS','Ambiente','B03-C01',520,150,700,210,'SA2210','2028-06-30',41200],
+    ['SA-304','Clexane 40mg jeringa x10','SANOFI AVENTIS','Ambiente','B03-C02',148,80,380,165,'SA2217','2027-09-30',124000],
+    ['SA-305','Aubagio 14mg x28 comp','SANOFI AVENTIS','Ambiente','B03-C03',73,40,180,55,'SA2224','2027-11-30',890000],
+    ['SA-306','Taxotere 80mg vial','SANOFI AVENTIS','Ambiente','B03-C04',41,25,110,32,'SA2231','2028-03-31',412000],
+
+    // --- AMGEN · VLM (biológicos, todo cadena de frío) ---
+    ['AM-401','Neulasta 6mg jeringa','AMGEN','Frio','CF-D1',8,15,60,22,'AM9901','2027-06-30',1240000],
+    ['AM-402','Prolia 60mg jeringa','AMGEN','Frio','CF-D2',37,20,85,29,'AM9908','2027-08-31',680000],
+    ['AM-403','Xgeva 120mg vial','AMGEN','Frio','CF-D3',24,16,70,25,'AM9914','2028-01-31',920000],
+    ['AM-404','Aranesp 40mcg jeringa x4','AMGEN','Frio','CF-D4',52,25,120,34,'AM9920','2027-10-31',445000],
+    ['AM-405','Repatha 140mg lapicera x2','AMGEN','Frio','CF-D5',19,22,95,41,'AM9927','2027-05-31',528000],
+
+    // --- ABBVIE · fuera del VLM ---
+    ['AB-501','Humira 40mg jeringa x2','ABBVIE','Frio','DEP-F1',13,18,75,31,'AB6601','2027-07-31',1580000],
+    ['AB-502','Venclexta 100mg x28 comp','ABBVIE','Ambiente','DEP-A3',44,25,120,38,'AB6608','2028-02-29',1920000],
+    ['AB-503','Creon 25000 x50 caps','ABBVIE','Ambiente','DEP-A4',186,70,340,112,'AB6615','2028-05-31',54800],
+    ['AB-504','Rinvoq 15mg x28 comp','ABBVIE','Ambiente','DEP-A5',58,30,140,46,'AB6622','2027-12-31',1340000],
+
+    // --- BIOSIDUS ARGENTINA · fuera del VLM ---
+    ['BS-601','Bioyetin 4000 UI x6 amp','BIOSIDUS ARGENTINA','Frio','DEP-F2',96,40,200,72,'BS1101','2027-04-30',148000],
+    ['BS-602','Neutromax 300mcg x5 jeringa','BIOSIDUS ARGENTINA','Frio','DEP-F3',28,30,130,58,'BS1108','2027-06-30',196000],
+    ['BS-603','Bioferon 3MUI x5 amp','BIOSIDUS ARGENTINA','Frio','DEP-F4',61,25,110,34,'BS1115','2028-01-31',132000],
+
+    // --- fuera del catálogo: se excluyen, pero la app avisa cuántos son ---
+    ['GA-701','Ibuprofeno 600mg x20 comp','GADOR','Ambiente','B09-C01',480,150,700,260,'GA0110','2028-03-31',12400],
+    ['EL-702','Losartan 50mg x30 comp','ELEA','Ambiente','B09-C02',312,120,600,195,'EL0220','2027-10-31',15800]
   ];
 
   function cargarDemo() {
     const mapa = P.autoMapear(DEMO[0]);
-    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg);
+    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs);
     S.setProductos(r.productos, {
       archivo: 'Datos de ejemplo',
       hoja: 'demo',
@@ -377,7 +454,81 @@ VLM.app = (function () {
       if (tipo === 'bool') el.checked = !!S.state.cfg[clave];
       else el.value = S.state.cfg[clave];
     });
+    $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
+    pintarLabsEditor();
     $('#modalSettings').hidden = false;
+  }
+
+  /* ---------- catálogo de laboratorios ---------- */
+
+  function pintarLabsEditor() {
+    const L = VLM.labs;
+    const labs = S.state.labs;
+    const cont = $('#labsEditor');
+
+    cont.innerHTML =
+      '<div class="labs-head"><span>Laboratorio</span><span>Ámbito</span><span>Conservación</span><span></span></div>' +
+      labs.map((l, i) =>
+        '<div class="lab-row" data-i="' + i + '">' +
+          '<div>' +
+            '<input type="text" data-campo="nombre" value="' + U.esc(l.nombre) + '" placeholder="Nombre">' +
+            '<span class="lab-alias">Reconoce: ' + U.esc(l.alias.join(', ')) + '</span>' +
+          '</div>' +
+          '<select data-campo="ambito">' +
+            Object.keys(L.AMBITOS).map(k => '<option value="' + k + '"' +
+              (l.ambito === k ? ' selected' : '') + '>' + L.AMBITOS[k].corto + '</option>').join('') +
+          '</select>' +
+          '<select data-campo="zona">' +
+            Object.keys(L.ZONAS).map(k => '<option value="' + k + '"' +
+              (l.zona === k ? ' selected' : '') + '>' + L.ZONAS[k].icono + ' ' + L.ZONAS[k].corto + '</option>').join('') +
+          '</select>' +
+          '<button class="btn btn-icon lab-row-del" title="Quitar del catálogo">' +
+            '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
+        '</div>').join('');
+
+    U.$$('.lab-row', cont).forEach(row => {
+      const i = +row.dataset.i;
+      U.$$('input, select', row).forEach(campo => campo.addEventListener('change', () => {
+        const labs2 = S.state.labs.slice();
+        const l = Object.assign({}, labs2[i]);
+        const valor = campo.value.trim();
+        if (campo.dataset.campo === 'nombre') {
+          if (!valor) { campo.value = l.nombre; return; }
+          l.nombre = valor;
+          // el nombre siempre tiene que estar entre los alias reconocidos
+          if (!l.alias.some(a => U.norm(a) === U.norm(valor))) l.alias = [valor].concat(l.alias);
+        } else {
+          l[campo.dataset.campo] = valor;
+        }
+        labs2[i] = l;
+        S.setLabs(labs2);
+        pintarLabsEditor();
+      }));
+      U.$('.lab-row-del', row).addEventListener('click', () => {
+        const l = S.state.labs[i];
+        if (!confirm('¿Quitar "' + l.nombre + '" del catálogo?\n\nSus productos dejarán de mostrarse.')) return;
+        S.setLabs(S.state.labs.filter((_, j) => j !== i));
+        pintarLabsEditor();
+      });
+    });
+  }
+
+  function agregarLab() {
+    const nombre = (prompt('Nombre del laboratorio:') || '').trim();
+    if (!nombre) return;
+    if (S.state.labs.some(l => U.norm(l.nombre) === U.norm(nombre))) {
+      U.toast('Ese laboratorio ya está en el catálogo', 'err');
+      return;
+    }
+    S.setLabs(S.state.labs.concat([{
+      id: U.norm(nombre).replace(/ /g, '-') || ('lab' + Date.now()),
+      nombre: nombre,
+      alias: [nombre],
+      ambito: 'vlm',
+      zona: 'ambiente'
+    }]));
+    pintarLabsEditor();
+    U.toast('Agregado: ' + nombre, 'ok');
   }
 
   function wireSettings() {
@@ -392,9 +543,20 @@ VLM.app = (function () {
       });
     });
 
+    $('#btnAddLab').addEventListener('click', agregarLab);
+    $('#btnResetLabs').addEventListener('click', () => {
+      if (!confirm('¿Restaurar el catálogo original de laboratorios?')) return;
+      S.resetLabs();
+      pintarLabsEditor();
+      U.toast('Catálogo restaurado', 'ok');
+    });
+    $('#cfgIncluirNoListados').addEventListener('change', e => {
+      S.setCfg({ labsNoListados: e.target.checked ? 'incluir' : 'excluir' });
+    });
+
     $('#btnExportCsv').addEventListener('click', () => {
       if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
-      const items = calculados || A.calcular(S.state.productos, S.state.cfg);
+      const items = itemsVisibles();
       V.exportarRepo(
         items.filter(p => ['agotado', 'critico', 'bajo'].indexOf(p.estado) > -1)
              .sort((a, b) => a.urgencia - b.urgencia),

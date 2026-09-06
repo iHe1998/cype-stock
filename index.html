@@ -56,6 +56,23 @@
   <button class="tab" data-view="inv">Inventario</button>
 </nav>
 
+<!-- ============ FILTRO GLOBAL ÁMBITO / CONSERVACIÓN ============ -->
+<div class="zonebar" id="zonebar" hidden>
+  <div class="seg" data-key="filtroAmbito">
+    <button class="seg-btn is-active" data-val="">Todo</button>
+    <button class="seg-btn" data-val="vlm">VLM</button>
+    <button class="seg-btn" data-val="externo">Fuera del VLM</button>
+  </div>
+  <span class="zonebar-sep"></span>
+  <div class="seg" data-key="filtroZona">
+    <button class="seg-btn is-active" data-val="">Todas</button>
+    <button class="seg-btn z-frio" data-val="frio">❄ Cámara de frío</button>
+    <button class="seg-btn z-amb" data-val="ambiente">🌡 Ambiente</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="muted small" id="zoneCount"></span>
+</div>
+
 <!-- ============ MAIN ============ -->
 <main id="app">
 
@@ -212,6 +229,20 @@
         </label>
       </div>
 
+      <h3 class="section-title">Laboratorios</h3>
+      <p class="muted small">Sólo se procesan los laboratorios de esta lista. <strong>Ámbito</strong>
+        indica si el producto vive dentro del VLM o fuera. <strong>Conservación</strong> es el
+        valor por defecto cuando la planilla no trae una columna que lo indique.</p>
+      <div class="labs-editor" id="labsEditor"></div>
+      <div class="cfg-actions" style="margin-top:10px">
+        <button class="btn" id="btnAddLab">+ Agregar laboratorio</button>
+        <button class="btn" id="btnResetLabs">Restaurar catálogo original</button>
+      </div>
+      <label class="field field-check" style="margin-top:14px">
+        <input type="checkbox" id="cfgIncluirNoListados">
+        <span>Mostrar también los laboratorios que no están en la lista</span>
+      </label>
+
       <h3 class="section-title">Datos</h3>
       <div class="cfg-actions">
         <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>
@@ -232,6 +263,7 @@
 <script src="lib/xlsx.full.min.js"></script>
 <script src="lib/chart.umd.min.js"></script>
 <script src="js/util.js"></script>
+<script src="js/labs.js"></script>
 <script src="js/store.js"></script>
 <script src="js/parser.js"></script>
 <script src="js/analytics.js"></script>

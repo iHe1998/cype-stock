@@ -39,6 +39,12 @@
   --info:        #a78bfa;
   --info-dim:    #2c2350;
 
+  /* zonas de conservación */
+  --frio:        #22d3ee;
+  --frio-dim:    #0c3a44;
+  --ambiente:    #f0a868;
+  --ambiente-dim:#3d2a15;
+
   /* forma */
   --r-sm: 6px;
   --r:    10px;
@@ -74,6 +80,10 @@
   --crit-dim:    #fee2e2;
   --info:        #7c3aed;
   --info-dim:    #ede9fe;
+  --frio:        #0891b2;
+  --frio-dim:    #cffafe;
+  --ambiente:    #b45309;
+  --ambiente-dim:#fef0dc;
   --shadow:      0 1px 2px rgba(16,24,38,.06), 0 8px 24px rgba(16,24,38,.07);
   --shadow-lg:   0 24px 64px rgba(16,24,38,.18);
 }
@@ -203,6 +213,108 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 }
 .tab:hover { color: var(--text-2); }
 .tab.is-active { color: var(--text); border-bottom-color: var(--accent); }
+
+/* ============================================================
+   BARRA DE ZONA (ámbito × conservación)
+   ============================================================ */
+.zonebar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+.zonebar[hidden] { display: none; }
+.zonebar-sep { width: 1px; height: 20px; background: var(--border); }
+
+.seg {
+  display: inline-flex; padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.seg-btn {
+  appearance: none; border: 0; background: none;
+  font: inherit; font-size: 12.5px; font-weight: 550;
+  color: var(--muted);
+  padding: 5px 12px; border-radius: 4px;
+  cursor: pointer; white-space: nowrap;
+  transition: background .13s, color .13s;
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.seg-btn.z-frio.is-active { color: var(--frio); background: var(--frio-dim); }
+.seg-btn.z-amb.is-active  { color: var(--ambiente); background: var(--ambiente-dim); }
+
+/* chips de zona y ámbito */
+.zchip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.z-frio     { color: var(--frio);     background: var(--frio-dim);     border-color: color-mix(in srgb, var(--frio) 30%, transparent); }
+.z-ambiente { color: var(--ambiente); background: var(--ambiente-dim); border-color: color-mix(in srgb, var(--ambiente) 30%, transparent); }
+.a-vlm      { color: var(--accent);   background: var(--accent-dim);   border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.a-externo  { color: var(--muted);    background: var(--surface-3);    border-color: var(--border); }
+
+/* encabezado de grupo (VLM · Cámara de frío) */
+.grupo-head {
+  display: flex; align-items: center; gap: 10px;
+  margin: 26px 0 12px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+}
+.grupo-head:first-child { margin-top: 0; }
+.grupo-head h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.grupo-head .g-ico { font-size: 17px; }
+.grupo-head.g-frio { border-bottom-color: color-mix(in srgb, var(--frio) 45%, transparent); }
+.grupo-head.g-ambiente { border-bottom-color: color-mix(in srgb, var(--ambiente) 45%, transparent); }
+.grupo-head .g-meta { font-size: 12px; color: var(--muted); }
+
+/* tarjetas de cuadrante en el resumen */
+.zona-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.zona-card {
+  padding: 14px 16px; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 3px solid var(--frio);
+  box-shadow: var(--shadow);
+}
+.zona-card.zc-ambiente { border-top-color: var(--ambiente); }
+.zona-card.zc-externo { opacity: .92; border-style: dashed; }
+.zona-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.zona-card-name { font-size: 13px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
+.zona-card-nums { display: flex; gap: 18px; margin-bottom: 10px; }
+.zona-card-nums div b { display: block; font-size: 22px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.zona-card-nums div span { font-size: 11px; color: var(--muted); }
+.zona-card-nums div.n-alerta b { color: var(--crit); }
+.zona-card-labs { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+
+/* ============================================================
+   EDITOR DE LABORATORIOS (Configuración)
+   ============================================================ */
+.labs-editor { display: flex; flex-direction: column; gap: 8px; }
+.lab-row {
+  display: grid; grid-template-columns: 1fr 110px 118px 32px;
+  gap: 8px; align-items: center;
+  padding: 9px 10px;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+}
+.lab-row input, .lab-row select {
+  height: 30px; padding: 0 8px; width: 100%;
+  font: inherit; font-size: 12.5px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; outline: none;
+}
+.lab-row input:focus, .lab-row select:focus { border-color: var(--accent); }
+.lab-row .lab-alias { font-size: 11px; color: var(--muted); margin-top: 3px; display: block; }
+.lab-row-del { color: var(--muted); }
+.lab-row-del:hover { color: var(--crit); border-color: var(--crit); }
+.labs-head {
+  display: grid; grid-template-columns: 1fr 110px 118px 32px; gap: 8px;
+  font-size: 10.5px; font-weight: 650; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted); padding: 0 10px 2px;
+}
 
 /* ============================================================
    LAYOUT
@@ -698,6 +810,23 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   <button class="tab" data-view="inv">Inventario</button>
 </nav>
 
+<!-- ============ FILTRO GLOBAL ÁMBITO / CONSERVACIÓN ============ -->
+<div class="zonebar" id="zonebar" hidden>
+  <div class="seg" data-key="filtroAmbito">
+    <button class="seg-btn is-active" data-val="">Todo</button>
+    <button class="seg-btn" data-val="vlm">VLM</button>
+    <button class="seg-btn" data-val="externo">Fuera del VLM</button>
+  </div>
+  <span class="zonebar-sep"></span>
+  <div class="seg" data-key="filtroZona">
+    <button class="seg-btn is-active" data-val="">Todas</button>
+    <button class="seg-btn z-frio" data-val="frio">❄ Cámara de frío</button>
+    <button class="seg-btn z-amb" data-val="ambiente">🌡 Ambiente</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="muted small" id="zoneCount"></span>
+</div>
+
 <!-- ============ MAIN ============ -->
 <main id="app">
 
@@ -853,6 +982,20 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
           <span>Priorizar sólo productos críticos</span>
         </label>
       </div>
+
+      <h3 class="section-title">Laboratorios</h3>
+      <p class="muted small">Sólo se procesan los laboratorios de esta lista. <strong>Ámbito</strong>
+        indica si el producto vive dentro del VLM o fuera. <strong>Conservación</strong> es el
+        valor por defecto cuando la planilla no trae una columna que lo indique.</p>
+      <div class="labs-editor" id="labsEditor"></div>
+      <div class="cfg-actions" style="margin-top:10px">
+        <button class="btn" id="btnAddLab">+ Agregar laboratorio</button>
+        <button class="btn" id="btnResetLabs">Restaurar catálogo original</button>
+      </div>
+      <label class="field field-check" style="margin-top:14px">
+        <input type="checkbox" id="cfgIncluirNoListados">
+        <span>Mostrar también los laboratorios que no están en la lista</span>
+      </label>
 
       <h3 class="section-title">Datos</h3>
       <div class="cfg-actions">
@@ -1109,6 +1252,156 @@ VLM.util = (function () {
 </script>
 <script>
 /* ============================================================
+   labs.js · catálogo de laboratorios, ámbito y conservación
+
+   Dos dimensiones independientes:
+     ámbito       vlm | externo     ¿está dentro de la torre?
+     conservación frio | ambiente   ¿cámara de frío o temperatura ambiente?
+   ============================================================ */
+window.VLM = window.VLM || {};
+
+VLM.labs = (function () {
+  const U = VLM.util;
+
+  /* ---------------- constantes de presentación ---------------- */
+
+  const AMBITOS = {
+    vlm:     { label: 'VLM',            corto: 'VLM',   desc: 'Dentro de la torre de picking' },
+    externo: { label: 'Fuera del VLM',  corto: 'Fuera', desc: 'Almacenado fuera de la torre' }
+  };
+
+  const ZONAS = {
+    frio:     { label: 'Cámara de frío', corto: 'Frío',     icono: '❄', desc: '2 a 8 °C' },
+    ambiente: { label: 'Ambiente',       corto: 'Ambiente', icono: '🌡', desc: '15 a 25 °C' }
+  };
+
+  /* ---------------- catálogo por defecto ----------------
+     `alias` se compara normalizado (sin acentos ni puntuación) contra el
+     valor de la columna Laboratorio, primero exacto y después por contención.
+     `zona` es el valor por defecto cuando la planilla no trae conservación.
+     ------------------------------------------------------ */
+  const CATALOGO_DEFAULT = [
+    { id: 'astrazeneca', nombre: 'AstraZeneca',         ambito: 'vlm',
+      alias: ['astrazeneca', 'astra zeneca', 'astra', 'az'],                  zona: 'ambiente' },
+    { id: 'roche',       nombre: 'Roche',               ambito: 'vlm',
+      alias: ['roche', 'productos roche', 'roche argentina'],                 zona: 'frio' },
+    { id: 'sanofi',      nombre: 'Sanofi Aventis',      ambito: 'vlm',
+      alias: ['sanofi aventis', 'sanofi', 'aventis', 'sanofi argentina'],     zona: 'ambiente' },
+    { id: 'amgen',       nombre: 'Amgen',               ambito: 'vlm',
+      alias: ['amgen', 'amgen argentina'],                                    zona: 'frio' },
+    { id: 'abbvie',      nombre: 'AbbVie',              ambito: 'externo',
+      alias: ['abbvie', 'abb vie', 'abbott vie'],                             zona: 'frio' },
+    { id: 'biosidus',    nombre: 'Biosidus Argentina',  ambito: 'externo',
+      alias: ['biosidus argentina', 'biosidus'],                              zona: 'frio' }
+  ];
+
+  /** Copia profunda, para no mutar la constante al editar en Configuración. */
+  function catalogoDefault() {
+    return CATALOGO_DEFAULT.map(l => Object.assign({}, l, { alias: l.alias.slice() }));
+  }
+
+  /* ---------------- matcheo de nombres ---------------- */
+
+  /**
+   * Busca a qué laboratorio del catálogo corresponde un nombre de la planilla.
+   * Primero intenta coincidencia exacta; después, que el nombre del Excel
+   * contenga algún alias ("LAB. ROCHE S.A.Q. e I." -> Roche).
+   * Los alias de menos de 4 caracteres sólo matchean exacto, para que "az"
+   * no se coma cualquier razón social que tenga esas letras.
+   */
+  function buscar(nombreRaw, catalogo) {
+    const n = U.norm(nombreRaw);
+    if (!n) return null;
+
+    for (const l of catalogo) {
+      if (l.alias.some(a => U.norm(a) === n)) return l;
+    }
+    let mejor = null, mejorLargo = 0;
+    for (const l of catalogo) {
+      for (const a of l.alias) {
+        const an = U.norm(a);
+        if (an.length < 4) continue;
+        if (an.length > mejorLargo && (n === an || n.indexOf(an + ' ') === 0 ||
+            n.indexOf(' ' + an) > -1 || n.indexOf(an) > -1)) {
+          mejor = l; mejorLargo = an.length;
+        }
+      }
+    }
+    return mejor;
+  }
+
+  /* ---------------- conservación ---------------- */
+
+  const RE_FRIO = /(cadena de frio|cadena frio|refriger|termolab|heladera|frio|cold|2 a 8|2 8 c|2 8 grados)/;
+  const RE_AMB  = /(ambiente|temperatura ambiente|seco|room|15 a 25|15 25|no refriger|sin frio)/;
+  const RE_SI   = /^(si|s|x|true|verdadero|1|sí)$/;
+  const RE_NO   = /^(no|n|false|falso|0)$/;
+
+  /**
+   * Interpreta el valor de la columna de conservación.
+   * `headerNorm` importa: en una columna "Cadena de frío" un "SI" significa
+   * frío, mientras que en una columna "Conservación" hay que leer el texto.
+   * @returns 'frio' | 'ambiente' | null (no se pudo determinar)
+   */
+  function parsearConservacion(valor, headerNorm) {
+    if (valor === null || valor === undefined || valor === '') return null;
+    const n = U.norm(valor);
+    if (!n) return null;
+
+    const headerEsFrio = headerNorm ? RE_FRIO.test(headerNorm) : false;
+    if (headerEsFrio) {
+      if (RE_SI.test(n)) return 'frio';
+      if (RE_NO.test(n)) return 'ambiente';
+    }
+    if (RE_AMB.test(n))  return 'ambiente';
+    if (RE_FRIO.test(n)) return 'frio';
+    return null;
+  }
+
+  /**
+   * Resuelve la conservación final de un producto.
+   * Prioridad: lo que diga la planilla > el default del laboratorio > ambiente.
+   */
+  function resolverZona(zonaDePlanilla, lab) {
+    if (zonaDePlanilla === 'frio' || zonaDePlanilla === 'ambiente') return zonaDePlanilla;
+    if (lab && (lab.zona === 'frio' || lab.zona === 'ambiente')) return lab.zona;
+    return 'ambiente';
+  }
+
+  /**
+   * Clasifica un producto ya normalizado: le agrega labId, labNombre,
+   * ambito, conservacion y gestionado.
+   */
+  function clasificar(p, catalogo) {
+    const lab = buscar(p.laboratorio, catalogo);
+    p.labId       = lab ? lab.id : null;
+    p.labNombre   = lab ? lab.nombre : p.laboratorio;
+    p.gestionado  = !!lab;
+    p.ambito      = lab ? lab.ambito : 'externo';
+    p.conservacion = resolverZona(p.zonaPlanilla, lab);
+    return p;
+  }
+
+  /** Clave de agrupación "vlm|frio" y su etiqueta legible. */
+  function claveGrupo(p)      { return p.ambito + '|' + p.conservacion; }
+  function labelGrupo(clave)  {
+    const [a, z] = clave.split('|');
+    return AMBITOS[a].label + ' · ' + ZONAS[z].label;
+  }
+
+  /** Los cuatro grupos posibles, en orden de importancia operativa. */
+  const GRUPOS = ['vlm|frio', 'vlm|ambiente', 'externo|frio', 'externo|ambiente'];
+
+  return {
+    AMBITOS, ZONAS, GRUPOS, CATALOGO_DEFAULT,
+    catalogoDefault, buscar, parsearConservacion, resolverZona, clasificar,
+    claveGrupo, labelGrupo
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
    store.js · estado global, configuración y persistencia
    ============================================================ */
 window.VLM = window.VLM || {};
@@ -1118,6 +1411,7 @@ VLM.store = (function () {
   const KEY_DATA = 'vlm.datos.v1';
   const KEY_CFG  = 'vlm.config.v1';
   const KEY_UI   = 'vlm.ui.v1';
+  const KEY_LABS = 'vlm.labs.v1';
 
   const CFG_DEFAULT = {
     diasCritico:   7,    // <= N días de cobertura => CRÍTICO
@@ -1127,7 +1421,11 @@ VLM.store = (function () {
     horizonte:     30,   // días de la curva de proyección
     diasMes:       30,   // divisor consumo mensual -> diario
     tvSegundos:    20,
-    tvSoloCriticos: false
+    tvSoloCriticos: false,
+    // qué hacer con laboratorios que no están en el catálogo:
+    // 'excluir' los deja fuera de KPIs y vistas (pero se informa cuántos son),
+    // 'incluir' los muestra como no gestionados.
+    labsNoListados: 'excluir'
   };
 
   const state = {
@@ -1140,11 +1438,14 @@ VLM.store = (function () {
       mapeo: null
     },
     cfg: Object.assign({}, CFG_DEFAULT),
+    labs: [],           // catálogo de laboratorios (ver labs.js)
     ui: {
       tema: 'dark',
       vista: 'dashboard',
       filtroLab: null,
       filtroEstado: null,
+      filtroAmbito: null,   // 'vlm' | 'externo' | null (todos)
+      filtroZona: null,     // 'frio' | 'ambiente' | null (todas)
       busqueda: '',
       orden: { campo: 'diasCobertura', dir: 'asc' }
     }
@@ -1182,11 +1483,21 @@ VLM.store = (function () {
     } catch (e) {}
   }
 
+  function guardarLabs() {
+    try { localStorage.setItem(KEY_LABS, JSON.stringify(state.labs)); } catch (e) {}
+  }
+
   function cargar() {
     try {
       const cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null');
       if (cfg) Object.assign(state.cfg, CFG_DEFAULT, cfg);
     } catch (e) {}
+    try {
+      const labs = JSON.parse(localStorage.getItem(KEY_LABS) || 'null');
+      state.labs = (labs && labs.length) ? labs : VLM.labs.catalogoDefault();
+    } catch (e) {
+      state.labs = VLM.labs.catalogoDefault();
+    }
     try {
       const ui = JSON.parse(localStorage.getItem(KEY_UI) || 'null');
       if (ui) Object.assign(state.ui, ui);
@@ -1228,6 +1539,17 @@ VLM.store = (function () {
     emit('cfg');
   }
 
+  /** Reemplaza el catálogo de laboratorios y reclasifica los productos. */
+  function setLabs(labs) {
+    state.labs = labs;
+    guardarLabs();
+    emit('labs');
+  }
+
+  function resetLabs() {
+    setLabs(VLM.labs.catalogoDefault());
+  }
+
   function setUi(parcial, silencioso) {
     Object.assign(state.ui, parcial);
     guardarUi();
@@ -1239,7 +1561,7 @@ VLM.store = (function () {
   return {
     state, CFG_DEFAULT,
     on, emit, cargar, guardar,
-    setProductos, limpiar, setCfg, setUi, hayDatos
+    setProductos, limpiar, setCfg, setUi, setLabs, resetLabs, hayDatos
   };
 })();
 
@@ -1293,6 +1615,12 @@ VLM.parser = (function () {
     { id: 'consumoMensual', label: 'Consumo mensual', req: false, tipo: 'numero',
       hint: 'Salidas del último mes o promedio mensual',
       alias: ['consumo mensual', 'consumo mes', 'cons mensual', 'salidas mes', 'salidas', 'egresos mes', 'demanda mensual', 'promedio mensual', 'consumo 30 dias', 'venta mensual', 'movimiento mensual'] },
+
+    { id: 'conservacion', label: 'Conservación', req: false, tipo: 'texto',
+      hint: 'Frío o ambiente; si falta se usa el default del laboratorio',
+      alias: ['conservacion', 'cadena de frio', 'cadena frio', 'temperatura', 'refrigerado',
+              'termolabil', 'condicion de conservacion', 'tipo de conservacion',
+              'condiciones de conservacion', 'almacenamiento', 'frio'] },
 
     { id: 'lote', label: 'Lote', req: false, tipo: 'texto',
       hint: '',
@@ -1411,14 +1739,22 @@ VLM.parser = (function () {
      ------------------------------------------------------------ */
 
   /**
-   * Convierte la matriz + mapeo en registros normalizados.
-   * @returns { productos, descartadas, avisos }
+   * Convierte la matriz + mapeo en registros normalizados y los clasifica
+   * contra el catálogo de laboratorios (ámbito VLM/externo y conservación).
+   * @returns { productos, descartadas, avisos, noListados }
    */
-  function normalizar(matriz, filaHeader, mapa, cfg) {
+  function normalizar(matriz, filaHeader, mapa, cfg, catalogo) {
     const productos = [];
     const avisos = [];
     let descartadas = 0;
     const diasMes = (cfg && cfg.diasMes) || 30;
+    catalogo = catalogo || VLM.labs.catalogoDefault();
+
+    // encabezado de la columna de conservación: cambia cómo se lee un "SI"
+    const filaHeaders = matriz[filaHeader] || [];
+    const idxCons = mapa.conservacion;
+    const headerCons = (idxCons === undefined || idxCons === null)
+      ? '' : U.norm(filaHeaders[idxCons]);
 
     const get = (fila, campoId) => {
       const idx = mapa[campoId];
@@ -1446,10 +1782,11 @@ VLM.parser = (function () {
 
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
-      productos.push({
+      productos.push(VLM.labs.clasificar({
         codigo:        String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1)),
         descripcion:   String(desc === null ? '' : desc).trim() || '(sin descripción)',
         laboratorio:   lab,
+        zonaPlanilla:  VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons),
         ubicacion:     String(get(fila, 'ubicacion') || '').trim(),
         stock:         stock,
         stockMin:      U.toNum(get(fila, 'stockMin')) || 0,
@@ -1460,8 +1797,17 @@ VLM.parser = (function () {
         lote:          String(get(fila, 'lote') || '').trim(),
         vencimiento:   U.toDate(get(fila, 'vencimiento')),
         precio:        U.toNum(get(fila, 'precio')) || 0
-      });
+      }, catalogo));
     }
+
+    // --- laboratorios de la planilla que no están en el catálogo ---
+    const noListados = {};
+    productos.forEach(p => {
+      if (p.gestionado) return;
+      if (!noListados[p.laboratorio]) noListados[p.laboratorio] = 0;
+      noListados[p.laboratorio]++;
+    });
+    const nombresNoListados = Object.keys(noListados);
 
     if (!productos.length) avisos.push('No se pudo leer ninguna fila válida. Revisá la fila de encabezados y el mapeo.');
     if (descartadas > 0)   avisos.push(descartadas + ' fila(s) omitidas por estar vacías o sin stock numérico.');
@@ -1471,23 +1817,32 @@ VLM.parser = (function () {
     if (mapa.stockMin === undefined && mapa.consumoDiario === undefined && mapa.consumoMensual === undefined) {
       avisos.push('Sin stock mínimo ni consumo: las alertas de faltante quedarán vacías.');
     }
-    return { productos, descartadas, avisos };
+    if (mapa.conservacion === undefined) {
+      avisos.push('Sin columna de conservación: se usa el valor por defecto de cada laboratorio (editable en Configuración).');
+    }
+    if (nombresNoListados.length) {
+      avisos.push(nombresNoListados.length + ' laboratorio(s) fuera del catálogo: ' +
+        nombresNoListados.slice(0, 4).join(', ') +
+        (nombresNoListados.length > 4 ? '…' : '') + '.');
+    }
+    return { productos, descartadas, avisos, noListados, nombresNoListados };
   }
 
   /* ------------------------------------------------------------
      Plantilla descargable
      ------------------------------------------------------------ */
   function generarPlantilla() {
-    const headers = ['Codigo', 'Descripcion', 'Laboratorio', 'Ubicacion', 'Stock',
+    const headers = ['Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ubicacion', 'Stock',
                      'Stock Minimo', 'Stock Maximo', 'Consumo Mensual', 'Lote', 'Vencimiento', 'Precio'];
     const filas = [
-      ['A-1001', 'Amoxicilina 500mg x21 comp', 'Bago',     'B01-C03', 340, 120, 600, 280, 'L2451', '2027-04-30', 1250],
-      ['A-1002', 'Ibuprofeno 400mg x20 comp',  'Bago',     'B01-C04',  85, 150, 700, 420, 'L2455', '2027-01-31',  890],
-      ['A-1003', 'Paracetamol 500mg x30 comp', 'Roemmers', 'B01-C05',1240, 300,1500, 610, 'L3312', '2028-02-28',  760]
+      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320,  95, 'AZ4411', '2027-08-31', 2480000],
+      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40,  14, 'RO8801', '2027-05-31', 4120000],
+      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60,  22, 'AM9901', '2027-06-30', 1240000],
+      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200,  72, 'BS1101', '2027-04-30',  148000]
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers].concat(filas));
-    ws['!cols'] = [{ wch: 10 }, { wch: 34 }, { wch: 16 }, { wch: 12 }, { wch: 8 },
-                   { wch: 12 }, { wch: 14 }, { wch: 15 }, { wch: 10 }, { wch: 13 }, { wch: 10 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 32 }, { wch: 20 }, { wch: 13 }, { wch: 11 }, { wch: 8 },
+                   { wch: 12 }, { wch: 14 }, { wch: 15 }, { wch: 10 }, { wch: 13 }, { wch: 11 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Stock VLM');
     XLSX.writeFile(wb, 'plantilla_vlm.xlsx');
@@ -1627,10 +1982,16 @@ VLM.analytics = (function () {
       faltanteHorizonte: 0,
       valorReposicion: 0,
       porEstado: { agotado: 0, critico: 0, bajo: 0, ok: 0, exceso: 0, sd: 0 },
+      porZona:   { frio: 0, ambiente: 0 },
+      porAmbito: { vlm: 0, externo: 0 },
+      alertaZona:   { frio: 0, ambiente: 0 },
+      alertaAmbito: { vlm: 0, externo: 0 },
+      unidadesZona: { frio: 0, ambiente: 0 },
       labs: 0,
       sinConsumo: 0,
       venceEn30: 0,
-      vencido: 0
+      vencido: 0,
+      noGestionados: 0
     };
     const labs = {};
     items.forEach(p => {
@@ -1640,13 +2001,26 @@ VLM.analytics = (function () {
       r.consumoHorizonte += p.consumoProyectado;
       r.faltanteHorizonte += p.faltanteProyectado;
       r.porEstado[p.estado] = (r.porEstado[p.estado] || 0) + 1;
-      if (p.estado === 'critico' || p.estado === 'agotado' || p.estado === 'bajo') r.valorReposicion += p.valorSugerido;
+
+      const enAlerta = p.estado === 'agotado' || p.estado === 'critico' || p.estado === 'bajo';
+      if (p.conservacion) {
+        r.porZona[p.conservacion]++;
+        r.unidadesZona[p.conservacion] += p.stock;
+        if (enAlerta) r.alertaZona[p.conservacion]++;
+      }
+      if (p.ambito) {
+        r.porAmbito[p.ambito]++;
+        if (enAlerta) r.alertaAmbito[p.ambito]++;
+      }
+      if (!p.gestionado) r.noGestionados++;
+
+      if (enAlerta) r.valorReposicion += p.valorSugerido;
       if (!p.consumoDiario) r.sinConsumo++;
       if (p.diasAVencer !== null) {
         if (p.diasAVencer < 0) r.vencido++;
         else if (p.diasAVencer <= 30) r.venceEn30++;
       }
-      labs[p.laboratorio] = true;
+      labs[p.labNombre || p.laboratorio] = true;
     });
     r.labs = Object.keys(labs).length;
     r.aReponer = r.porEstado.agotado + r.porEstado.critico;
@@ -1659,21 +2033,66 @@ VLM.analytics = (function () {
   function porLaboratorio(items, cfg) {
     const mapa = {};
     items.forEach(p => {
-      if (!mapa[p.laboratorio]) mapa[p.laboratorio] = [];
-      mapa[p.laboratorio].push(p);
+      const k = p.labNombre || p.laboratorio;
+      if (!mapa[k]) mapa[k] = [];
+      mapa[k].push(p);
     });
     return Object.keys(mapa).map(nombre => {
       const productos = mapa[nombre];
       const res = resumen(productos, cfg);
+      const ref = productos[0];
       return {
         nombre: nombre,
         color: U.colorDe(nombre),
+        ambito: ref.ambito,
+        gestionado: ref.gestionado,
         productos: productos,
         resumen: res,
         criticos: res.porEstado.agotado + res.porEstado.critico,
         alerta: res.enAlerta
       };
     }).sort((a, b) => (b.criticos - a.criticos) || (b.alerta - a.alerta) || a.nombre.localeCompare(b.nombre));
+  }
+
+  /**
+   * Agrupa en los cuatro cuadrantes ámbito × conservación
+   * (VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente).
+   * Devuelve sólo los grupos que tienen productos.
+   */
+  function porGrupo(items, cfg) {
+    const L = VLM.labs;
+    const mapa = {};
+    items.forEach(p => {
+      const k = L.claveGrupo(p);
+      if (!mapa[k]) mapa[k] = [];
+      mapa[k].push(p);
+    });
+    return L.GRUPOS.filter(k => mapa[k]).map(clave => {
+      const [ambito, zona] = clave.split('|');
+      const productos = mapa[clave];
+      const res = resumen(productos, cfg);
+      return {
+        clave: clave,
+        ambito: ambito,
+        zona: zona,
+        label: L.labelGrupo(clave),
+        icono: L.ZONAS[zona].icono,
+        productos: productos,
+        resumen: res,
+        labs: porLaboratorio(productos, cfg),
+        criticos: res.porEstado.agotado + res.porEstado.critico,
+        alerta: res.enAlerta
+      };
+    });
+  }
+
+  /** Aplica los filtros globales de ámbito y conservación. */
+  function filtrarPorZona(items, ui) {
+    return items.filter(p => {
+      if (ui.filtroAmbito && p.ambito !== ui.filtroAmbito) return false;
+      if (ui.filtroZona && p.conservacion !== ui.filtroZona) return false;
+      return true;
+    });
   }
 
   /**
@@ -1726,7 +2145,8 @@ VLM.analytics = (function () {
 
   return {
     ESTADOS, ORDEN_ESTADOS,
-    calcular, resumen, porLaboratorio, proyeccion, quiebresPorTramo, topUrgentes
+    calcular, resumen, porLaboratorio, porGrupo, filtrarPorZona,
+    proyeccion, quiebresPorTramo, topUrgentes
   };
 })();
 
@@ -2079,6 +2499,48 @@ VLM.views = (function () {
     return '<span class="badge b-' + estado + '">' + e.label + '</span>';
   }
 
+  /** Chip de conservación (❄ Frío / 🌡 Ambiente). */
+  function zchip(zona) {
+    const z = VLM.labs.ZONAS[zona];
+    if (!z) return '';
+    return '<span class="zchip z-' + zona + '" title="' + z.desc + '">' + z.icono + ' ' + z.corto + '</span>';
+  }
+
+  /** Chip de ámbito (VLM / Fuera). */
+  function achip(ambito) {
+    const a = VLM.labs.AMBITOS[ambito];
+    if (!a) return '';
+    return '<span class="zchip a-' + ambito + '" title="' + a.desc + '">' + a.corto + '</span>';
+  }
+
+  /** Encabezado de un cuadrante ámbito × conservación. */
+  function grupoHead(g) {
+    const r = g.resumen;
+    return '<div class="grupo-head g-' + g.zona + '">' +
+      '<h3><span class="g-ico">' + g.icono + '</span>' + U.esc(g.label) + '</h3>' +
+      '<span class="g-meta">' + r.skus + ' SKU · ' + U.fmtCompact(r.unidades) + ' unidades' +
+        (g.alerta ? ' · <strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : '') +
+      '</span></div>';
+  }
+
+  /** Tarjeta de cuadrante para el resumen. */
+  function zonaCard(g) {
+    const r = g.resumen;
+    return '<div class="zona-card zc-' + g.zona + (g.ambito === 'externo' ? ' zc-externo' : '') + '">' +
+      '<div class="zona-card-top">' +
+        '<div class="zona-card-name">' + g.icono + ' ' + VLM.labs.ZONAS[g.zona].label + '</div>' +
+        achip(g.ambito) +
+      '</div>' +
+      '<div class="zona-card-nums">' +
+        '<div><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
+        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>unidades</span></div>' +
+        '<div class="' + (g.alerta ? 'n-alerta' : '') + '"><b>' + U.fmt(g.alerta) + '</b><span>en alerta</span></div>' +
+      '</div>' +
+      stackbar(r) +
+      '<div class="zona-card-labs">' + g.labs.map(l => U.esc(l.nombre)).join(' · ') + '</div>' +
+      '</div>';
+  }
+
   function kpi(label, valor, sub, clase) {
     return '<div class="kpi ' + (clase || '') + '">' +
       '<div class="kpi-label">' + U.esc(label) + '</div>' +
@@ -2114,6 +2576,7 @@ VLM.views = (function () {
   function dashboard(el, items, cfg) {
     const res  = A.resumen(items, cfg);
     const labs = A.porLaboratorio(items, cfg);
+    const grupos = A.porGrupo(items, cfg);
     const proy = A.proyeccion(items, cfg);
     const tramos = A.quiebresPorTramo(items, cfg);
     const urgentes = A.topUrgentes(items, 6);
@@ -2133,9 +2596,16 @@ VLM.views = (function () {
       kpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo),
           'menos de ' + cfg.diasBajo + ' días de cobertura',
           res.porEstado.bajo > 0 ? 'k-warn' : 'k-ok') +
+      kpi('❄ Cadena de frío en alerta', U.fmt(res.alertaZona.frio),
+          'de ' + res.porZona.frio + ' SKU refrigerados',
+          res.alertaZona.frio > 0 ? 'k-crit' : 'k-ok') +
       kpi('Consumo a ' + cfg.horizonte + ' días', U.fmtCompact(res.consumoHorizonte),
           U.fmt(res.consumoDiario, true) + ' uds/día · cobertura ' + cobertura, 'k-info') +
       '</div>';
+
+    /* --- cuadrantes ámbito × conservación --- */
+    html += '<h3 class="section-title">Por zona de almacenamiento</h3>';
+    html += '<div class="zona-grid">' + grupos.map(zonaCard).join('') + '</div>';
 
     /* --- aviso de faltante proyectado --- */
     if (res.faltanteHorizonte > 0) {
@@ -2188,6 +2658,7 @@ VLM.views = (function () {
      ============================================================ */
   function laboratorios(el, items, cfg) {
     const labs = A.porLaboratorio(items, cfg);
+    const grupos = A.porGrupo(items, cfg);
 
     let html = '<div class="toolbar">' +
       '<input class="input" id="labSearch" type="search" placeholder="Buscar laboratorio…" ' +
@@ -2200,8 +2671,11 @@ VLM.views = (function () {
       cardChart('Consumo proyectado', cfg.horizonte + ' días', 'chLabConsumo', 340) +
       '</div>';
 
-    html += '<h3 class="section-title">Detalle por laboratorio</h3>';
-    html += '<div class="lab-grid" id="labGrid">' + labs.map(l => labCard(l, cfg)).join('') + '</div>';
+    // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente
+    html += '<div id="labGrid">' + grupos.map(g =>
+      grupoHead(g) +
+      '<div class="lab-grid">' + g.labs.map(l => labCard(l, cfg, g.zona)).join('') + '</div>'
+    ).join('') + '</div>';
 
     el.innerHTML = html;
     C.estadosPorLab($('#chLabEstados', el), labs);
@@ -2213,15 +2687,23 @@ VLM.views = (function () {
       U.$$('#labGrid .lab-card', el).forEach(card => {
         card.hidden = q ? U.norm(card.dataset.lab).indexOf(q) === -1 : false;
       });
+      // ocultar el encabezado de los cuadrantes que quedaron vacíos
+      U.$$('#labGrid .grupo-head', el).forEach(head => {
+        const grid = head.nextElementSibling;
+        const visibles = grid ? U.$$('.lab-card', grid).filter(c => !c.hidden).length : 0;
+        head.hidden = visibles === 0;
+        if (grid) grid.hidden = visibles === 0;
+      });
     }, 150));
   }
 
-  function labCard(l, cfg) {
+  function labCard(l, cfg, zona) {
     const r = l.resumen;
     const cob = r.coberturaGlobal !== null ? U.fmtDias(r.coberturaGlobal) + ' d' : 's/d';
     return '<div class="card lab-card" data-lab="' + U.esc(l.nombre) + '">' +
       '<div class="lab-top">' +
         '<div class="lab-name"><i class="lab-swatch" style="background:' + l.color + '"></i>' + U.esc(l.nombre) + '</div>' +
+        (zona ? zchip(zona) : '') +
         (l.criticos > 0 ? badge('critico') : (r.porEstado.bajo > 0 ? badge('bajo') : badge('ok'))) +
       '</div>' +
       '<div class="lab-stats">' +
@@ -2251,7 +2733,7 @@ VLM.views = (function () {
       .sort((a, b) => a.urgencia - b.urgencia);
 
     const filtrados = criticos.filter(p => {
-      if (ui.filtroLab && p.laboratorio !== ui.filtroLab) return false;
+      if (ui.filtroLab && (p.labNombre || p.laboratorio) !== ui.filtroLab) return false;
       if (ui.filtroEstado && p.estado !== ui.filtroEstado) return false;
       return true;
     });
@@ -2322,7 +2804,8 @@ VLM.views = (function () {
         '<strong>' + U.esc(p.descripcion) + '</strong>' +
         '<div class="repo-meta">' +
           '<span>' + U.esc(p.codigo) + '</span>' +
-          '<span>' + U.esc(p.laboratorio) + '</span>' +
+          '<span>' + U.esc(p.labNombre || p.laboratorio) + '</span>' +
+          '<span>' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</span>' +
           (p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
           '<span>' + quiebre + '</span>' +
         '</div>' +
@@ -2337,12 +2820,15 @@ VLM.views = (function () {
   function exportarRepo(lista, cfg) {
     if (!lista.length) { U.toast('No hay nada para exportar', 'err'); return; }
     const filas = [[
-      'Codigo', 'Descripcion', 'Laboratorio', 'Ubicacion', 'Estado',
+      'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ambito', 'Ubicacion', 'Estado',
       'Stock actual', 'Stock minimo', 'Consumo diario', 'Dias de cobertura',
       'Fecha estimada de quiebre', 'Unidades a reponer', 'Valor estimado'
     ]];
     lista.forEach(p => filas.push([
-      p.codigo, p.descripcion, p.laboratorio, p.ubicacion,
+      p.codigo, p.descripcion, p.labNombre || p.laboratorio,
+      VLM.labs.ZONAS[p.conservacion] ? VLM.labs.ZONAS[p.conservacion].label : '',
+      VLM.labs.AMBITOS[p.ambito] ? VLM.labs.AMBITOS[p.ambito].label : '',
+      p.ubicacion,
       A.ESTADOS[p.estado].label,
       p.stock, p.stockMin,
       Math.round(p.consumoDiario * 100) / 100,
@@ -2362,7 +2848,9 @@ VLM.views = (function () {
   const COLUMNAS = [
     { id: 'codigo',        label: 'Código',    clase: 't-code' },
     { id: 'descripcion',   label: 'Producto',  clase: 't-desc' },
-    { id: 'laboratorio',   label: 'Laboratorio' },
+    { id: 'labNombre',     label: 'Laboratorio' },
+    { id: 'conservacion',  label: 'Conserv.' },
+    { id: 'ambito',        label: 'Ámbito' },
     { id: 'ubicacion',     label: 'Ubicación', clase: 't-code' },
     { id: 'stock',         label: 'Stock',     num: true },
     { id: 'stockMin',      label: 'Mínimo',    num: true },
@@ -2416,10 +2904,11 @@ VLM.views = (function () {
   function filtrar(items, ui) {
     const q = U.norm(ui.busqueda);
     return items.filter(p => {
-      if (ui.filtroLab && p.laboratorio !== ui.filtroLab) return false;
+      if (ui.filtroLab && (p.labNombre || p.laboratorio) !== ui.filtroLab) return false;
       if (ui.filtroEstado && p.estado !== ui.filtroEstado) return false;
       if (q) {
-        const blob = U.norm(p.codigo + ' ' + p.descripcion + ' ' + p.laboratorio + ' ' + p.ubicacion + ' ' + p.lote);
+        const blob = U.norm(p.codigo + ' ' + p.descripcion + ' ' + p.laboratorio + ' ' +
+          (p.labNombre || '') + ' ' + p.ubicacion + ' ' + p.lote);
         if (blob.indexOf(q) === -1) return false;
       }
       return true;
@@ -2448,7 +2937,10 @@ VLM.views = (function () {
         html += '<tr class="row-' + p.estado + '">' +
           '<td class="t-code">' + U.esc(p.codigo) + '</td>' +
           '<td class="t-desc">' + U.esc(p.descripcion) + '</td>' +
-          '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.laboratorio) + '"></i> ' + U.esc(p.laboratorio) + '</td>' +
+          '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.labNombre || p.laboratorio) + '"></i> ' +
+            U.esc(p.labNombre || p.laboratorio) + '</td>' +
+          '<td>' + zchip(p.conservacion) + '</td>' +
+          '<td>' + achip(p.ambito) + '</td>' +
           '<td class="t-code">' + U.esc(p.ubicacion || '—') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(p.stock) + '</strong></td>' +
           '<td class="t-num muted">' + (p.stockMin ? U.fmt(p.stockMin) : '—') + '</td>' +
@@ -2487,7 +2979,10 @@ VLM.views = (function () {
     });
   }
 
-  return { dashboard, laboratorios, reposicion, inventario, badge, kpi, stackbar, repoItem, exportarRepo };
+  return {
+    dashboard, laboratorios, reposicion, inventario,
+    badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem, exportarRepo
+  };
 })();
 
 </script>
@@ -2516,7 +3011,11 @@ VLM.tv = (function () {
      ------------------------------------------------------------ */
   const SLIDES = [
     { nombre: 'Resumen general', render: slideResumen },
-    { nombre: 'Reponer ahora',   render: slideCriticos, saltarSi: d => A.topUrgentes(d.items, 1).length === 0 },
+    { nombre: 'Reponer ahora',   render: slideCriticos,
+      saltarSi: d => A.topUrgentes(d.items, 1).length === 0 },
+    { nombre: 'Cadena de frío',  render: slideFrio,
+      saltarSi: d => d.items.filter(p => p.conservacion === 'frio').length === 0 },
+    { nombre: 'Zonas de almacenamiento', render: slideZonas },
     { nombre: 'Laboratorios',    render: slideLabs },
     { nombre: 'Proyección de consumo', render: slideProyeccion }
   ];
@@ -2676,6 +3175,61 @@ VLM.tv = (function () {
   }
 
   /* ------------------------------------------------------------
+     Pantalla · Cadena de frío (2-8 °C)
+     ------------------------------------------------------------ */
+  function slideFrio(el, items, cfg) {
+    const frio = items.filter(p => p.conservacion === 'frio');
+    const res = A.resumen(frio, cfg);
+    const urgentes = A.topUrgentes(frio, 6);
+
+    el.innerHTML =
+      '<h2>❄ Cadena de frío · 2 a 8 °C</h2>' +
+      '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
+        tvKpi('SKU refrigerados', U.fmt(res.skus), U.fmtCompact(res.unidades) + ' unidades') +
+        tvKpi('En alerta', U.fmt(res.enAlerta),
+              res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
+              res.enAlerta ? 'k-crit' : 'k-ok') +
+        tvKpi('Valor inmovilizado', res.valor ? '$' + U.fmtCompact(res.valor) : '—', 'stock refrigerado') +
+      '</div>' +
+      (urgentes.length
+        ? '<div class="tv-crit" style="margin-top:1.6vh">' + urgentes.map((p, i) => {
+            const dias = p.diasCobertura !== null && isFinite(p.diasCobertura) ? U.fmtDias(p.diasCobertura) : 's/d';
+            return '<div class="tv-crit-row r-' + p.estado + '">' +
+              '<div class="tv-crit-rank">' + (i + 1) + '</div>' +
+              '<div class="tv-crit-name">' + U.esc(p.descripcion) +
+                '<span class="tv-crit-lab"> · ' + U.esc(p.labNombre || p.laboratorio) +
+                (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
+              '<div class="tv-crit-val ' + (p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
+                '<span class="tv-crit-sub">días</span></div>' +
+              '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
+              '</div>';
+          }).join('') + '</div>'
+        : '<div class="tv-panel" style="margin-top:1.6vh;align-items:center;justify-content:center">' +
+          '<h3 style="color:var(--ok)">Sin alertas en cadena de frío</h3></div>');
+  }
+
+  /* ------------------------------------------------------------
+     Pantalla · Zonas (ámbito × conservación)
+     ------------------------------------------------------------ */
+  function slideZonas(el, items, cfg) {
+    const grupos = A.porGrupo(items, cfg);
+    el.innerHTML =
+      '<h2>Stock por zona de almacenamiento</h2>' +
+      '<div class="tv-labs">' + grupos.map(g => {
+        const r = g.resumen;
+        return '<div class="tv-lab">' +
+          '<div class="tv-lab-name">' + g.icono + ' ' + U.esc(g.label) + '</div>' +
+          '<div class="tv-lab-num">' + U.fmtCompact(r.unidades) + '</div>' +
+          '<div class="tv-lab-sub">' + r.skus + ' SKU · ' +
+            (g.alerta ? '<strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : 'sin alertas') +
+          '</div>' + V.stackbar(r) +
+          '<div class="tv-lab-sub" style="margin-top:.8vh">' +
+            g.labs.map(l => U.esc(l.nombre)).join(' · ') + '</div>' +
+          '</div>';
+      }).join('') + '</div>';
+  }
+
+  /* ------------------------------------------------------------
      Pantalla 3 · Laboratorios
      ------------------------------------------------------------ */
   function slideLabs(el, items, cfg) {
@@ -2746,14 +3300,36 @@ VLM.app = (function () {
     aplicarTema(S.state.ui.tema);
     wireTopbar();
     wireTabs();
+    wireZonebar();
     wireImport();
     wireSettings();
     S.on(motivo => {
+      if (motivo === 'labs') reclasificar();
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
       render();
     });
     render();
     setInterval(actualizarEstado, 60000);
+  }
+
+  /** Reaplica el catálogo de laboratorios sobre los productos ya cargados. */
+  function reclasificar() {
+    const cat = S.state.labs;
+    S.state.productos.forEach(p => VLM.labs.clasificar(p, cat));
+    S.guardar();
+    calculados = null;
+  }
+
+  /**
+   * Productos que se muestran: calculados, sin los laboratorios fuera del
+   * catálogo (si así está configurado) y filtrados por ámbito y conservación.
+   */
+  function itemsVisibles() {
+    const cfg = S.state.cfg, ui = S.state.ui;
+    if (!calculados) calculados = A.calcular(S.state.productos, cfg);
+    let items = calculados;
+    if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
+    return A.filtrarPorZona(items, ui);
   }
 
   /* ============================================================
@@ -2763,12 +3339,14 @@ VLM.app = (function () {
     const hay = S.hayDatos();
     $('#empty').hidden = hay;
     $('#tabs').hidden = !hay;
+    $('#zonebar').hidden = !hay;
     $$('.view').forEach(v => v.hidden = true);
     actualizarEstado();
     if (!hay) return;
 
     const cfg = S.state.cfg;
-    if (!calculados) calculados = A.calcular(S.state.productos, cfg);
+    const items = itemsVisibles();
+    sincronizarZonebar(items);
 
     const vista = S.state.ui.vista;
     $$('.tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === vista));
@@ -2776,11 +3354,17 @@ VLM.app = (function () {
     if (!el) return;
     el.hidden = false;
 
+    if (!items.length) {
+      el.innerHTML = '<div class="no-results"><strong>Ningún producto coincide con el filtro</strong><br>' +
+        '<span class="small">Probá con “Todo” y “Todas” en la barra de arriba.</span></div>';
+      return;
+    }
+
     try {
-      if (vista === 'dashboard') V.dashboard(el, calculados, cfg);
-      else if (vista === 'labs')  V.laboratorios(el, calculados, cfg);
-      else if (vista === 'repo')  V.reposicion(el, calculados, cfg);
-      else if (vista === 'inv')   V.inventario(el, calculados, cfg);
+      if (vista === 'dashboard') V.dashboard(el, items, cfg);
+      else if (vista === 'labs')  V.laboratorios(el, items, cfg);
+      else if (vista === 'repo')  V.reposicion(el, items, cfg);
+      else if (vista === 'inv')   V.inventario(el, items, cfg);
     } catch (e) {
       console.error(e);
       el.innerHTML = '<div class="no-results"><strong>Error al dibujar la vista</strong><br>' +
@@ -2795,7 +3379,34 @@ VLM.app = (function () {
       S.setUi({ filtroLab: c.dataset.lab, filtroEstado: null, vista: 'repo' });
     }));
 
-    if (VLM.tv.activo) VLM.tv.refrescar(calculados, cfg);
+    if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+  }
+
+  /* ---------- barra de ámbito / conservación ---------- */
+
+  function wireZonebar() {
+    $$('#zonebar .seg').forEach(seg => {
+      const clave = seg.dataset.key;
+      U.$$('.seg-btn', seg).forEach(btn => btn.addEventListener('click', () => {
+        S.setUi({ [clave]: btn.dataset.val || null });
+      }));
+    });
+  }
+
+  function sincronizarZonebar(items) {
+    const ui = S.state.ui;
+    $$('#zonebar .seg').forEach(seg => {
+      const actual = ui[seg.dataset.key] || '';
+      U.$$('.seg-btn', seg).forEach(btn =>
+        btn.classList.toggle('is-active', btn.dataset.val === actual));
+    });
+
+    const total = S.state.productos.length;
+    const excluidos = S.state.cfg.labsNoListados === 'excluir'
+      ? S.state.productos.filter(p => !p.gestionado).length : 0;
+    let txt = items.length + ' de ' + total + ' productos';
+    if (excluidos) txt += ' · ' + excluidos + ' fuera del catálogo de laboratorios';
+    $('#zoneCount').textContent = txt;
   }
 
   function actualizarEstado() {
@@ -2830,8 +3441,7 @@ VLM.app = (function () {
       render();
     });
     $('#btnTV').addEventListener('click', () => {
-      if (!calculados) calculados = A.calcular(S.state.productos, S.state.cfg);
-      VLM.tv.entrar(calculados, S.state.cfg);
+      VLM.tv.entrar(itemsVisibles(), S.state.cfg);
     });
     $('#tvExit').addEventListener('click', () => VLM.tv.salir());
 
@@ -2992,7 +3602,7 @@ VLM.app = (function () {
   }
 
   function pintarPreview() {
-    const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg);
+    const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs);
     imp.resultado = r;
     const muestra = r.productos.slice(0, 8);
     $('#prevCount').textContent = r.productos.length
@@ -3019,7 +3629,7 @@ VLM.app = (function () {
 
   function confirmarImport() {
     if (!validarMapeo()) return;
-    const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg);
+    const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs);
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
     S.setProductos(r.productos, {
@@ -3038,37 +3648,58 @@ VLM.app = (function () {
      DATOS DE EJEMPLO
      ============================================================ */
   const DEMO = [
-    ['Codigo','Descripcion','Laboratorio','Ubicacion','Stock','Stock Minimo','Stock Maximo','Consumo Mensual','Lote','Vencimiento','Precio'],
-    ['A-1001','Amoxicilina 500mg x21 comp','Bago','B01-C03',340,120,600,280,'L2451','2027-04-30',1250],
-    ['A-1002','Ibuprofeno 400mg x20 comp','Bago','B01-C04',85,150,700,420,'L2455','2027-01-31',890],
-    ['A-1003','Paracetamol 500mg x30 comp','Roemmers','B01-C05',1240,300,1500,610,'L3312','2028-02-28',760],
-    ['A-1004','Enalapril 10mg x30 comp','Roemmers','B02-C01',42,100,500,190,'L3319','2026-11-30',980],
-    ['A-1005','Losartan 50mg x30 comp','Elea','B02-C02',610,200,900,340,'L7781','2027-09-30',1420],
-    ['A-1006','Metformina 850mg x30 comp','Elea','B02-C03',150,180,800,360,'L7788','2027-06-30',1130],
-    ['A-1007','Atorvastatina 20mg x30 comp','Gador','B02-C04',880,250,1200,410,'L5502','2028-05-31',2100],
-    ['A-1008','Levotiroxina 100mcg x50 comp','Gador','B03-C01',95,120,600,230,'L5510','2027-03-31',1650],
-    ['A-1009','Omeprazol 20mg x30 caps','Raffo','B03-C02',720,200,1000,380,'L9021','2027-12-31',940],
-    ['A-1010','Amlodipina 5mg x30 comp','Raffo','B03-C03',26,90,450,175,'L9033','2026-10-31',1080],
-    ['A-1011','Salbutamol aerosol 200 dosis','Roche','B03-C04',58,60,300,145,'L1140','2027-08-31',4300],
-    ['A-1012','Insulina Glargina 100UI lapicera','Roche','B04-C01',34,40,180,95,'L1155','2026-12-15',18900],
-    ['A-1013','Clopidogrel 75mg x30 comp','Pfizer','B04-C02',410,150,700,260,'L6620','2028-01-31',2650],
-    ['A-1014','Sertralina 50mg x30 comp','Pfizer','B04-C03',192,140,600,290,'L6631','2027-07-31',1780],
-    ['A-1015','Rivaroxaban 20mg x28 comp','Bayer','B04-C04',64,80,350,155,'L4410','2027-05-31',9800],
-    ['A-1016','Aspirina Prevent 100mg x60','Bayer','B05-C01',1520,400,2000,520,'L4422','2029-03-31',680],
-    ['A-1017','Diclofenac 75mg amp x5','Novartis','B05-C02',210,120,600,240,'L8815','2027-02-28',1340],
-    ['A-1018','Valsartan 160mg x28 comp','Novartis','B05-C03',7,70,400,180,'L8829','2026-09-30',2380],
-    ['A-1019','Clexane 40mg jeringa x2','Sanofi','B05-C04',118,60,300,130,'L2207','2027-10-31',12400],
-    ['A-1020','Ramipril 5mg x30 comp','Sanofi','B06-C01',455,150,700,215,'L2219','2028-04-30',1290],
-    ['A-1021','Dexametasona 8mg amp x3','Bago','B06-C02',0,50,250,110,'L2470','2027-11-30',1560],
-    ['A-1022','Ceftriaxona 1g amp','Roemmers','B06-C03',88,100,500,320,'L3341','2027-04-30',3200],
-    ['A-1023','Ondansetron 8mg amp x5','Elea','B06-C04',265,80,400,140,'L7799','2028-03-31',2950],
-    ['A-1024','Hidroclorotiazida 25mg x30','Gador','B07-C01',690,180,800,210,'L5528','2028-06-30',720],
-    ['A-1025','Furosemida 40mg x30 comp','Raffo','B07-C02',132,150,650,275,'L9044','2027-09-30',860]
+    ['Codigo','Descripcion','Laboratorio','Conservacion','Ubicacion','Stock','Stock Minimo','Stock Maximo','Consumo Mensual','Lote','Vencimiento','Precio'],
+
+    // --- ASTRAZENECA · VLM ---
+    ['AZ-101','Tagrisso 80mg x30 comp','ASTRAZENECA','Ambiente','B01-C01',140,60,320,95,'AZ4411','2027-08-31',2480000],
+    ['AZ-102','Forxiga 10mg x28 comp','ASTRAZENECA','Ambiente','B01-C02',62,80,400,150,'AZ4418','2027-11-30',38500],
+    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','Ambiente','B01-C03',410,120,600,185,'AZ4423','2028-02-28',29800],
+    ['AZ-104','Symbicort 160/4.5 turbuhaler','ASTRAZENECA','Ambiente','B01-C04',228,90,450,140,'AZ4430','2027-06-30',46200],
+    ['AZ-105','Imfinzi 500mg vial','ASTRAZENECA','Frio','CF-A1',18,12,60,26,'AZ7702','2027-03-31',3950000],
+    ['AZ-106','Faslodex 250mg jeringa x2','ASTRAZENECA','Frio','CF-A2',34,20,90,38,'AZ7715','2027-09-30',890000],
+
+    // --- ROCHE · VLM ---
+    ['RO-201','Herceptin 440mg vial','ROCHE','Frio','CF-B1',4,10,40,14,'RO8801','2027-05-31',4120000],
+    ['RO-202','MabThera 500mg vial','ROCHE','Frio','CF-B2',11,10,45,17,'RO8809','2027-07-31',3480000],
+    ['RO-203','Avastin 400mg vial','ROCHE','Frio','CF-B3',26,14,60,22,'RO8814','2028-01-31',2760000],
+    ['RO-204','Actemra 400mg vial','ROCHE','Frio','CF-B4',31,12,50,15,'RO8820','2027-10-31',1980000],
+    ['RO-205','Xeloda 500mg x120 comp','ROCHE','Ambiente','B02-C01',96,45,220,68,'RO3310','2028-04-30',312000],
+    ['RO-206','Tamiflu 75mg x10 caps','ROCHE','Ambiente','B02-C02',315,100,500,120,'RO3318','2027-12-31',68400],
+
+    // --- SANOFI AVENTIS · VLM ---
+    ['SA-301','Lantus SoloStar 100UI x5','SANOFI AVENTIS','Frio','CF-C1',0,20,90,45,'SA5501','2027-02-28',186000],
+    ['SA-302','Toujeo SoloStar 300UI x3','SANOFI AVENTIS','Frio','CF-C2',22,18,80,36,'SA5508','2027-04-30',214000],
+    ['SA-303','Plavix 75mg x28 comp','SANOFI AVENTIS','Ambiente','B03-C01',520,150,700,210,'SA2210','2028-06-30',41200],
+    ['SA-304','Clexane 40mg jeringa x10','SANOFI AVENTIS','Ambiente','B03-C02',148,80,380,165,'SA2217','2027-09-30',124000],
+    ['SA-305','Aubagio 14mg x28 comp','SANOFI AVENTIS','Ambiente','B03-C03',73,40,180,55,'SA2224','2027-11-30',890000],
+    ['SA-306','Taxotere 80mg vial','SANOFI AVENTIS','Ambiente','B03-C04',41,25,110,32,'SA2231','2028-03-31',412000],
+
+    // --- AMGEN · VLM (biológicos, todo cadena de frío) ---
+    ['AM-401','Neulasta 6mg jeringa','AMGEN','Frio','CF-D1',8,15,60,22,'AM9901','2027-06-30',1240000],
+    ['AM-402','Prolia 60mg jeringa','AMGEN','Frio','CF-D2',37,20,85,29,'AM9908','2027-08-31',680000],
+    ['AM-403','Xgeva 120mg vial','AMGEN','Frio','CF-D3',24,16,70,25,'AM9914','2028-01-31',920000],
+    ['AM-404','Aranesp 40mcg jeringa x4','AMGEN','Frio','CF-D4',52,25,120,34,'AM9920','2027-10-31',445000],
+    ['AM-405','Repatha 140mg lapicera x2','AMGEN','Frio','CF-D5',19,22,95,41,'AM9927','2027-05-31',528000],
+
+    // --- ABBVIE · fuera del VLM ---
+    ['AB-501','Humira 40mg jeringa x2','ABBVIE','Frio','DEP-F1',13,18,75,31,'AB6601','2027-07-31',1580000],
+    ['AB-502','Venclexta 100mg x28 comp','ABBVIE','Ambiente','DEP-A3',44,25,120,38,'AB6608','2028-02-29',1920000],
+    ['AB-503','Creon 25000 x50 caps','ABBVIE','Ambiente','DEP-A4',186,70,340,112,'AB6615','2028-05-31',54800],
+    ['AB-504','Rinvoq 15mg x28 comp','ABBVIE','Ambiente','DEP-A5',58,30,140,46,'AB6622','2027-12-31',1340000],
+
+    // --- BIOSIDUS ARGENTINA · fuera del VLM ---
+    ['BS-601','Bioyetin 4000 UI x6 amp','BIOSIDUS ARGENTINA','Frio','DEP-F2',96,40,200,72,'BS1101','2027-04-30',148000],
+    ['BS-602','Neutromax 300mcg x5 jeringa','BIOSIDUS ARGENTINA','Frio','DEP-F3',28,30,130,58,'BS1108','2027-06-30',196000],
+    ['BS-603','Bioferon 3MUI x5 amp','BIOSIDUS ARGENTINA','Frio','DEP-F4',61,25,110,34,'BS1115','2028-01-31',132000],
+
+    // --- fuera del catálogo: se excluyen, pero la app avisa cuántos son ---
+    ['GA-701','Ibuprofeno 600mg x20 comp','GADOR','Ambiente','B09-C01',480,150,700,260,'GA0110','2028-03-31',12400],
+    ['EL-702','Losartan 50mg x30 comp','ELEA','Ambiente','B09-C02',312,120,600,195,'EL0220','2027-10-31',15800]
   ];
 
   function cargarDemo() {
     const mapa = P.autoMapear(DEMO[0]);
-    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg);
+    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs);
     S.setProductos(r.productos, {
       archivo: 'Datos de ejemplo',
       hoja: 'demo',
@@ -3099,7 +3730,81 @@ VLM.app = (function () {
       if (tipo === 'bool') el.checked = !!S.state.cfg[clave];
       else el.value = S.state.cfg[clave];
     });
+    $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
+    pintarLabsEditor();
     $('#modalSettings').hidden = false;
+  }
+
+  /* ---------- catálogo de laboratorios ---------- */
+
+  function pintarLabsEditor() {
+    const L = VLM.labs;
+    const labs = S.state.labs;
+    const cont = $('#labsEditor');
+
+    cont.innerHTML =
+      '<div class="labs-head"><span>Laboratorio</span><span>Ámbito</span><span>Conservación</span><span></span></div>' +
+      labs.map((l, i) =>
+        '<div class="lab-row" data-i="' + i + '">' +
+          '<div>' +
+            '<input type="text" data-campo="nombre" value="' + U.esc(l.nombre) + '" placeholder="Nombre">' +
+            '<span class="lab-alias">Reconoce: ' + U.esc(l.alias.join(', ')) + '</span>' +
+          '</div>' +
+          '<select data-campo="ambito">' +
+            Object.keys(L.AMBITOS).map(k => '<option value="' + k + '"' +
+              (l.ambito === k ? ' selected' : '') + '>' + L.AMBITOS[k].corto + '</option>').join('') +
+          '</select>' +
+          '<select data-campo="zona">' +
+            Object.keys(L.ZONAS).map(k => '<option value="' + k + '"' +
+              (l.zona === k ? ' selected' : '') + '>' + L.ZONAS[k].icono + ' ' + L.ZONAS[k].corto + '</option>').join('') +
+          '</select>' +
+          '<button class="btn btn-icon lab-row-del" title="Quitar del catálogo">' +
+            '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
+        '</div>').join('');
+
+    U.$$('.lab-row', cont).forEach(row => {
+      const i = +row.dataset.i;
+      U.$$('input, select', row).forEach(campo => campo.addEventListener('change', () => {
+        const labs2 = S.state.labs.slice();
+        const l = Object.assign({}, labs2[i]);
+        const valor = campo.value.trim();
+        if (campo.dataset.campo === 'nombre') {
+          if (!valor) { campo.value = l.nombre; return; }
+          l.nombre = valor;
+          // el nombre siempre tiene que estar entre los alias reconocidos
+          if (!l.alias.some(a => U.norm(a) === U.norm(valor))) l.alias = [valor].concat(l.alias);
+        } else {
+          l[campo.dataset.campo] = valor;
+        }
+        labs2[i] = l;
+        S.setLabs(labs2);
+        pintarLabsEditor();
+      }));
+      U.$('.lab-row-del', row).addEventListener('click', () => {
+        const l = S.state.labs[i];
+        if (!confirm('¿Quitar "' + l.nombre + '" del catálogo?\n\nSus productos dejarán de mostrarse.')) return;
+        S.setLabs(S.state.labs.filter((_, j) => j !== i));
+        pintarLabsEditor();
+      });
+    });
+  }
+
+  function agregarLab() {
+    const nombre = (prompt('Nombre del laboratorio:') || '').trim();
+    if (!nombre) return;
+    if (S.state.labs.some(l => U.norm(l.nombre) === U.norm(nombre))) {
+      U.toast('Ese laboratorio ya está en el catálogo', 'err');
+      return;
+    }
+    S.setLabs(S.state.labs.concat([{
+      id: U.norm(nombre).replace(/ /g, '-') || ('lab' + Date.now()),
+      nombre: nombre,
+      alias: [nombre],
+      ambito: 'vlm',
+      zona: 'ambiente'
+    }]));
+    pintarLabsEditor();
+    U.toast('Agregado: ' + nombre, 'ok');
   }
 
   function wireSettings() {
@@ -3114,9 +3819,20 @@ VLM.app = (function () {
       });
     });
 
+    $('#btnAddLab').addEventListener('click', agregarLab);
+    $('#btnResetLabs').addEventListener('click', () => {
+      if (!confirm('¿Restaurar el catálogo original de laboratorios?')) return;
+      S.resetLabs();
+      pintarLabsEditor();
+      U.toast('Catálogo restaurado', 'ok');
+    });
+    $('#cfgIncluirNoListados').addEventListener('change', e => {
+      S.setCfg({ labsNoListados: e.target.checked ? 'incluir' : 'excluir' });
+    });
+
     $('#btnExportCsv').addEventListener('click', () => {
       if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
-      const items = calculados || A.calcular(S.state.productos, S.state.cfg);
+      const items = itemsVisibles();
       V.exportarRepo(
         items.filter(p => ['agotado', 'critico', 'bajo'].indexOf(p.estado) > -1)
              .sort((a, b) => a.urgencia - b.urgencia),

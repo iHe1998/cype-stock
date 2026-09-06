@@ -30,6 +30,12 @@
   --info:        #a78bfa;
   --info-dim:    #2c2350;
 
+  /* zonas de conservación */
+  --frio:        #22d3ee;
+  --frio-dim:    #0c3a44;
+  --ambiente:    #f0a868;
+  --ambiente-dim:#3d2a15;
+
   /* forma */
   --r-sm: 6px;
   --r:    10px;
@@ -65,6 +71,10 @@
   --crit-dim:    #fee2e2;
   --info:        #7c3aed;
   --info-dim:    #ede9fe;
+  --frio:        #0891b2;
+  --frio-dim:    #cffafe;
+  --ambiente:    #b45309;
+  --ambiente-dim:#fef0dc;
   --shadow:      0 1px 2px rgba(16,24,38,.06), 0 8px 24px rgba(16,24,38,.07);
   --shadow-lg:   0 24px 64px rgba(16,24,38,.18);
 }
@@ -194,6 +204,108 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 }
 .tab:hover { color: var(--text-2); }
 .tab.is-active { color: var(--text); border-bottom-color: var(--accent); }
+
+/* ============================================================
+   BARRA DE ZONA (ámbito × conservación)
+   ============================================================ */
+.zonebar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+.zonebar[hidden] { display: none; }
+.zonebar-sep { width: 1px; height: 20px; background: var(--border); }
+
+.seg {
+  display: inline-flex; padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.seg-btn {
+  appearance: none; border: 0; background: none;
+  font: inherit; font-size: 12.5px; font-weight: 550;
+  color: var(--muted);
+  padding: 5px 12px; border-radius: 4px;
+  cursor: pointer; white-space: nowrap;
+  transition: background .13s, color .13s;
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.seg-btn.z-frio.is-active { color: var(--frio); background: var(--frio-dim); }
+.seg-btn.z-amb.is-active  { color: var(--ambiente); background: var(--ambiente-dim); }
+
+/* chips de zona y ámbito */
+.zchip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 650;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+  border: 1px solid transparent;
+}
+.z-frio     { color: var(--frio);     background: var(--frio-dim);     border-color: color-mix(in srgb, var(--frio) 30%, transparent); }
+.z-ambiente { color: var(--ambiente); background: var(--ambiente-dim); border-color: color-mix(in srgb, var(--ambiente) 30%, transparent); }
+.a-vlm      { color: var(--accent);   background: var(--accent-dim);   border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.a-externo  { color: var(--muted);    background: var(--surface-3);    border-color: var(--border); }
+
+/* encabezado de grupo (VLM · Cámara de frío) */
+.grupo-head {
+  display: flex; align-items: center; gap: 10px;
+  margin: 26px 0 12px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--border);
+}
+.grupo-head:first-child { margin-top: 0; }
+.grupo-head h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.grupo-head .g-ico { font-size: 17px; }
+.grupo-head.g-frio { border-bottom-color: color-mix(in srgb, var(--frio) 45%, transparent); }
+.grupo-head.g-ambiente { border-bottom-color: color-mix(in srgb, var(--ambiente) 45%, transparent); }
+.grupo-head .g-meta { font-size: 12px; color: var(--muted); }
+
+/* tarjetas de cuadrante en el resumen */
+.zona-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.zona-card {
+  padding: 14px 16px; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: 3px solid var(--frio);
+  box-shadow: var(--shadow);
+}
+.zona-card.zc-ambiente { border-top-color: var(--ambiente); }
+.zona-card.zc-externo { opacity: .92; border-style: dashed; }
+.zona-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.zona-card-name { font-size: 13px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
+.zona-card-nums { display: flex; gap: 18px; margin-bottom: 10px; }
+.zona-card-nums div b { display: block; font-size: 22px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.zona-card-nums div span { font-size: 11px; color: var(--muted); }
+.zona-card-nums div.n-alerta b { color: var(--crit); }
+.zona-card-labs { font-size: 11.5px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+
+/* ============================================================
+   EDITOR DE LABORATORIOS (Configuración)
+   ============================================================ */
+.labs-editor { display: flex; flex-direction: column; gap: 8px; }
+.lab-row {
+  display: grid; grid-template-columns: 1fr 110px 118px 32px;
+  gap: 8px; align-items: center;
+  padding: 9px 10px;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm);
+}
+.lab-row input, .lab-row select {
+  height: 30px; padding: 0 8px; width: 100%;
+  font: inherit; font-size: 12.5px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; outline: none;
+}
+.lab-row input:focus, .lab-row select:focus { border-color: var(--accent); }
+.lab-row .lab-alias { font-size: 11px; color: var(--muted); margin-top: 3px; display: block; }
+.lab-row-del { color: var(--muted); }
+.lab-row-del:hover { color: var(--crit); border-color: var(--crit); }
+.labs-head {
+  display: grid; grid-template-columns: 1fr 110px 118px 32px; gap: 8px;
+  font-size: 10.5px; font-weight: 650; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted); padding: 0 10px 2px;
+}
 
 /* ============================================================
    LAYOUT

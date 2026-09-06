@@ -22,7 +22,11 @@ VLM.tv = (function () {
      ------------------------------------------------------------ */
   const SLIDES = [
     { nombre: 'Resumen general', render: slideResumen },
-    { nombre: 'Reponer ahora',   render: slideCriticos, saltarSi: d => A.topUrgentes(d.items, 1).length === 0 },
+    { nombre: 'Reponer ahora',   render: slideCriticos,
+      saltarSi: d => A.topUrgentes(d.items, 1).length === 0 },
+    { nombre: 'Cadena de frío',  render: slideFrio,
+      saltarSi: d => d.items.filter(p => p.conservacion === 'frio').length === 0 },
+    { nombre: 'Zonas de almacenamiento', render: slideZonas },
     { nombre: 'Laboratorios',    render: slideLabs },
     { nombre: 'Proyección de consumo', render: slideProyeccion }
   ];
@@ -177,6 +181,61 @@ VLM.tv = (function () {
           '<div class="tv-crit-val ' + (p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
             '<span class="tv-crit-sub">días</span></div>' +
           '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
+          '</div>';
+      }).join('') + '</div>';
+  }
+
+  /* ------------------------------------------------------------
+     Pantalla · Cadena de frío (2-8 °C)
+     ------------------------------------------------------------ */
+  function slideFrio(el, items, cfg) {
+    const frio = items.filter(p => p.conservacion === 'frio');
+    const res = A.resumen(frio, cfg);
+    const urgentes = A.topUrgentes(frio, 6);
+
+    el.innerHTML =
+      '<h2>❄ Cadena de frío · 2 a 8 °C</h2>' +
+      '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
+        tvKpi('SKU refrigerados', U.fmt(res.skus), U.fmtCompact(res.unidades) + ' unidades') +
+        tvKpi('En alerta', U.fmt(res.enAlerta),
+              res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
+              res.enAlerta ? 'k-crit' : 'k-ok') +
+        tvKpi('Valor inmovilizado', res.valor ? '$' + U.fmtCompact(res.valor) : '—', 'stock refrigerado') +
+      '</div>' +
+      (urgentes.length
+        ? '<div class="tv-crit" style="margin-top:1.6vh">' + urgentes.map((p, i) => {
+            const dias = p.diasCobertura !== null && isFinite(p.diasCobertura) ? U.fmtDias(p.diasCobertura) : 's/d';
+            return '<div class="tv-crit-row r-' + p.estado + '">' +
+              '<div class="tv-crit-rank">' + (i + 1) + '</div>' +
+              '<div class="tv-crit-name">' + U.esc(p.descripcion) +
+                '<span class="tv-crit-lab"> · ' + U.esc(p.labNombre || p.laboratorio) +
+                (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
+              '<div class="tv-crit-val ' + (p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
+                '<span class="tv-crit-sub">días</span></div>' +
+              '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
+              '</div>';
+          }).join('') + '</div>'
+        : '<div class="tv-panel" style="margin-top:1.6vh;align-items:center;justify-content:center">' +
+          '<h3 style="color:var(--ok)">Sin alertas en cadena de frío</h3></div>');
+  }
+
+  /* ------------------------------------------------------------
+     Pantalla · Zonas (ámbito × conservación)
+     ------------------------------------------------------------ */
+  function slideZonas(el, items, cfg) {
+    const grupos = A.porGrupo(items, cfg);
+    el.innerHTML =
+      '<h2>Stock por zona de almacenamiento</h2>' +
+      '<div class="tv-labs">' + grupos.map(g => {
+        const r = g.resumen;
+        return '<div class="tv-lab">' +
+          '<div class="tv-lab-name">' + g.icono + ' ' + U.esc(g.label) + '</div>' +
+          '<div class="tv-lab-num">' + U.fmtCompact(r.unidades) + '</div>' +
+          '<div class="tv-lab-sub">' + r.skus + ' SKU · ' +
+            (g.alerta ? '<strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : 'sin alertas') +
+          '</div>' + V.stackbar(r) +
+          '<div class="tv-lab-sub" style="margin-top:.8vh">' +
+            g.labs.map(l => U.esc(l.nombre)).join(' · ') + '</div>' +
           '</div>';
       }).join('') + '</div>';
   }

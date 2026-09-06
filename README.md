@@ -5,7 +5,8 @@ planilla Excel. Pensado para quedar proyectado en un televisor del depósito y q
 vea de un vistazo qué hay que reponer.
 
 - 📊 Gráficos de stock, consumo y proyección
-- 🏭 Agrupación por **laboratorio**
+- 🏭 Catálogo cerrado de **laboratorios**, con los de fuera separados y contados
+- ❄️ Separa **cámara de frío** (2-8 °C) de **ambiente**, y **dentro** de **fuera del VLM**
 - 🔴 Marca los productos **próximos a vaciarse** y los ya agotados
 - 📅 Calcula **días de cobertura** y la **fecha estimada de quiebre**
 - 📺 **Modo TV**: pantallas rotativas a gran escala
@@ -60,6 +61,7 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 | Stock mínimo | — | Minimo, Punto de Pedido, Stock Min |
 | Stock máximo | — | Maximo, Capacidad |
 | Consumo diario | — | Consumo Diario, Promedio Diario |
+| Conservación | — | Conservacion, Cadena de Frío, Temperatura, Refrigerado |
 | Consumo mensual | — | Consumo Mensual, Salidas Mes, Demanda Mensual |
 | Lote | — | Lote, Partida, Batch |
 | Vencimiento | — | Vencimiento, Vto, Caducidad |
@@ -71,6 +73,45 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 
 Hay una planilla de ejemplo en [`data/plantilla_vlm.csv`](data/plantilla_vlm.csv), y desde la
 pantalla inicial podés **descargar la plantilla en `.xlsx`**.
+
+---
+
+## Laboratorios, ámbito y conservación
+
+Los productos se clasifican en dos dimensiones independientes, que se combinan
+en cuatro cuadrantes: **VLM · Frío**, **VLM · Ambiente**, **Fuera · Frío**, **Fuera · Ambiente**.
+La barra superior filtra por cualquiera de las dos y afecta a todas las vistas.
+
+### Catálogo (editable en ⚙ Configuración)
+
+| Laboratorio | Ámbito | Conservación por defecto |
+|---|---|---|
+| AstraZeneca | VLM | Ambiente |
+| Roche | VLM | Frío |
+| Sanofi Aventis | VLM | Ambiente |
+| Amgen | VLM | Frío |
+| AbbVie | Fuera del VLM | Frío |
+| Biosidus Argentina | Fuera del VLM | Frío |
+
+**Sólo se procesan los laboratorios del catálogo.** Los demás quedan fuera de KPIs y
+gráficos, pero la app *dice cuántos son* en la barra superior — para que un nombre mal
+escrito no desaparezca en silencio. Si querés verlos igual, hay un check en Configuración.
+
+El matcheo es tolerante: reconoce razones sociales completas. `LAB. ROCHE S.A.Q. e I.`,
+`SANOFI-AVENTIS ARGENTINA S.A.` y `ASTRA ZENECA ARGENTINA` caen en el laboratorio correcto.
+
+### De dónde sale frío o ambiente
+
+Se resuelve con esta prioridad:
+
+1. **La columna de conservación de la planilla**, si existe. Entiende `Frío`, `Refrigerado`,
+   `2-8°C`, `Termolábil`, `Heladera`, `Ambiente`, `15-25°C`, `Seco`. En una columna llamada
+   `Cadena de frío`, un `SI`/`NO` también se interpreta bien.
+2. **El valor por defecto del laboratorio**, según la tabla de arriba.
+3. Si no hay ninguno de los dos: `Ambiente`.
+
+Así un laboratorio puede tener productos en las dos zonas (Roche tiene los biológicos en
+frío y Xeloda o Tamiflu en ambiente) y aparece en los dos cuadrantes.
 
 ---
 
@@ -118,6 +159,7 @@ index.html            estructura y modales
 build.ps1             arma la versión de un solo archivo (dist/)
 css/styles.css        sistema de diseño (tema oscuro/claro, modo TV)
 js/util.js            formateo de números y fechas, colores, helpers
+js/labs.js            catálogo de laboratorios, ámbito y conservación
 js/store.js           estado global, configuración y persistencia
 js/parser.js          lectura de Excel, detección y mapeo de columnas
 js/analytics.js       cobertura, criticidad, proyecciones y agregados

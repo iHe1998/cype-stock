@@ -16,6 +16,48 @@ VLM.views = (function () {
     return '<span class="badge b-' + estado + '">' + e.label + '</span>';
   }
 
+  /** Chip de conservación (❄ Frío / 🌡 Ambiente). */
+  function zchip(zona) {
+    const z = VLM.labs.ZONAS[zona];
+    if (!z) return '';
+    return '<span class="zchip z-' + zona + '" title="' + z.desc + '">' + z.icono + ' ' + z.corto + '</span>';
+  }
+
+  /** Chip de ámbito (VLM / Fuera). */
+  function achip(ambito) {
+    const a = VLM.labs.AMBITOS[ambito];
+    if (!a) return '';
+    return '<span class="zchip a-' + ambito + '" title="' + a.desc + '">' + a.corto + '</span>';
+  }
+
+  /** Encabezado de un cuadrante ámbito × conservación. */
+  function grupoHead(g) {
+    const r = g.resumen;
+    return '<div class="grupo-head g-' + g.zona + '">' +
+      '<h3><span class="g-ico">' + g.icono + '</span>' + U.esc(g.label) + '</h3>' +
+      '<span class="g-meta">' + r.skus + ' SKU · ' + U.fmtCompact(r.unidades) + ' unidades' +
+        (g.alerta ? ' · <strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : '') +
+      '</span></div>';
+  }
+
+  /** Tarjeta de cuadrante para el resumen. */
+  function zonaCard(g) {
+    const r = g.resumen;
+    return '<div class="zona-card zc-' + g.zona + (g.ambito === 'externo' ? ' zc-externo' : '') + '">' +
+      '<div class="zona-card-top">' +
+        '<div class="zona-card-name">' + g.icono + ' ' + VLM.labs.ZONAS[g.zona].label + '</div>' +
+        achip(g.ambito) +
+      '</div>' +
+      '<div class="zona-card-nums">' +
+        '<div><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
+        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>unidades</span></div>' +
+        '<div class="' + (g.alerta ? 'n-alerta' : '') + '"><b>' + U.fmt(g.alerta) + '</b><span>en alerta</span></div>' +
+      '</div>' +
+      stackbar(r) +
+      '<div class="zona-card-labs">' + g.labs.map(l => U.esc(l.nombre)).join(' · ') + '</div>' +
+      '</div>';
+  }
+
   function kpi(label, valor, sub, clase) {
     return '<div class="kpi ' + (clase || '') + '">' +
       '<div class="kpi-label">' + U.esc(label) + '</div>' +
@@ -51,6 +93,7 @@ VLM.views = (function () {
   function dashboard(el, items, cfg) {
     const res  = A.resumen(items, cfg);
     const labs = A.porLaboratorio(items, cfg);
+    const grupos = A.porGrupo(items, cfg);
     const proy = A.proyeccion(items, cfg);
     const tramos = A.quiebresPorTramo(items, cfg);
     const urgentes = A.topUrgentes(items, 6);
@@ -70,9 +113,16 @@ VLM.views = (function () {
       kpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo),
           'menos de ' + cfg.diasBajo + ' días de cobertura',
           res.porEstado.bajo > 0 ? 'k-warn' : 'k-ok') +
+      kpi('❄ Cadena de frío en alerta', U.fmt(res.alertaZona.frio),
+          'de ' + res.porZona.frio + ' SKU refrigerados',
+          res.alertaZona.frio > 0 ? 'k-crit' : 'k-ok') +
       kpi('Consumo a ' + cfg.horizonte + ' días', U.fmtCompact(res.consumoHorizonte),
           U.fmt(res.consumoDiario, true) + ' uds/día · cobertura ' + cobertura, 'k-info') +
       '</div>';
+
+    /* --- cuadrantes ámbito × conservación --- */
+    html += '<h3 class="section-title">Por zona de almacenamiento</h3>';
+    html += '<div class="zona-grid">' + grupos.map(zonaCard).join('') + '</div>';
 
     /* --- aviso de faltante proyectado --- */
     if (res.faltanteHorizonte > 0) {
@@ -125,6 +175,7 @@ VLM.views = (function () {
      ============================================================ */
   function laboratorios(el, items, cfg) {
     const labs = A.porLaboratorio(items, cfg);
+    const grupos = A.porGrupo(items, cfg);
 
     let html = '<div class="toolbar">' +
       '<input class="input" id="labSearch" type="search" placeholder="Buscar laboratorio…" ' +
@@ -137,8 +188,11 @@ VLM.views = (function () {
       cardChart('Consumo proyectado', cfg.horizonte + ' días', 'chLabConsumo', 340) +
       '</div>';
 
-    html += '<h3 class="section-title">Detalle por laboratorio</h3>';
-    html += '<div class="lab-grid" id="labGrid">' + labs.map(l => labCard(l, cfg)).join('') + '</div>';
+    // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente
+    html += '<div id="labGrid">' + grupos.map(g =>
+      grupoHead(g) +
+      '<div class="lab-grid">' + g.labs.map(l => labCard(l, cfg, g.zona)).join('') + '</div>'
+    ).join('') + '</div>';
 
     el.innerHTML = html;
     C.estadosPorLab($('#chLabEstados', el), labs);
@@ -150,15 +204,23 @@ VLM.views = (function () {
       U.$$('#labGrid .lab-card', el).forEach(card => {
         card.hidden = q ? U.norm(card.dataset.lab).indexOf(q) === -1 : false;
       });
+      // ocultar el encabezado de los cuadrantes que quedaron vacíos
+      U.$$('#labGrid .grupo-head', el).forEach(head => {
+        const grid = head.nextElementSibling;
+        const visibles = grid ? U.$$('.lab-card', grid).filter(c => !c.hidden).length : 0;
+        head.hidden = visibles === 0;
+        if (grid) grid.hidden = visibles === 0;
+      });
     }, 150));
   }
 
-  function labCard(l, cfg) {
+  function labCard(l, cfg, zona) {
     const r = l.resumen;
     const cob = r.coberturaGlobal !== null ? U.fmtDias(r.coberturaGlobal) + ' d' : 's/d';
     return '<div class="card lab-card" data-lab="' + U.esc(l.nombre) + '">' +
       '<div class="lab-top">' +
         '<div class="lab-name"><i class="lab-swatch" style="background:' + l.color + '"></i>' + U.esc(l.nombre) + '</div>' +
+        (zona ? zchip(zona) : '') +
         (l.criticos > 0 ? badge('critico') : (r.porEstado.bajo > 0 ? badge('bajo') : badge('ok'))) +
       '</div>' +
       '<div class="lab-stats">' +
@@ -188,7 +250,7 @@ VLM.views = (function () {
       .sort((a, b) => a.urgencia - b.urgencia);
 
     const filtrados = criticos.filter(p => {
-      if (ui.filtroLab && p.laboratorio !== ui.filtroLab) return false;
+      if (ui.filtroLab && (p.labNombre || p.laboratorio) !== ui.filtroLab) return false;
       if (ui.filtroEstado && p.estado !== ui.filtroEstado) return false;
       return true;
     });
@@ -259,7 +321,8 @@ VLM.views = (function () {
         '<strong>' + U.esc(p.descripcion) + '</strong>' +
         '<div class="repo-meta">' +
           '<span>' + U.esc(p.codigo) + '</span>' +
-          '<span>' + U.esc(p.laboratorio) + '</span>' +
+          '<span>' + U.esc(p.labNombre || p.laboratorio) + '</span>' +
+          '<span>' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</span>' +
           (p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
           '<span>' + quiebre + '</span>' +
         '</div>' +
@@ -274,12 +337,15 @@ VLM.views = (function () {
   function exportarRepo(lista, cfg) {
     if (!lista.length) { U.toast('No hay nada para exportar', 'err'); return; }
     const filas = [[
-      'Codigo', 'Descripcion', 'Laboratorio', 'Ubicacion', 'Estado',
+      'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ambito', 'Ubicacion', 'Estado',
       'Stock actual', 'Stock minimo', 'Consumo diario', 'Dias de cobertura',
       'Fecha estimada de quiebre', 'Unidades a reponer', 'Valor estimado'
     ]];
     lista.forEach(p => filas.push([
-      p.codigo, p.descripcion, p.laboratorio, p.ubicacion,
+      p.codigo, p.descripcion, p.labNombre || p.laboratorio,
+      VLM.labs.ZONAS[p.conservacion] ? VLM.labs.ZONAS[p.conservacion].label : '',
+      VLM.labs.AMBITOS[p.ambito] ? VLM.labs.AMBITOS[p.ambito].label : '',
+      p.ubicacion,
       A.ESTADOS[p.estado].label,
       p.stock, p.stockMin,
       Math.round(p.consumoDiario * 100) / 100,
@@ -299,7 +365,9 @@ VLM.views = (function () {
   const COLUMNAS = [
     { id: 'codigo',        label: 'Código',    clase: 't-code' },
     { id: 'descripcion',   label: 'Producto',  clase: 't-desc' },
-    { id: 'laboratorio',   label: 'Laboratorio' },
+    { id: 'labNombre',     label: 'Laboratorio' },
+    { id: 'conservacion',  label: 'Conserv.' },
+    { id: 'ambito',        label: 'Ámbito' },
     { id: 'ubicacion',     label: 'Ubicación', clase: 't-code' },
     { id: 'stock',         label: 'Stock',     num: true },
     { id: 'stockMin',      label: 'Mínimo',    num: true },
@@ -353,10 +421,11 @@ VLM.views = (function () {
   function filtrar(items, ui) {
     const q = U.norm(ui.busqueda);
     return items.filter(p => {
-      if (ui.filtroLab && p.laboratorio !== ui.filtroLab) return false;
+      if (ui.filtroLab && (p.labNombre || p.laboratorio) !== ui.filtroLab) return false;
       if (ui.filtroEstado && p.estado !== ui.filtroEstado) return false;
       if (q) {
-        const blob = U.norm(p.codigo + ' ' + p.descripcion + ' ' + p.laboratorio + ' ' + p.ubicacion + ' ' + p.lote);
+        const blob = U.norm(p.codigo + ' ' + p.descripcion + ' ' + p.laboratorio + ' ' +
+          (p.labNombre || '') + ' ' + p.ubicacion + ' ' + p.lote);
         if (blob.indexOf(q) === -1) return false;
       }
       return true;
@@ -385,7 +454,10 @@ VLM.views = (function () {
         html += '<tr class="row-' + p.estado + '">' +
           '<td class="t-code">' + U.esc(p.codigo) + '</td>' +
           '<td class="t-desc">' + U.esc(p.descripcion) + '</td>' +
-          '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.laboratorio) + '"></i> ' + U.esc(p.laboratorio) + '</td>' +
+          '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.labNombre || p.laboratorio) + '"></i> ' +
+            U.esc(p.labNombre || p.laboratorio) + '</td>' +
+          '<td>' + zchip(p.conservacion) + '</td>' +
+          '<td>' + achip(p.ambito) + '</td>' +
           '<td class="t-code">' + U.esc(p.ubicacion || '—') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(p.stock) + '</strong></td>' +
           '<td class="t-num muted">' + (p.stockMin ? U.fmt(p.stockMin) : '—') + '</td>' +
@@ -424,5 +496,8 @@ VLM.views = (function () {
     });
   }
 
-  return { dashboard, laboratorios, reposicion, inventario, badge, kpi, stackbar, repoItem, exportarRepo };
+  return {
+    dashboard, laboratorios, reposicion, inventario,
+    badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem, exportarRepo
+  };
 })();

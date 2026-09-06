@@ -124,10 +124,16 @@ VLM.analytics = (function () {
       faltanteHorizonte: 0,
       valorReposicion: 0,
       porEstado: { agotado: 0, critico: 0, bajo: 0, ok: 0, exceso: 0, sd: 0 },
+      porZona:   { frio: 0, ambiente: 0 },
+      porAmbito: { vlm: 0, externo: 0 },
+      alertaZona:   { frio: 0, ambiente: 0 },
+      alertaAmbito: { vlm: 0, externo: 0 },
+      unidadesZona: { frio: 0, ambiente: 0 },
       labs: 0,
       sinConsumo: 0,
       venceEn30: 0,
-      vencido: 0
+      vencido: 0,
+      noGestionados: 0
     };
     const labs = {};
     items.forEach(p => {
@@ -137,13 +143,26 @@ VLM.analytics = (function () {
       r.consumoHorizonte += p.consumoProyectado;
       r.faltanteHorizonte += p.faltanteProyectado;
       r.porEstado[p.estado] = (r.porEstado[p.estado] || 0) + 1;
-      if (p.estado === 'critico' || p.estado === 'agotado' || p.estado === 'bajo') r.valorReposicion += p.valorSugerido;
+
+      const enAlerta = p.estado === 'agotado' || p.estado === 'critico' || p.estado === 'bajo';
+      if (p.conservacion) {
+        r.porZona[p.conservacion]++;
+        r.unidadesZona[p.conservacion] += p.stock;
+        if (enAlerta) r.alertaZona[p.conservacion]++;
+      }
+      if (p.ambito) {
+        r.porAmbito[p.ambito]++;
+        if (enAlerta) r.alertaAmbito[p.ambito]++;
+      }
+      if (!p.gestionado) r.noGestionados++;
+
+      if (enAlerta) r.valorReposicion += p.valorSugerido;
       if (!p.consumoDiario) r.sinConsumo++;
       if (p.diasAVencer !== null) {
         if (p.diasAVencer < 0) r.vencido++;
         else if (p.diasAVencer <= 30) r.venceEn30++;
       }
-      labs[p.laboratorio] = true;
+      labs[p.labNombre || p.laboratorio] = true;
     });
     r.labs = Object.keys(labs).length;
     r.aReponer = r.porEstado.agotado + r.porEstado.critico;
@@ -156,21 +175,66 @@ VLM.analytics = (function () {
   function porLaboratorio(items, cfg) {
     const mapa = {};
     items.forEach(p => {
-      if (!mapa[p.laboratorio]) mapa[p.laboratorio] = [];
-      mapa[p.laboratorio].push(p);
+      const k = p.labNombre || p.laboratorio;
+      if (!mapa[k]) mapa[k] = [];
+      mapa[k].push(p);
     });
     return Object.keys(mapa).map(nombre => {
       const productos = mapa[nombre];
       const res = resumen(productos, cfg);
+      const ref = productos[0];
       return {
         nombre: nombre,
         color: U.colorDe(nombre),
+        ambito: ref.ambito,
+        gestionado: ref.gestionado,
         productos: productos,
         resumen: res,
         criticos: res.porEstado.agotado + res.porEstado.critico,
         alerta: res.enAlerta
       };
     }).sort((a, b) => (b.criticos - a.criticos) || (b.alerta - a.alerta) || a.nombre.localeCompare(b.nombre));
+  }
+
+  /**
+   * Agrupa en los cuatro cuadrantes ámbito × conservación
+   * (VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente).
+   * Devuelve sólo los grupos que tienen productos.
+   */
+  function porGrupo(items, cfg) {
+    const L = VLM.labs;
+    const mapa = {};
+    items.forEach(p => {
+      const k = L.claveGrupo(p);
+      if (!mapa[k]) mapa[k] = [];
+      mapa[k].push(p);
+    });
+    return L.GRUPOS.filter(k => mapa[k]).map(clave => {
+      const [ambito, zona] = clave.split('|');
+      const productos = mapa[clave];
+      const res = resumen(productos, cfg);
+      return {
+        clave: clave,
+        ambito: ambito,
+        zona: zona,
+        label: L.labelGrupo(clave),
+        icono: L.ZONAS[zona].icono,
+        productos: productos,
+        resumen: res,
+        labs: porLaboratorio(productos, cfg),
+        criticos: res.porEstado.agotado + res.porEstado.critico,
+        alerta: res.enAlerta
+      };
+    });
+  }
+
+  /** Aplica los filtros globales de ámbito y conservación. */
+  function filtrarPorZona(items, ui) {
+    return items.filter(p => {
+      if (ui.filtroAmbito && p.ambito !== ui.filtroAmbito) return false;
+      if (ui.filtroZona && p.conservacion !== ui.filtroZona) return false;
+      return true;
+    });
   }
 
   /**
@@ -223,6 +287,7 @@ VLM.analytics = (function () {
 
   return {
     ESTADOS, ORDEN_ESTADOS,
-    calcular, resumen, porLaboratorio, proyeccion, quiebresPorTramo, topUrgentes
+    calcular, resumen, porLaboratorio, porGrupo, filtrarPorZona,
+    proyeccion, quiebresPorTramo, topUrgentes
   };
 })();
