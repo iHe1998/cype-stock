@@ -129,3 +129,15 @@ Librerías por CDN: [SheetJS](https://sheetjs.com) para leer Excel y
 - [ ] Conectar directo al **WMS / ERP** del VLM en vez de subir la planilla a mano
 - [ ] Auto-refresco leyendo un archivo desde una carpeta de red
 - [ ] Alertas por mail o Telegram cuando algo entra en crítico
+
+---
+
+## Licencia
+
+© 2026 Joel — Todos los derechos reservados.
+
+Este proyecto es un **prototipo en evaluación** y todavía no tiene una licencia de código
+abierto asignada. El código está publicado para poder demostrarlo, no para su reutilización:
+sin una licencia explícita, no se otorga permiso para copiarlo, modificarlo ni distribuirlo.
+
+Si te interesa usarlo, escribime.
