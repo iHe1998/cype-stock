@@ -1,0 +1,13 @@
+# Codigo del proyecto: normalizar a LF en el repo.
+*.html  text eol=lf
+*.css   text eol=lf
+*.js    text eol=lf
+*.md    text eol=lf
+*.csv   text eol=lf
+*.ps1   text eol=crlf
+
+# Librerias vendorizadas y salida del build: NO tocar.
+# Deben quedar byte a byte identicas a lo que publica el CDN
+# (ver lib/README.md) y a lo que genera build.ps1.
+lib/*.js       -text
+dist/*.html    -text
