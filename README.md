@@ -11,7 +11,8 @@ vea de un vistazo qué hay que reponer.
 - 📺 **Modo TV**: pantallas rotativas a gran escala
 - 📥 Importa `.xlsx` / `.xls` / `.csv` con **detección automática de columnas**
 
-Sin backend, sin build, sin dependencias que instalar: es HTML + CSS + JS.
+Sin backend, sin dependencias que instalar y **sin conexión a internet**: es HTML + CSS + JS,
+con las dos librerías que usa copiadas dentro del repo.
 
 ---
 
@@ -19,7 +20,16 @@ Sin backend, sin build, sin dependencias que instalar: es HTML + CSS + JS.
 
 ### Local
 Abrí `index.html` con doble clic. Listo.
-(Necesita conexión a internet la primera vez para bajar las librerías de CDN.)
+
+### En un pendrive (para presentar)
+```powershell
+.\build.ps1 -Demo
+```
+Genera `dist\vlm-stock.html`: **un solo archivo** con todo adentro (CSS, librerías y código).
+Lo copiás a un pendrive, doble clic y funciona en cualquier PC con Windows, sin internet,
+sin instalar nada y sin permisos de sistemas.
+
+`-Demo` genera además `dist\vlm-stock-demo.html`, que arranca con datos de ejemplo cargados.
 
 ### En la tele del trabajo
 1. Publicalo en GitHub Pages (ver más abajo).
@@ -105,6 +115,7 @@ En un par de minutos queda en `https://TU-USUARIO.github.io/vlm-stock/`.
 
 ```
 index.html            estructura y modales
+build.ps1             arma la versión de un solo archivo (dist/)
 css/styles.css        sistema de diseño (tema oscuro/claro, modo TV)
 js/util.js            formateo de números y fechas, colores, helpers
 js/store.js           estado global, configuración y persistencia
@@ -114,11 +125,15 @@ js/charts.js          gráficos (Chart.js)
 js/views.js           las cuatro vistas
 js/tv.js              modo televisor
 js/app.js             arranque, navegación, asistente de importación
+lib/                  SheetJS y Chart.js (ver lib/README.md)
 data/                 planilla de ejemplo
+dist/                 salida de build.ps1 — generado, no editar a mano
 ```
 
-Librerías por CDN: [SheetJS](https://sheetjs.com) para leer Excel y
-[Chart.js](https://www.chartjs.org) para los gráficos.
+Librerías: [SheetJS](https://sheetjs.com) para leer Excel y
+[Chart.js](https://www.chartjs.org) para los gráficos. Están **vendorizadas** en `lib/`
+para que la app no dependa de un CDN — ver [`lib/README.md`](lib/README.md) para las
+versiones y cómo actualizarlas.
 
 ---
 
