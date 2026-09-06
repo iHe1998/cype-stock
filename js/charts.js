@@ -157,36 +157,88 @@ VLM.charts = (function () {
   }
 
   /* ------------------------------------------------------------
-     3. Proyección de stock total
+     3. Historial de consumo real (barras) + stock total (línea)
      ------------------------------------------------------------ */
-  function proyeccion(canvas, proy, tv) {
+  function historial(canvas, hist, tv) {
     const t = tema();
+    const p = hist.periodos;
     const o = base(t, tv);
     o.scales.y.ticks.callback = v => U.fmtCompact(v);
-    o.scales.x.ticks.maxTicksLimit = tv ? 8 : 10;
+    o.scales.y.title = { display: !tv, text: 'unidades consumidas', color: t.muted, font: { size: 10 } };
     o.scales.x.grid.display = false;
-    o.plugins.tooltip.callbacks = {
-      title: c => 'En ' + c[0].dataIndex + ' días · ' + c[0].label,
-      label: c => U.fmt(c.parsed.y) + ' unidades en stock'
+    o.scales.x.ticks.maxTicksLimit = tv ? 10 : 14;
+    o.scales.y1 = {
+      position: 'right',
+      grid: { display: false },
+      border: { display: false },
+      ticks: { color: t.muted, font: { size: tv ? 16 : 10 }, callback: v => U.fmtCompact(v) }
     };
-    o.elements = { point: { radius: 0, hitRadius: 12, hoverRadius: 4 } };
-
-    const ctx = canvas.getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 0, 300);
-    grad.addColorStop(0, 'rgba(56,189,248,.30)');
-    grad.addColorStop(1, 'rgba(56,189,248,0)');
+    o.plugins.tooltip.callbacks = {
+      title: c => {
+        const per = p[c[0].dataIndex];
+        return U.fmtFecha(per.fecha) + (per.dias > 1 ? ' · acumula ' + per.dias + ' días' : '');
+      },
+      label: c => c.datasetIndex === 0
+        ? U.fmt(c.parsed.y) + ' unidades consumidas'
+        : 'Stock al cierre: ' + U.fmt(c.parsed.y)
+    };
+    o.plugins.legend = {
+      display: true, position: 'top',
+      labels: { color: t.muted, font: { size: tv ? 16 : 11 }, boxWidth: 9, boxHeight: 9,
+                usePointStyle: true, pointStyle: 'circle', padding: 12 }
+    };
 
     return montar(canvas, {
-      type: 'line',
+      type: 'bar',
       data: {
-        labels: proy.labels,
+        labels: p.map(x => U.fmtFechaCorta(x.fecha)),
+        datasets: [
+          {
+            label: 'Consumido',
+            data: p.map(x => Math.round(x.consumido)),
+            backgroundColor: t.accent,
+            borderRadius: 4,
+            maxBarThickness: tv ? 40 : 26,
+            order: 2
+          },
+          {
+            label: 'Stock total',
+            type: 'line',
+            data: p.map(x => x.stockFinal),
+            borderColor: t.muted,
+            borderWidth: tv ? 3 : 2,
+            borderDash: [5, 4],
+            pointRadius: 0,
+            tension: .3,
+            yAxisID: 'y1',
+            order: 1
+          }
+        ]
+      },
+      options: o
+    });
+  }
+
+  /* ------------------------------------------------------------
+     3b. Consumo del período por laboratorio
+     ------------------------------------------------------------ */
+  function consumoLab(canvas, filas, tv) {
+    const t = tema();
+    const top = filas.slice(0, tv ? 8 : 10);
+    const o = base(t, tv);
+    o.indexAxis = 'y';
+    o.scales.y.grid.display = false;
+    o.scales.x.ticks.callback = v => U.fmtCompact(v);
+    o.plugins.tooltip.callbacks = { label: c => U.fmt(c.parsed.x) + ' unidades consumidas' };
+    return montar(canvas, {
+      type: 'bar',
+      data: {
+        labels: top.map(l => recortar(l.nombre, 20)),
         datasets: [{
-          data: proy.stock,
-          borderColor: t.accent,
-          backgroundColor: grad,
-          borderWidth: tv ? 4 : 2.5,
-          fill: true,
-          tension: .3
+          data: top.map(l => Math.round(l.consumido)),
+          backgroundColor: top.map(l => l.color),
+          borderRadius: 4,
+          barThickness: tv ? 24 : 16
         }]
       },
       options: o
@@ -283,37 +335,6 @@ VLM.charts = (function () {
     });
   }
 
-  /* ------------------------------------------------------------
-     7. Consumo diario proyectado por laboratorio
-     ------------------------------------------------------------ */
-  function consumoPorLab(canvas, labs, cfg, tv) {
-    const t = tema();
-    const top = labs.slice()
-      .sort((a, b) => b.resumen.consumoHorizonte - a.resumen.consumoHorizonte)
-      .filter(l => l.resumen.consumoHorizonte > 0)
-      .slice(0, tv ? 8 : 10);
-    const o = base(t, tv);
-    o.scales.y.ticks.callback = v => U.fmtCompact(v);
-    o.scales.x.grid.display = false;
-    o.scales.x.ticks.maxRotation = 40;
-    o.plugins.tooltip.callbacks = {
-      label: c => U.fmt(c.parsed.y) + ' uds a consumir en ' + cfg.horizonte + ' días'
-    };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(l => recortar(l.nombre, 14)),
-        datasets: [{
-          data: top.map(l => Math.round(l.resumen.consumoHorizonte)),
-          backgroundColor: top.map(l => l.color),
-          borderRadius: 5,
-          maxBarThickness: tv ? 70 : 44
-        }]
-      },
-      options: o
-    });
-  }
-
   function recortar(s, n) {
     s = String(s || '');
     return s.length > n ? s.slice(0, n - 1) + '…' : s;
@@ -321,6 +342,6 @@ VLM.charts = (function () {
 
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, estados, proyeccion, quiebres, menorCobertura, estadosPorLab, consumoPorLab
+    stockPorLab, estados, historial, consumoLab, quiebres, menorCobertura, estadosPorLab
   };
 })();

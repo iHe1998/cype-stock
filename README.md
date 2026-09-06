@@ -4,7 +4,7 @@ Panel web para visualizar el **stock de una torre de picking vertical (VLM)** a 
 planilla Excel. Pensado para quedar proyectado en un televisor del depósito y que el equipo
 vea de un vistazo qué hay que reponer.
 
-- 📊 Gráficos de stock, consumo y proyección
+- 📊 Gráficos de stock y del **consumo real del mes**
 - 🏭 Catálogo cerrado de **laboratorios**, con los de fuera separados y contados
 - ❄️ Separa **cámara de frío** (2-8 °C) de **ambiente**, y **dentro** de **fuera del VLM**
 - 🔴 Marca los productos **próximos a vaciarse** y los ya agotados
@@ -67,9 +67,9 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 | Vencimiento | — | Vencimiento, Vto, Caducidad |
 | Precio unitario | — | Precio, Costo, Valor Unitario |
 
-> Para que funcionen los **días de cobertura** y la **proyección** hace falta al menos una
-> columna de consumo (diaria o mensual). Sin ella la app igual muestra el stock, pero no
-> puede anticipar cuándo se vacía.
+> **No hace falta que la planilla traiga el consumo.** Si no lo trae, la app lo calcula
+> sola restando importaciones sucesivas — ver la sección siguiente. Si lo trae, esa columna
+> tiene prioridad.
 
 Hay una planilla de ejemplo en [`data/plantilla_vlm.csv`](data/plantilla_vlm.csv), y desde la
 pantalla inicial podés **descargar la plantilla en `.xlsx`**.
@@ -90,7 +90,7 @@ La barra superior filtra por cualquiera de las dos y afecta a todas las vistas.
 | Roche | VLM | Frío |
 | Sanofi Aventis | VLM | Ambiente |
 | Amgen | VLM | Frío |
-| AbbVie | Fuera del VLM | Frío |
+| Abbvie | Fuera del VLM | Frío |
 | Biosidus Argentina | Fuera del VLM | Frío |
 
 **Sólo se procesan los laboratorios del catálogo.** Los demás quedan fuera de KPIs y
@@ -115,10 +115,37 @@ frío y Xeloda o Tamiflu en ambiente) y aparece en los dos cuadrantes.
 
 ---
 
+## Historial de consumo
+
+La planilla es una **foto del stock del momento**: dice cuánto hay, no cuánto salió.
+Para saber el consumo real, la app **guarda un snapshot en cada importación** y resta.
+
+```
+consumo del día   = Σ  max(0, stock_ayer − stock_hoy)     por SKU
+reposición        = Σ  max(0, stock_hoy − stock_ayer)     por SKU
+consumo diario    = consumo acumulado / días transcurridos
+```
+
+Una baja de stock es consumo; una suba es reposición. Se cuentan por separado porque un
+mismo SKU puede recibir mercadería y consumirse en el mismo intervalo — en ese caso la
+diferencia **subestima** el consumo. Importando una vez por día el error es despreciable;
+si pasás una semana entre importaciones, el número queda corto.
+
+- Se necesitan **al menos 2 importaciones** para que aparezca cualquier cálculo de consumo.
+- Dos importaciones el mismo día se pisan: vale la última.
+- Se guardan hasta **60 snapshots**. Si el navegador se queda sin espacio, la app va
+  descartando los más viejos antes que perder todo, y avisa.
+- El historial se borra desde **⚙ Configuración → Historial de consumo**.
+
+Este historial es además la **fuente del consumo diario** de cada SKU cuando la planilla
+no trae una columna de consumo, y con eso salen los días de cobertura y la fecha de quiebre.
+
+---
+
 ## Cómo calcula las alertas
 
 ```
-consumo diario   = consumo diario  ó  consumo mensual / 30
+consumo diario    = columna de la planilla  ó  promedio del historial
 días de cobertura = stock / consumo diario
 fecha de quiebre  = hoy + días de cobertura
 a reponer         = objetivo - stock       (objetivo = consumo diario × días objetivo,
@@ -162,7 +189,7 @@ js/util.js            formateo de números y fechas, colores, helpers
 js/labs.js            catálogo de laboratorios, ámbito y conservación
 js/store.js           estado global, configuración y persistencia
 js/parser.js          lectura de Excel, detección y mapeo de columnas
-js/analytics.js       cobertura, criticidad, proyecciones y agregados
+js/analytics.js       cobertura, criticidad, historial de consumo y agregados
 js/charts.js          gráficos (Chart.js)
 js/views.js           las cuatro vistas
 js/tv.js              modo televisor
@@ -181,8 +208,9 @@ versiones y cómo actualizarlas.
 
 ## Próximos pasos
 
-- [ ] Calcular el consumo real desde un **historial de movimientos** en vez de un promedio fijo
-- [ ] Guardar histórico de importaciones para ver la **tendencia** del stock
+- [x] ~~Calcular el consumo real por diferencia entre importaciones~~
+- [ ] Derivar el ámbito (VLM / fuera) de la **posición** en vez del laboratorio
+- [ ] Exportar el historial de consumo a Excel
 - [ ] Conectar directo al **WMS / ERP** del VLM en vez de subir la planilla a mano
 - [ ] Auto-refresco leyendo un archivo desde una carpeta de red
 - [ ] Alertas por mail o Telegram cuando algo entra en crítico

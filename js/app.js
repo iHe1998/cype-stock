@@ -50,10 +50,19 @@ VLM.app = (function () {
    */
   function itemsVisibles() {
     const cfg = S.state.cfg, ui = S.state.ui;
-    if (!calculados) calculados = A.calcular(S.state.productos, cfg);
+    if (!calculados) {
+      // el consumo diario sale del historial cuando la planilla no lo trae
+      const consumoHist = A.consumoPorSku(S.state.historial, cfg.ventanaConsumo);
+      calculados = A.calcular(S.state.productos, cfg, consumoHist);
+    }
     let items = calculados;
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
     return A.filtrarPorZona(items, ui);
+  }
+
+  /** Historial de consumo real, ya recortado a la ventana configurada. */
+  function historialActual() {
+    return A.historialConsumo(S.state.historial, S.state.cfg.diasHistorial);
   }
 
   /* ============================================================
@@ -84,8 +93,9 @@ VLM.app = (function () {
       return;
     }
 
+    const hist = historialActual();
     try {
-      if (vista === 'dashboard') V.dashboard(el, items, cfg);
+      if (vista === 'dashboard') V.dashboard(el, items, cfg, hist);
       else if (vista === 'labs')  V.laboratorios(el, items, cfg);
       else if (vista === 'repo')  V.reposicion(el, items, cfg);
       else if (vista === 'inv')   V.inventario(el, items, cfg);
@@ -103,7 +113,7 @@ VLM.app = (function () {
       S.setUi({ filtroLab: c.dataset.lab, filtroEstado: null, vista: 'repo' });
     }));
 
-    if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+    if (VLM.tv.activo) VLM.tv.refrescar(items, cfg, hist);
   }
 
   /* ---------- barra de ámbito / conservación ---------- */
@@ -165,7 +175,7 @@ VLM.app = (function () {
       render();
     });
     $('#btnTV').addEventListener('click', () => {
-      VLM.tv.entrar(itemsVisibles(), S.state.cfg);
+      VLM.tv.entrar(itemsVisibles(), S.state.cfg, historialActual());
     });
     $('#tvExit').addEventListener('click', () => VLM.tv.salir());
 
@@ -424,6 +434,8 @@ VLM.app = (function () {
   function cargarDemo() {
     const mapa = P.autoMapear(DEMO[0]);
     const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs);
+    S.limpiarHistorial();
+    sembrarHistorialDemo(r.productos, 21);
     S.setProductos(r.productos, {
       archivo: 'Datos de ejemplo',
       hoja: 'demo',
@@ -434,6 +446,44 @@ VLM.app = (function () {
     U.toast('Cargados ' + r.productos.length + ' productos de ejemplo', 'ok');
   }
 
+  /**
+   * Inventa N días de importaciones previas para que el demo tenga historial.
+   * Va hacia atrás desde el stock actual: cada día anterior tenía algo más de
+   * stock (lo consumido), y de vez en cuando entra una reposición.
+   * Sólo para la demo: con datos reales el historial se arma importando.
+   */
+  function sembrarHistorialDemo(productos, dias) {
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    // semilla fija para que el demo se vea igual siempre
+    let semilla = 20260906;
+    const rnd = () => { semilla = (semilla * 1103515245 + 12345) % 2147483648; return semilla / 2147483648; };
+
+    const stock = {};
+    productos.forEach(p => { stock[p.codigo] = p.stock; });
+
+    const snaps = [];
+    for (let d = 0; d < dias; d++) {
+      const fecha = U.addDias(hoy, -d);
+      snaps.push({
+        dia: fecha.getFullYear() + '-' + String(fecha.getMonth() + 1).padStart(2, '0') +
+             '-' + String(fecha.getDate()).padStart(2, '0'),
+        ts: fecha.getTime(),
+        archivo: 'Datos de ejemplo',
+        skus: productos.length,
+        total: Object.keys(stock).reduce((s, k) => s + stock[k], 0),
+        porSku: Object.assign({}, stock)
+      });
+      // retroceder un día: sumar lo consumido y descontar reposiciones
+      productos.forEach(p => {
+        const base = Math.max(p.stockMin || 1, p.stock || 1);
+        const consumo = Math.round(base * (0.02 + rnd() * 0.05));
+        stock[p.codigo] += consumo;
+        if (rnd() < 0.06) stock[p.codigo] = Math.max(0, stock[p.codigo] - Math.round(base * 0.4));
+      });
+    }
+    snaps.reverse().forEach(s => S.state.historial.push(s));
+  }
+
   /* ============================================================
      CONFIGURACIÓN
      ============================================================ */
@@ -442,8 +492,8 @@ VLM.app = (function () {
     ['cfgDiasBajo', 'diasBajo', 'int'],
     ['cfgDiasObjetivo', 'diasObjetivo', 'int'],
     ['cfgFactorBajo', 'factorBajo', 'float'],
-    ['cfgHorizonte', 'horizonte', 'int'],
-    ['cfgDiasMes', 'diasMes', 'int'],
+    ['cfgVentanaConsumo', 'ventanaConsumo', 'int'],
+    ['cfgDiasHistorial', 'diasHistorial', 'int'],
     ['cfgTvSegundos', 'tvSegundos', 'int'],
     ['cfgTvSoloCriticos', 'tvSoloCriticos', 'bool']
   ];
@@ -456,7 +506,17 @@ VLM.app = (function () {
     });
     $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
     pintarLabsEditor();
+    actualizarHistInfo();
     $('#modalSettings').hidden = false;
+  }
+
+  function actualizarHistInfo() {
+    const h = S.state.historial;
+    const el = $('#histInfo');
+    if (!h.length) { el.textContent = 'Sin importaciones guardadas todavía.'; return; }
+    el.textContent = h.length + (h.length === 1 ? ' importación guardada' : ' importaciones guardadas') +
+      ' · del ' + h[0].dia + ' al ' + h[h.length - 1].dia +
+      ' · máximo ' + S.MAX_SNAPSHOTS;
   }
 
   /* ---------- catálogo de laboratorios ---------- */
@@ -541,6 +601,15 @@ VLM.app = (function () {
         if (tipo !== 'bool' && (!isFinite(v) || v < 0)) { e.target.value = S.state.cfg[clave]; return; }
         S.setCfg({ [clave]: v });
       });
+    });
+
+    $('#btnClearHist').addEventListener('click', () => {
+      if (!confirm('¿Borrar el historial de importaciones?\n\nSe pierde el consumo calculado y hay que ' +
+                   'volver a acumular al menos 2 días para recuperarlo.')) return;
+      S.limpiarHistorial();
+      calculados = null;
+      actualizarHistInfo();
+      U.toast('Historial borrado');
     });
 
     $('#btnAddLab').addEventListener('click', agregarLab);

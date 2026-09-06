@@ -205,16 +205,23 @@
         </label>
       </div>
 
-      <h3 class="section-title">Proyección</h3>
+      <h3 class="section-title">Historial de consumo</h3>
+      <p class="muted small">El consumo se calcula restando importaciones sucesivas.
+        Importá la planilla una vez por día para que el historial sea preciso.</p>
       <div class="cfg-grid">
         <label class="field">
-          <span>Horizonte de proyección (días)</span>
-          <input type="number" id="cfgHorizonte" min="7" max="180" step="1">
+          <span>Días a promediar para el consumo diario</span>
+          <input type="number" id="cfgVentanaConsumo" min="2" max="90" step="1">
         </label>
         <label class="field">
-          <span>Días por mes (consumo mensual → diario)</span>
-          <input type="number" id="cfgDiasMes" min="1" max="31" step="1">
+          <span>Días que muestra el gráfico</span>
+          <input type="number" id="cfgDiasHistorial" min="7" max="90" step="1">
         </label>
+      </div>
+      <div class="cfg-actions" style="margin-top:10px">
+        <span class="muted small" id="histInfo"></span>
+        <div class="spacer"></div>
+        <button class="btn btn-danger" id="btnClearHist">Borrar historial</button>
       </div>
 
       <h3 class="section-title">Modo TV</h3>

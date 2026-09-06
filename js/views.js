@@ -90,16 +90,13 @@ VLM.views = (function () {
   /* ============================================================
      VISTA 1 · RESUMEN
      ============================================================ */
-  function dashboard(el, items, cfg) {
+  function dashboard(el, items, cfg, hist) {
     const res  = A.resumen(items, cfg);
     const labs = A.porLaboratorio(items, cfg);
     const grupos = A.porGrupo(items, cfg);
-    const proy = A.proyeccion(items, cfg);
     const tramos = A.quiebresPorTramo(items, cfg);
     const urgentes = A.topUrgentes(items, 6);
-
-    const cobertura = res.coberturaGlobal !== null
-      ? U.fmtDias(res.coberturaGlobal) + ' días' : 's/d';
+    const consLabs = A.consumoPorLaboratorio(items, cfg);
 
     let html = '';
 
@@ -116,23 +113,15 @@ VLM.views = (function () {
       kpi('❄ Cadena de frío en alerta', U.fmt(res.alertaZona.frio),
           'de ' + res.porZona.frio + ' SKU refrigerados',
           res.alertaZona.frio > 0 ? 'k-crit' : 'k-ok') +
-      kpi('Consumo a ' + cfg.horizonte + ' días', U.fmtCompact(res.consumoHorizonte),
-          U.fmt(res.consumoDiario, true) + ' uds/día · cobertura ' + cobertura, 'k-info') +
+      kpi('Consumido en el período', hist.suficiente ? U.fmtCompact(hist.totalConsumido) : '—',
+          hist.suficiente
+            ? U.fmt(hist.promedioDiario, true) + ' uds/día en ' + hist.dias + ' días'
+            : 'hacen falta 2 importaciones', 'k-info') +
       '</div>';
 
     /* --- cuadrantes ámbito × conservación --- */
     html += '<h3 class="section-title">Por zona de almacenamiento</h3>';
     html += '<div class="zona-grid">' + grupos.map(zonaCard).join('') + '</div>';
-
-    /* --- aviso de faltante proyectado --- */
-    if (res.faltanteHorizonte > 0) {
-      html += '<div class="notice n-warn" style="margin-top:14px">' +
-        '<svg viewBox="0 0 24 24" class="ico"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
-        '<div>Con el consumo actual faltarán <strong>' + U.fmt(res.faltanteHorizonte) +
-        ' unidades</strong> en los próximos ' + cfg.horizonte + ' días. ' +
-        (res.valorReposicion > 0 ? 'Reposición estimada: <strong>$' + U.fmt(res.valorReposicion) + '</strong>.' : '') +
-        '</div></div>';
-    }
 
     /* --- gráficos --- */
     html += '<h3 class="section-title">Situación del stock</h3>';
@@ -141,15 +130,22 @@ VLM.views = (function () {
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       '</div>';
 
-    html += '<h3 class="section-title">Consumo y proyección</h3>';
-    html += '<div class="grid grid-2">' +
-      cardChart('Stock total proyectado', 'próximos ' + cfg.horizonte + ' días, sin reposición', 'chProy', 300) +
-      cardChart('¿Cuándo se agota cada producto?', 'SKU por tramo', 'chQuiebres', 300) +
-      '</div>';
+    /* --- historial real de consumo --- */
+    html += '<h3 class="section-title">Historial de consumo</h3>';
+    if (!hist.suficiente) {
+      html += avisoHistorial(hist);
+    } else {
+      html += '<div class="grid grid-2">' +
+        cardChart('Consumo por día', 'unidades que salieron, calculadas por diferencia de stock', 'chHist', 300) +
+        cardChart('Consumido por laboratorio', 'período completo', 'chConsumoLab', 300) +
+        '</div>';
+    }
 
-    html += '<div class="grid grid-2" style="margin-top:14px">' +
-      cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 320) +
-      cardChart('Consumo proyectado por laboratorio', cfg.horizonte + ' días', 'chConsumoLab', 320) +
+    /* --- análisis de detalle: cuándo se agota cada producto --- */
+    html += '<h3 class="section-title">Análisis de detalle</h3>';
+    html += '<div class="grid grid-2">' +
+      cardChart('¿Cuándo se agota cada producto?', 'SKU por tramo, según el consumo observado', 'chQuiebres', 300) +
+      cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
       '</div>';
 
     /* --- top urgentes --- */
@@ -164,10 +160,28 @@ VLM.views = (function () {
     /* --- montaje de gráficos --- */
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
-    C.proyeccion($('#chProy', el), proy);
     C.quiebres($('#chQuiebres', el), tramos);
     C.menorCobertura($('#chCobertura', el), items, cfg, false, 10);
-    C.consumoPorLab($('#chConsumoLab', el), labs, cfg);
+    if (hist.suficiente) {
+      C.historial($('#chHist', el), hist);
+      C.consumoLab($('#chConsumoLab', el), consLabs);
+    }
+  }
+
+  /** Explica por qué todavía no hay historial y cómo se construye. */
+  function avisoHistorial(hist) {
+    const n = hist.snapshots;
+    return '<div class="notice">' +
+      '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
+        '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
+      '<div><strong>Todavía no se puede calcular el consumo.</strong><br>' +
+      'La planilla es una foto del stock del momento, así que el consumo sale de ' +
+      '<strong>restar importaciones sucesivas</strong>. Llevás ' + n +
+      (n === 1 ? ' importación guardada' : ' importaciones guardadas') +
+      ' y hacen falta al menos 2.<br>' +
+      '<span class="small muted">Importá la planilla una vez por día y a partir de mañana vas a ver ' +
+      'el consumo diario, la cobertura y la fecha estimada de quiebre de cada producto.</span>' +
+      '</div></div>';
   }
 
   /* ============================================================
@@ -185,7 +199,7 @@ VLM.views = (function () {
 
     html += '<div class="grid grid-2" style="margin-bottom:18px">' +
       cardChart('Estados por laboratorio', 'cantidad de SKU', 'chLabEstados', 340) +
-      cardChart('Consumo proyectado', cfg.horizonte + ' días', 'chLabConsumo', 340) +
+      cardChart('Consumo por laboratorio', 'según el historial observado', 'chLabConsumo', 340) +
       '</div>';
 
     // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente
@@ -196,7 +210,7 @@ VLM.views = (function () {
 
     el.innerHTML = html;
     C.estadosPorLab($('#chLabEstados', el), labs);
-    C.consumoPorLab($('#chLabConsumo', el), labs, cfg);
+    C.consumoLab($('#chLabConsumo', el), A.consumoPorLaboratorio(items, cfg));
 
     const buscar = $('#labSearch', el);
     buscar.addEventListener('input', U.debounce(() => {
@@ -373,7 +387,7 @@ VLM.views = (function () {
     { id: 'stockMin',      label: 'Mínimo',    num: true },
     { id: 'consumoDiario', label: 'Cons./día', num: true },
     { id: 'diasCobertura', label: 'Cobertura', num: true },
-    { id: 'consumoProyectado', label: 'Consumo proy.', num: true },
+    { id: 'fechaQuiebre',  label: 'Se agota', num: true },
     { id: 'sugerido',      label: 'A reponer', num: true },
     { id: 'estado',        label: 'Estado' }
   ];
@@ -464,7 +478,7 @@ VLM.views = (function () {
           '<td class="t-num">' + (p.consumoDiario ? U.fmt(p.consumoDiario, true) : '—') + '</td>' +
           '<td class="t-num">' + U.fmtDias(p.diasCobertura) +
             '<div class="minibar m-' + p.estado + '"><i style="width:' + pct + '%"></i></div></td>' +
-          '<td class="t-num muted">' + (p.consumoProyectado ? U.fmt(p.consumoProyectado) : '—') + '</td>' +
+          '<td class="t-num muted">' + (p.fechaQuiebre ? U.fmtFechaCorta(p.fechaQuiebre) : '—') + '</td>' +
           '<td class="t-num">' + (p.sugerido ? '<strong>+' + U.fmt(p.sugerido) + '</strong>' : '—') + '</td>' +
           '<td>' + badge(p.estado) + '</td>' +
           '</tr>';

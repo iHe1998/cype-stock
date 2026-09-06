@@ -28,15 +28,16 @@ VLM.tv = (function () {
       saltarSi: d => d.items.filter(p => p.conservacion === 'frio').length === 0 },
     { nombre: 'Zonas de almacenamiento', render: slideZonas },
     { nombre: 'Laboratorios',    render: slideLabs },
-    { nombre: 'Proyección de consumo', render: slideProyeccion }
+    { nombre: 'Historial de consumo', render: slideHistorial,
+      saltarSi: d => !d.hist || !d.hist.suficiente }
   ];
 
   /* ------------------------------------------------------------
      Ciclo de vida
      ------------------------------------------------------------ */
-  function entrar(items, cfg) {
+  function entrar(items, cfg, hist) {
     if (!items.length) { U.toast('Cargá datos antes de usar el modo TV', 'err'); return; }
-    datos = { items, cfg };
+    datos = { items, cfg, hist: hist || { suficiente: false, periodos: [] } };
     activo = true;
     idx = 0;
     C.destruirTodos();
@@ -126,9 +127,9 @@ VLM.tv = (function () {
   }
 
   /** Redibuja con datos nuevos sin cortar la rotación. */
-  function refrescar(items, cfg) {
+  function refrescar(items, cfg, hist) {
     if (!activo) return;
-    datos = { items, cfg };
+    datos = { items, cfg, hist: hist || datos.hist };
     pintar();
   }
 
@@ -259,24 +260,28 @@ VLM.tv = (function () {
   }
 
   /* ------------------------------------------------------------
-     Pantalla 4 · Proyección
+     Pantalla · Historial de consumo real
      ------------------------------------------------------------ */
-  function slideProyeccion(el, items, cfg) {
-    const res = A.resumen(items, cfg);
+  function slideHistorial(el, items, cfg) {
+    const h = datos.hist;
+    const ult = h.periodos[h.periodos.length - 1];
+
     el.innerHTML =
       '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
-        tvKpi('Se va a consumir en ' + cfg.horizonte + ' días', U.fmtCompact(res.consumoHorizonte), 'unidades proyectadas', 'k-warn') +
-        tvKpi('Faltante proyectado', U.fmtCompact(res.faltanteHorizonte), 'unidades que no alcanzan', res.faltanteHorizonte ? 'k-crit' : 'k-ok') +
-        tvKpi('Valor de reposición', res.valorReposicion ? '$' + U.fmtCompact(res.valorReposicion) : '—', 'estimado') +
+        tvKpi('Consumido en el período', U.fmtCompact(h.totalConsumido),
+              h.dias + ' días · ' + U.fmt(h.promedioDiario, true) + ' uds/día', 'k-warn') +
+        tvKpi('Último día', ult ? U.fmtCompact(ult.consumido) : '—',
+              ult ? U.fmtFecha(ult.fecha) : '') +
+        tvKpi('Repuesto en el período', U.fmtCompact(h.totalRepuesto), 'unidades ingresadas') +
       '</div>' +
       '<div class="tv-split">' +
-        '<div class="tv-panel"><h3>Stock total proyectado (' + cfg.horizonte + ' días)</h3>' +
-          '<div class="tv-chart"><canvas id="tvChProy"></canvas></div></div>' +
+        '<div class="tv-panel"><h3>Consumo por día</h3>' +
+          '<div class="tv-chart"><canvas id="tvChHist"></canvas></div></div>' +
         '<div class="tv-panel"><h3>¿Cuándo se agota cada producto?</h3>' +
           '<div class="tv-chart"><canvas id="tvChQ"></canvas></div></div>' +
       '</div>';
 
-    C.proyeccion($('#tvChProy', el), A.proyeccion(items, cfg), true);
+    C.historial($('#tvChHist', el), h, true);
     C.quiebres($('#tvChQ', el), A.quiebresPorTramo(items, cfg), true);
   }
 

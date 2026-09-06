@@ -36,7 +36,7 @@ VLM.labs = (function () {
       alias: ['sanofi aventis', 'sanofi', 'aventis', 'sanofi argentina'],     zona: 'ambiente' },
     { id: 'amgen',       nombre: 'Amgen',               ambito: 'vlm',
       alias: ['amgen', 'amgen argentina'],                                    zona: 'frio' },
-    { id: 'abbvie',      nombre: 'AbbVie',              ambito: 'externo',
+    { id: 'abbvie',      nombre: 'Abbvie',              ambito: 'externo',
       alias: ['abbvie', 'abb vie', 'abbott vie'],                             zona: 'frio' },
     { id: 'biosidus',    nombre: 'Biosidus Argentina',  ambito: 'externo',
       alias: ['biosidus argentina', 'biosidus'],                              zona: 'frio' }

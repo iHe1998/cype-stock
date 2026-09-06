@@ -243,10 +243,11 @@ VLM.parser = (function () {
     if (!productos.length) avisos.push('No se pudo leer ninguna fila válida. Revisá la fila de encabezados y el mapeo.');
     if (descartadas > 0)   avisos.push(descartadas + ' fila(s) omitidas por estar vacías o sin stock numérico.');
     if (mapa.consumoDiario === undefined && mapa.consumoMensual === undefined) {
-      avisos.push('Sin columna de consumo: no se podrán calcular días de cobertura ni proyección.');
+      avisos.push('Sin columna de consumo: se calcula restando importaciones sucesivas. ' +
+                  'Importá una vez por día y desde la segunda vas a ver la cobertura.');
     }
-    if (mapa.stockMin === undefined && mapa.consumoDiario === undefined && mapa.consumoMensual === undefined) {
-      avisos.push('Sin stock mínimo ni consumo: las alertas de faltante quedarán vacías.');
+    if (mapa.stockMin === undefined) {
+      avisos.push('Sin stock mínimo: las alertas salen sólo de los días de cobertura.');
     }
     if (mapa.conservacion === undefined) {
       avisos.push('Sin columna de conservación: se usa el valor por defecto de cada laboratorio (editable en Configuración).');
