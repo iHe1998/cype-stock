@@ -54,8 +54,6 @@ VLM.analytics = (function () {
 
       // --- sugerencia de reposición ---
       r.sugerido = calcularSugerido(r, cfg);
-      r.valorStock = r.stock * (r.precio || 0);
-      r.valorSugerido = r.sugerido * (r.precio || 0);
 
       // --- vencimiento ---
       r.diasAVencer = r.vencimiento
@@ -119,9 +117,7 @@ VLM.analytics = (function () {
     const r = {
       skus: items.length,
       unidades: 0,
-      valor: 0,
       consumoDiario: 0,
-      valorReposicion: 0,
       porEstado: { agotado: 0, critico: 0, bajo: 0, ok: 0, exceso: 0, sd: 0 },
       porZona:   { frio: 0, ambiente: 0 },
       porAmbito: { vlm: 0, externo: 0 },
@@ -137,7 +133,6 @@ VLM.analytics = (function () {
     const labs = {};
     items.forEach(p => {
       r.unidades += p.stock;
-      r.valor += p.valorStock;
       r.consumoDiario += p.consumoDiario;
       r.porEstado[p.estado] = (r.porEstado[p.estado] || 0) + 1;
 
@@ -153,7 +148,6 @@ VLM.analytics = (function () {
       }
       if (!p.gestionado) r.noGestionados++;
 
-      if (enAlerta) r.valorReposicion += p.valorSugerido;
       if (!p.consumoDiario) r.sinConsumo++;
       if (p.diasAVencer !== null) {
         if (p.diasAVencer < 0) r.vencido++;

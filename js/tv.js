@@ -201,7 +201,8 @@ VLM.tv = (function () {
         tvKpi('En alerta', U.fmt(res.enAlerta),
               res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
               res.enAlerta ? 'k-crit' : 'k-ok') +
-        tvKpi('Valor inmovilizado', res.valor ? '$' + U.fmtCompact(res.valor) : '—', 'stock refrigerado') +
+        tvKpi('Unidades a reponer', U.fmtCompact(frio.reduce((s, p) => s + p.sugerido, 0)),
+              'para cubrir ' + cfg.diasObjetivo + ' días') +
       '</div>' +
       (urgentes.length
         ? '<div class="tv-crit" style="margin-top:1.6vh">' + urgentes.map((p, i) => {

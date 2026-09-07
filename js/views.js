@@ -280,8 +280,7 @@ VLM.views = (function () {
       stackbar(r) +
       '<div class="lab-legend">' +
         '<span>Cobertura ' + cob + '</span>' +
-        '<span>Consumo ' + U.fmtCompact(r.consumoHorizonte) + ' uds/' + cfg.horizonte + 'd</span>' +
-        (r.valorReposicion > 0 ? '<span>Reposición $' + U.fmtCompact(r.valorReposicion) + '</span>' : '') +
+        (r.consumoDiario > 0 ? '<span>Consumo ' + U.fmt(r.consumoDiario, true) + ' uds/día</span>' : '') +
       '</div>' +
       '</div>';
   }
@@ -304,16 +303,16 @@ VLM.views = (function () {
     });
 
     const totalUds = filtrados.reduce((s, p) => s + p.sugerido, 0);
-    const totalVal = filtrados.reduce((s, p) => s + p.valorSugerido, 0);
+    const enFrio = filtrados.filter(p => p.conservacion === 'frio').length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
       kpi('Productos a reponer', U.fmt(filtrados.length),
           criticos.filter(p => p.estado === 'agotado').length + ' agotados', 'k-crit') +
       kpi('Unidades sugeridas', U.fmtCompact(totalUds),
           'para cubrir ' + cfg.diasObjetivo + ' días', 'k-info') +
-      kpi('Valor estimado', totalVal > 0 ? '$' + U.fmtCompact(totalVal) : '—',
-          'según precio unitario cargado') +
-      kpi('Laboratorios afectados', U.fmt(new Set(filtrados.map(p => p.laboratorio)).size),
+      kpi('❄ En cadena de frío', U.fmt(enFrio),
+          'de ' + filtrados.length + ' a reponer', enFrio > 0 ? 'k-warn' : 'k-ok') +
+      kpi('Laboratorios afectados', U.fmt(new Set(filtrados.map(p => p.labNombre || p.laboratorio)).size),
           'de ' + labs.length + ' en total', 'k-warn') +
       '</div>';
 
@@ -387,7 +386,7 @@ VLM.views = (function () {
     const filas = [[
       'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ambito', 'Ubicacion', 'Estado',
       'Stock actual', 'Stock minimo', 'Consumo diario', 'Dias de cobertura',
-      'Fecha estimada de quiebre', 'Unidades a reponer', 'Valor estimado'
+      'Fecha estimada de quiebre', 'Unidades a reponer'
     ]];
     lista.forEach(p => filas.push([
       p.codigo, p.descripcion, p.labNombre || p.laboratorio,
@@ -399,8 +398,7 @@ VLM.views = (function () {
       Math.round(p.consumoDiario * 100) / 100,
       p.diasCobertura !== null && isFinite(p.diasCobertura) ? Math.round(p.diasCobertura * 10) / 10 : '',
       p.fechaQuiebre ? U.fmtFecha(p.fechaQuiebre) : '',
-      p.sugerido,
-      Math.round(p.valorSugerido)
+      p.sugerido
     ]));
     const hoy = new Date().toISOString().slice(0, 10);
     U.download('reposicion_vlm_' + hoy + '.csv', U.toCsv(filas), 'text/csv;charset=utf-8');

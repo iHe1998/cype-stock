@@ -61,9 +61,6 @@ VLM.parser = (function () {
       hint: 'Fecha de caducidad',
       alias: ['vencimiento', 'vto', 'vence', 'caducidad', 'fecha vencimiento', 'fecha vto', 'expira', 'expiry'] },
 
-    { id: 'precio', label: 'Precio unitario', req: false, tipo: 'numero',
-      hint: 'Para valorizar el stock',
-      alias: ['precio', 'precio unitario', 'costo', 'costo unitario', 'valor', 'valor unitario', 'pvp', 'importe unitario'] }
   ];
 
   /* ------------------------------------------------------------
@@ -226,8 +223,7 @@ VLM.parser = (function () {
         consumoMensual: consMensual !== null ? consMensual : (consumoDiario ? consumoDiario * diasMes : 0),
         fuenteConsumo: fuenteConsumo,
         lote:          String(get(fila, 'lote') || '').trim(),
-        vencimiento:   U.toDate(get(fila, 'vencimiento')),
-        precio:        U.toNum(get(fila, 'precio')) || 0
+        vencimiento:   U.toDate(get(fila, 'vencimiento'))
       }, catalogo));
     }
 
@@ -265,16 +261,16 @@ VLM.parser = (function () {
      ------------------------------------------------------------ */
   function generarPlantilla() {
     const headers = ['Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ubicacion', 'Stock',
-                     'Stock Minimo', 'Stock Maximo', 'Consumo Mensual', 'Lote', 'Vencimiento', 'Precio'];
+                     'Stock Minimo', 'Stock Maximo', 'Consumo Mensual', 'Lote', 'Vencimiento'];
     const filas = [
-      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320,  95, 'AZ4411', '2027-08-31', 2480000],
-      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40,  14, 'RO8801', '2027-05-31', 4120000],
-      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60,  22, 'AM9901', '2027-06-30', 1240000],
-      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200,  72, 'BS1101', '2027-04-30',  148000]
+      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320,  95, 'AZ4411', '2027-08-31'],
+      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40,  14, 'RO8801', '2027-05-31'],
+      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60,  22, 'AM9901', '2027-06-30'],
+      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200,  72, 'BS1101', '2027-04-30']
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers].concat(filas));
     ws['!cols'] = [{ wch: 10 }, { wch: 32 }, { wch: 20 }, { wch: 13 }, { wch: 11 }, { wch: 8 },
-                   { wch: 12 }, { wch: 14 }, { wch: 15 }, { wch: 10 }, { wch: 13 }, { wch: 11 }];
+                   { wch: 12 }, { wch: 14 }, { wch: 15 }, { wch: 10 }, { wch: 13 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Stock VLM');
     XLSX.writeFile(wb, 'plantilla_vlm.xlsx');

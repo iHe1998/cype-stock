@@ -65,7 +65,6 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 | Consumo mensual | — | Consumo Mensual, Salidas Mes, Demanda Mensual |
 | Lote | — | Lote, Partida, Batch |
 | Vencimiento | — | Vencimiento, Vto, Caducidad |
-| Precio unitario | — | Precio, Costo, Valor Unitario |
 
 > **No hace falta que la planilla traiga el consumo.** Si no lo trae, la app lo calcula
 > sola restando importaciones sucesivas — ver la sección siguiente. Si lo trae, esa columna
