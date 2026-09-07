@@ -10,6 +10,7 @@ VLM.store = (function () {
   const KEY_UI   = 'vlm.ui.v1';
   const KEY_LABS = 'vlm.labs.v1';
   const KEY_HIST = 'vlm.historial.v1';
+  const KEY_UBIC = 'vlm.ubicaciones.v1';
 
   const MAX_SNAPSHOTS = 60;   // ~2 meses de importaciones diarias
 
@@ -51,6 +52,7 @@ VLM.store = (function () {
     },
     cfg: Object.assign({}, CFG_DEFAULT),
     labs: [],           // catálogo de laboratorios (ver labs.js)
+    reglasUbic: [],     // reglas de posición (ver ubicaciones.js)
     historial: [],      // snapshots de stock, uno por día (ver agregarSnapshot)
     ui: {
       tema: 'dark',
@@ -101,6 +103,10 @@ VLM.store = (function () {
     try { localStorage.setItem(KEY_LABS, JSON.stringify(state.labs)); } catch (e) {}
   }
 
+  function guardarReglasUbic() {
+    try { localStorage.setItem(KEY_UBIC, JSON.stringify(state.reglasUbic)); } catch (e) {}
+  }
+
   /**
    * Guarda el historial. Si no entra en localStorage va tirando los snapshots
    * más viejos antes que perder todo, y como último recurso deja sólo los
@@ -140,6 +146,12 @@ VLM.store = (function () {
       state.labs = (labs && labs.length) ? labs : VLM.labs.catalogoDefault();
     } catch (e) {
       state.labs = VLM.labs.catalogoDefault();
+    }
+    try {
+      const ru = JSON.parse(localStorage.getItem(KEY_UBIC) || 'null');
+      state.reglasUbic = (ru && ru.length) ? ru : VLM.ubicaciones.reglasDefault();
+    } catch (e) {
+      state.reglasUbic = VLM.ubicaciones.reglasDefault();
     }
     try {
       const h = JSON.parse(localStorage.getItem(KEY_HIST) || 'null');
@@ -269,6 +281,17 @@ VLM.store = (function () {
     setLabs(VLM.labs.catalogoDefault());
   }
 
+  /** Reemplaza las reglas de posición. Obliga a reimportar para que apliquen. */
+  function setReglasUbic(reglas) {
+    state.reglasUbic = reglas;
+    guardarReglasUbic();
+    emit('ubicaciones');
+  }
+
+  function resetReglasUbic() {
+    setReglasUbic(VLM.ubicaciones.reglasDefault());
+  }
+
   function setUi(parcial, silencioso) {
     Object.assign(state.ui, parcial);
     guardarUi();
@@ -280,7 +303,8 @@ VLM.store = (function () {
   return {
     state, CFG_DEFAULT,
     on, emit, cargar, guardar,
-    setProductos, limpiar, setCfg, setUi, setLabs, resetLabs, hayDatos,
+    setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
+    setReglasUbic, resetReglasUbic, hayDatos,
     agregarSnapshot, limpiarHistorial, MAX_SNAPSHOTS
   };
 })();

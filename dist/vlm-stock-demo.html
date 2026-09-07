@@ -540,7 +540,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .repo-list { display: flex; flex-direction: column; gap: 8px; }
 .repo-item {
   display: grid;
-  grid-template-columns: 44px 1fr auto auto auto;
+  grid-template-columns: 44px 1fr auto auto auto auto;
   gap: 14px; align-items: center;
   padding: 12px 16px;
   background: var(--surface);
@@ -556,6 +556,17 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .repo-metric { text-align: right; min-width: 92px; }
 .repo-metric b { display: block; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .repo-metric span { font-size: 11px; color: var(--muted); }
+/* de dónde bajar mercadería para rellenar la posición de picking */
+.repo-altura {
+  font-size: 11.5px; line-height: 1.35; text-align: right;
+  padding: 5px 10px; border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  color: var(--muted); min-width: 120px;
+}
+.repo-altura b { color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+.repo-altura span { font-family: var(--mono); font-size: 10.5px; }
+.sin-pick { color: var(--crit); font-weight: 700; }
+
 .repo-metric.m-crit b { color: var(--crit); }
 .repo-metric.m-agotado b { color: var(--agotado-txt); }
 .repo-metric.m-warn b { color: var(--warn); }
@@ -777,6 +788,41 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 }
 
 @media print { .topbar, .tabs, .modal, .toast-wrap { display: none !important; } }
+
+/* ============================================================
+   EDITOR DE REGLAS DE POSICIÓN (Configuración)
+   ============================================================ */
+.reglas-editor { display: flex; flex-direction: column; gap: 6px; }
+.reglas-head, .regla-row {
+  display: grid;
+  grid-template-columns: 1.5fr 90px 90px 110px 90px 32px;
+  gap: 6px; align-items: center;
+}
+.reglas-head {
+  font-size: 10.5px; font-weight: 650; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted); padding: 0 10px 2px;
+}
+.regla-row {
+  padding: 7px 10px;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--ok); border-radius: var(--r-sm);
+}
+.regla-row.r-ign { border-left-color: var(--agotado); opacity: .78; }
+.regla-row input, .regla-row select {
+  height: 28px; padding: 0 7px; width: 100%;
+  font: inherit; font-size: 12px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; outline: none;
+}
+.regla-row input { font-family: var(--mono); }
+.regla-row input:focus, .regla-row select:focus { border-color: var(--accent); }
+.regla-row select[disabled] { opacity: .4; }
+.regla-nota { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+@media (max-width: 760px) {
+  .reglas-head { display: none; }
+  .regla-row { grid-template-columns: 1fr 1fr; }
+}
 
 </style>
 </head>
@@ -1022,6 +1068,17 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
           <input type="checkbox" id="cfgTvSoloCriticos">
           <span>Priorizar sólo productos críticos</span>
         </label>
+      </div>
+
+      <h3 class="section-title">Reglas de posición</h3>
+      <p class="muted small">Se evalúan <strong>en orden</strong> y gana la primera que coincide, así
+        que las de ignorar van arriba: <code>PACK</code> tiene que resolverse antes que <code>P*</code>.
+        Comodín <code>*</code> al principio, al final o solo (<code>*</code> = todas).
+        Los cambios se aplican al volver a importar.</p>
+      <div class="reglas-editor" id="reglasEditor"></div>
+      <div class="cfg-actions" style="margin-top:10px">
+        <button class="btn" id="btnAddRegla">+ Agregar regla</button>
+        <button class="btn" id="btnResetReglas">Restaurar reglas originales</button>
       </div>
 
       <h3 class="section-title">Laboratorios</h3>
@@ -1428,7 +1485,9 @@ VLM.labs = (function () {
     p.labId       = lab ? lab.id : null;
     p.labNombre   = lab ? lab.nombre : p.laboratorio;
     p.gestionado  = !!lab;
-    p.ambito      = lab ? lab.ambito : 'externo';
+    // el ámbito sale de la posición si una regla lo define: dónde está la
+    // mercadería es un hecho físico, el laboratorio es sólo el default
+    p.ambito      = p.ambitoPos || (lab ? lab.ambito : 'externo');
     p.conservacion = resolverZona(p.zonaPlanilla, lab);
     return p;
   }
@@ -1453,6 +1512,110 @@ VLM.labs = (function () {
 </script>
 <script>
 /* ============================================================
+   ubicaciones.js · reglas de posición
+
+   La posición dice más que el laboratorio: si se pickea o es stock de
+   altura, si está en cámara o en ambiente, y si hay que ignorarla porque
+   es una zona de tránsito y no stock real.
+
+   Las reglas se evalúan EN ORDEN y gana la primera que coincide, así que
+   las de ignorar van arriba: "PACK" tiene que resolverse antes que "P*".
+   ============================================================ */
+window.VLM = window.VLM || {};
+
+VLM.ubicaciones = (function () {
+
+  const TIPOS = {
+    picking: { label: 'Picking',  corto: 'Pick',   desc: 'Se pickea de acá' },
+    altura:  { label: 'Altura',   corto: 'Altura', desc: 'Reserva: se baja para rellenar picking' }
+  };
+
+  /* ------------------------------------------------------------
+     Reglas provisionales, según lo que describió el usuario para el
+     export de Biosidus. Se editan en Configuración; el archivo bueno
+     va a traer las posiciones del VLM, que todavía no aparecen acá.
+     ------------------------------------------------------------ */
+  const REGLAS_DEFAULT = [
+    // --- tránsito, acondicionado y faltantes: no son stock ubicado ---
+    { patron: 'SPP',     accion: 'ignorar', nota: 'tránsito' },
+    { patron: 'PACK',    accion: 'ignorar', nota: 'packing' },
+    { patron: 'STAGE',   accion: 'ignorar', nota: 'staging' },
+    { patron: 'ACONDI',  accion: 'ignorar', nota: 'acondicionado' },
+    { patron: 'PICKTO',  accion: 'ignorar', nota: 'tránsito' },
+    { patron: 'FALDEP*', accion: 'ignorar', nota: 'faltante depósito' },
+    { patron: 'ROTORI*', accion: 'ignorar', nota: 'rotura / origen' },
+    { patron: 'C*',      accion: 'ignorar', nota: 'no se usa' },
+
+    // --- picking ---
+    { patron: 'BIOCAM*', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
+      nota: 'picking cámara, pasillo' },
+    { patron: '*100',    accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
+      nota: 'picking cámara, nivel 100' },
+    { patron: 'P*',      accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'ambiente',
+      nota: 'picking ambiente' },
+
+    // --- todo lo demás: stock de altura. No se pickea, pero es stock real
+    //     y dice de dónde bajar mercadería para rellenar el picking. ---
+    { patron: '*',       accion: 'usar', tipo: 'altura',
+      nota: 'stock de altura (niveles 200 en adelante)' }
+  ];
+
+  function reglasDefault() {
+    return REGLAS_DEFAULT.map(r => Object.assign({}, r));
+  }
+
+  /* ------------------------------------------------------------
+     Matcheo
+     ------------------------------------------------------------ */
+
+  /** Glob simple: PREFIJO*, *SUFIJO, *CONTIENE*, * (todo) o exacto. */
+  function coincide(ubicacion, patron) {
+    const u = String(ubicacion == null ? '' : ubicacion).trim().toUpperCase();
+    const p = String(patron == null ? '' : patron).trim().toUpperCase();
+    if (!p) return false;
+    if (p === '*') return true;
+    const abre = p.charAt(0) === '*';
+    const cierra = p.charAt(p.length - 1) === '*';
+    const core = p.replace(/^\*/, '').replace(/\*$/, '');
+    if (!core) return true;
+    if (abre && cierra) return u.indexOf(core) > -1;
+    if (abre)  return u.length >= core.length && u.slice(-core.length) === core;
+    if (cierra) return u.indexOf(core) === 0;
+    return u === core;
+  }
+
+  /**
+   * Primera regla que coincide, o null si ninguna.
+   * @returns { accion, tipo, ambito, zona, patron, nota } | null
+   */
+  function evaluar(ubicacion, reglas) {
+    if (!ubicacion) return null;
+    const lista = reglas && reglas.length ? reglas : REGLAS_DEFAULT;
+    for (const r of lista) {
+      if (coincide(ubicacion, r.patron)) return r;
+    }
+    return null;
+  }
+
+  /** Cuenta cuántas ubicaciones distintas caen en cada regla. Para el editor. */
+  function cobertura(ubicaciones, reglas) {
+    const lista = reglas && reglas.length ? reglas : REGLAS_DEFAULT;
+    const conteo = lista.map(r => ({ patron: r.patron, accion: r.accion, tipo: r.tipo, n: 0 }));
+    let sinRegla = 0;
+    ubicaciones.forEach(u => {
+      let i = -1;
+      for (let k = 0; k < lista.length; k++) { if (coincide(u, lista[k].patron)) { i = k; break; } }
+      if (i === -1) sinRegla++; else conteo[i].n++;
+    });
+    return { conteo, sinRegla };
+  }
+
+  return { TIPOS, REGLAS_DEFAULT, reglasDefault, coincide, evaluar, cobertura };
+})();
+
+</script>
+<script>
+/* ============================================================
    store.js · estado global, configuración y persistencia
    ============================================================ */
 window.VLM = window.VLM || {};
@@ -1464,6 +1627,7 @@ VLM.store = (function () {
   const KEY_UI   = 'vlm.ui.v1';
   const KEY_LABS = 'vlm.labs.v1';
   const KEY_HIST = 'vlm.historial.v1';
+  const KEY_UBIC = 'vlm.ubicaciones.v1';
 
   const MAX_SNAPSHOTS = 60;   // ~2 meses de importaciones diarias
 
@@ -1505,6 +1669,7 @@ VLM.store = (function () {
     },
     cfg: Object.assign({}, CFG_DEFAULT),
     labs: [],           // catálogo de laboratorios (ver labs.js)
+    reglasUbic: [],     // reglas de posición (ver ubicaciones.js)
     historial: [],      // snapshots de stock, uno por día (ver agregarSnapshot)
     ui: {
       tema: 'dark',
@@ -1555,6 +1720,10 @@ VLM.store = (function () {
     try { localStorage.setItem(KEY_LABS, JSON.stringify(state.labs)); } catch (e) {}
   }
 
+  function guardarReglasUbic() {
+    try { localStorage.setItem(KEY_UBIC, JSON.stringify(state.reglasUbic)); } catch (e) {}
+  }
+
   /**
    * Guarda el historial. Si no entra en localStorage va tirando los snapshots
    * más viejos antes que perder todo, y como último recurso deja sólo los
@@ -1594,6 +1763,12 @@ VLM.store = (function () {
       state.labs = (labs && labs.length) ? labs : VLM.labs.catalogoDefault();
     } catch (e) {
       state.labs = VLM.labs.catalogoDefault();
+    }
+    try {
+      const ru = JSON.parse(localStorage.getItem(KEY_UBIC) || 'null');
+      state.reglasUbic = (ru && ru.length) ? ru : VLM.ubicaciones.reglasDefault();
+    } catch (e) {
+      state.reglasUbic = VLM.ubicaciones.reglasDefault();
     }
     try {
       const h = JSON.parse(localStorage.getItem(KEY_HIST) || 'null');
@@ -1723,6 +1898,17 @@ VLM.store = (function () {
     setLabs(VLM.labs.catalogoDefault());
   }
 
+  /** Reemplaza las reglas de posición. Obliga a reimportar para que apliquen. */
+  function setReglasUbic(reglas) {
+    state.reglasUbic = reglas;
+    guardarReglasUbic();
+    emit('ubicaciones');
+  }
+
+  function resetReglasUbic() {
+    setReglasUbic(VLM.ubicaciones.reglasDefault());
+  }
+
   function setUi(parcial, silencioso) {
     Object.assign(state.ui, parcial);
     guardarUi();
@@ -1734,7 +1920,8 @@ VLM.store = (function () {
   return {
     state, CFG_DEFAULT,
     on, emit, cargar, guardar,
-    setProductos, limpiar, setCfg, setUi, setLabs, resetLabs, hayDatos,
+    setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
+    setReglasUbic, resetReglasUbic, hayDatos,
     agregarSnapshot, limpiarHistorial, MAX_SNAPSHOTS
   };
 })();
@@ -1964,29 +2151,59 @@ VLM.parser = (function () {
     productos.forEach(p => {
       const k = p.codigo;
       if (!mapa[k]) {
-        mapa[k] = Object.assign({}, p, { ubicaciones: [], lotes: [], posiciones: 0 });
+        mapa[k] = Object.assign({}, p, {
+          ubicaciones: [], ubicPicking: [], ubicAltura: [], lotes: [],
+          posiciones: 0, stockPicking: 0, stockAltura: 0,
+          zonaPeso: {}, ambitoPeso: {}
+        });
         orden.push(k);
         mapa[k].stock = 0;
       }
       const g = mapa[k];
       g.stock += p.stock;
       g.posiciones++;
+      if (p.tipoPos === 'altura') {
+        g.stockAltura += p.stock;
+        if (p.ubicacion && g.ubicAltura.indexOf(p.ubicacion) === -1) g.ubicAltura.push(p.ubicacion);
+      } else {
+        g.stockPicking += p.stock;
+        if (p.ubicacion && g.ubicPicking.indexOf(p.ubicacion) === -1) g.ubicPicking.push(p.ubicacion);
+      }
       if (p.ubicacion && g.ubicaciones.indexOf(p.ubicacion) === -1) g.ubicaciones.push(p.ubicacion);
       if (p.lote && g.lotes.indexOf(p.lote) === -1) g.lotes.push(p.lote);
+
+      // La zona y el ámbito se deciden por peso, pero SÓLO votan las filas
+      // donde el dato es explícito: una columna de la planilla o una regla de
+      // posición. Las que caen al default del laboratorio no votan, porque es
+      // una suposición y no puede ganarle a un dato real — si no, el stock de
+      // altura (que suele no tener regla de zona) tapa a las posiciones de
+      // picking, que son las que definen desde dónde se sirve el artículo.
+      const peso = (p.stock || 0) * (p.tipoPos === 'picking' ? 2 : 1) + 1;
+      if (p.zonaExplicita && p.conservacion) {
+        g.zonaPeso[p.conservacion] = (g.zonaPeso[p.conservacion] || 0) + peso;
+      }
+      if (p.ambitoPos) g.ambitoPeso[p.ambitoPos] = (g.ambitoPeso[p.ambitoPos] || 0) + peso;
+
       g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
       g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
       g.consumoDiario  = Math.max(g.consumoDiario || 0, p.consumoDiario || 0);
       g.consumoMensual = Math.max(g.consumoMensual || 0, p.consumoMensual || 0);
       if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
-      if (!g.descripcion || g.descripcion === '(sin descripción)') g.descripcion = p.descripcion;
+      if (!g.descripcion || g.descripcion === g.codigo) g.descripcion = p.descripcion;
     });
+
+    const mayor = o => Object.keys(o).sort((a, b) => o[b] - o[a])[0];
 
     return orden.map(k => {
       const g = mapa[k];
-      g.ubicacion = g.ubicaciones.length > 1
-        ? g.ubicaciones[0] + ' +' + (g.ubicaciones.length - 1)
-        : (g.ubicaciones[0] || '');
+      g.ubicacion = g.ubicPicking.length ? g.ubicPicking[0] : (g.ubicaciones[0] || '');
+      if (g.ubicaciones.length > 1) g.ubicacion += ' +' + (g.ubicaciones.length - 1);
       g.lote = g.lotes.length > 1 ? g.lotes.length + ' lotes' : (g.lotes[0] || '');
+      g.conservacion = mayor(g.zonaPeso) || g.conservacion;
+      g.ambito       = mayor(g.ambitoPeso) || g.ambito;
+      g.zonasMixtas  = Object.keys(g.zonaPeso).length > 1;
+      g.sinPicking   = g.ubicPicking.length === 0;
+      delete g.zonaPeso; delete g.ambitoPeso;
       return g;
     });
   }
@@ -2007,6 +2224,12 @@ VLM.parser = (function () {
     const diasMes = (cfg && cfg.diasMes) || 30;
     catalogo = catalogo || VLM.labs.catalogoDefault();
     opciones = opciones || {};
+    const reglas = opciones.reglas || VLM.ubicaciones.reglasDefault();
+    let ignoradas = 0, sinRegla = 0;
+    const ignoradasPorPatron = {};
+    // todas las posiciones que aparecen en el archivo, incluidas las ignoradas:
+    // el editor de reglas las necesita para decir cuántas cubre cada regla
+    const ubicVistas = {};
     const fmtFecha = detectarFormatoFecha(matriz, filaHeader, mapa.vencimiento);
 
     // encabezado de la columna de conservación: cambia cómo se lee un "SI"
@@ -2041,14 +2264,34 @@ VLM.parser = (function () {
 
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
+      // --- reglas de posición: ignorar, picking o altura ---
+      const ubic = String(get(fila, 'ubicacion') || '').trim();
+      if (ubic) ubicVistas[ubic] = 1;
+      const regla = VLM.ubicaciones.evaluar(ubic, reglas);
+      if (regla && regla.accion === 'ignorar') {
+        ignoradas++;
+        ignoradasPorPatron[regla.patron] = (ignoradasPorPatron[regla.patron] || 0) + 1;
+        continue;
+      }
+      if (ubic && !regla) sinRegla++;
+
+      // la columna de la planilla manda sobre la regla de posición
+      const zonaFila = VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons) ||
+                       (regla && regla.zona) || null;
+
       const cod = String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1));
       productos.push(VLM.labs.clasificar({
         codigo:        cod,
         // sin columna de descripcion se muestra el codigo, que es lo unico que hay
         descripcion:   String(desc === null ? '' : desc).trim() || cod,
         laboratorio:   lab,
-        zonaPlanilla:  VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons),
-        ubicacion:     String(get(fila, 'ubicacion') || '').trim(),
+        // la posición manda sobre el default del laboratorio, pero no sobre
+        // una columna de conservación explícita en la planilla
+        zonaPlanilla:  zonaFila,
+        zonaExplicita: !!zonaFila,
+        ambitoPos:     regla && regla.ambito ? regla.ambito : null,
+        tipoPos:       (regla && regla.tipo) || 'picking',
+        ubicacion:     ubic,
         stock:         stock,
         stockMin:      U.toNum(get(fila, 'stockMin')) || 0,
         stockMax:      U.toNum(get(fila, 'stockMax')) || 0,
@@ -2077,6 +2320,15 @@ VLM.parser = (function () {
 
     if (!productos.length) avisos.push('No se pudo leer ninguna fila válida. Revisá la fila de encabezados y el mapeo.');
     if (descartadas > 0)   avisos.push(descartadas + ' fila(s) omitidas por estar vacías o sin stock numérico.');
+    if (ignoradas) {
+      const detalle = Object.keys(ignoradasPorPatron)
+        .sort((a,b) => ignoradasPorPatron[b] - ignoradasPorPatron[a])
+        .slice(0, 5).map(k => k + ' (' + ignoradasPorPatron[k] + ')').join(', ');
+      avisos.push(ignoradas + ' fila(s) ignoradas por reglas de posición: ' + detalle + '.');
+    }
+    if (sinRegla) {
+      avisos.push(sinRegla + ' fila(s) con posiciones que ninguna regla cubre.');
+    }
     if (agrupado) {
       avisos.push('La planilla trae varias filas por artículo: se agruparon ' + filasLeidas +
                   ' filas en ' + lista.length + ' productos, sumando las cantidades.');
@@ -2102,7 +2354,9 @@ VLM.parser = (function () {
         (nombresNoListados.length > 4 ? '…' : '') + '.');
     }
     return { productos: lista, descartadas, avisos, noListados, nombresNoListados,
-             repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha };
+             repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha,
+             ignoradas, sinRegla, ignoradasPorPatron,
+             ubicacionesVistas: Object.keys(ubicVistas) };
   }
 
   /* ------------------------------------------------------------
@@ -3255,6 +3509,13 @@ VLM.views = (function () {
           '<span>' + quiebre + '</span>' +
         '</div>' +
       '</div>' +
+      (p.stockAltura > 0
+        ? '<div class="repo-altura" title="' + U.esc(p.ubicAltura.join(', ')) + '">' +
+            '<b>' + U.fmt(p.stockAltura) + '</b> en altura<br>' +
+            '<span>bajar de ' + U.esc(p.ubicAltura.slice(0, 2).join(', ')) +
+            (p.ubicAltura.length > 2 ? ' +' + (p.ubicAltura.length - 2) : '') + '</span>' +
+          '</div>'
+        : '') +
       '<div class="repo-metric"><b>' + U.fmt(p.stock) + '</b><span>stock actual</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + dias + '</b><span>días restantes</span></div>' +
@@ -3297,6 +3558,8 @@ VLM.views = (function () {
     { id: 'ambito',        label: 'Ámbito' },
     { id: 'ubicacion',     label: 'Ubicación', clase: 't-code' },
     { id: 'stock',         label: 'Stock',     num: true },
+    { id: 'stockPicking',  label: 'Picking',   num: true },
+    { id: 'stockAltura',   label: 'Altura',    num: true },
     { id: 'stockMin',      label: 'Mínimo',    num: true },
     { id: 'consumoDiario', label: 'Cons./día', num: true },
     { id: 'diasCobertura', label: 'Cobertura', num: true },
@@ -3387,6 +3650,10 @@ VLM.views = (function () {
           '<td>' + achip(p.ambito) + '</td>' +
           '<td class="t-code">' + U.esc(p.ubicacion || '—') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(p.stock) + '</strong></td>' +
+          '<td class="t-num">' + (p.stockPicking === undefined ? '—'
+            : (p.stockPicking > 0 ? U.fmt(p.stockPicking)
+               : '<span class="sin-pick">0</span>')) + '</td>' +
+          '<td class="t-num muted">' + (p.stockAltura ? U.fmt(p.stockAltura) : '—') + '</td>' +
           '<td class="t-num muted">' + (p.stockMin ? U.fmt(p.stockMin) : '—') + '</td>' +
           '<td class="t-num">' + (p.consumoDiario ? U.fmt(p.consumoDiario, true) : '—') + '</td>' +
           '<td class="t-num">' + U.fmtDias(p.diasCobertura) +
@@ -4070,7 +4337,7 @@ VLM.app = (function () {
 
   function pintarPreview() {
     const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
-                           { agrupar: $('#impAgrupar').checked });
+                           { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic });
     imp.resultado = r;
 
     // la opción de agrupar sólo aparece si la planilla realmente repite códigos
@@ -4107,7 +4374,7 @@ VLM.app = (function () {
   function confirmarImport() {
     if (!validarMapeo()) return;
     const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
-                                            { agrupar: $('#impAgrupar').checked });
+                                            { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic });
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
     S.setProductos(r.productos, {
@@ -4115,7 +4382,8 @@ VLM.app = (function () {
       hoja: imp.hoja,
       filas: r.productos.length,
       importadoEn: Date.now(),
-      mapeo: Object.assign({}, imp.mapa)
+      mapeo: Object.assign({}, imp.mapa),
+      ubicacionesVistas: r.ubicacionesVistas || []
     });
     $('#modalImport').hidden = true;
     U.toast('Importados ' + r.productos.length + ' productos', 'ok');
@@ -4177,7 +4445,7 @@ VLM.app = (function () {
 
   function cargarDemo() {
     const mapa = P.autoMapear(DEMO[0]);
-    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs);
+    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs, { reglas: S.state.reglasUbic });
     S.limpiarHistorial();
     if (S.state.cfg.historialActivo) sembrarHistorialDemo(r.productos, 21);
     S.setProductos(r.productos, {
@@ -4252,6 +4520,7 @@ VLM.app = (function () {
       else el.value = S.state.cfg[clave];
     });
     $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
+    pintarReglasEditor();
     pintarLabsEditor();
     actualizarHistInfo();
     $('#modalSettings').hidden = false;
@@ -4267,6 +4536,85 @@ VLM.app = (function () {
     el.textContent = h.length + (h.length === 1 ? ' importación guardada' : ' importaciones guardadas') +
       ' · del ' + h[0].dia + ' al ' + h[h.length - 1].dia +
       ' · máximo ' + S.MAX_SNAPSHOTS;
+  }
+
+  /* ---------- reglas de posición ---------- */
+
+  function pintarReglasEditor() {
+    const Ub = VLM.ubicaciones;
+    const reglas = S.state.reglasUbic;
+    const cont = $('#reglasEditor');
+
+    // cuántas ubicaciones de lo que está cargado cae en cada regla
+    // contra TODAS las posiciones del archivo, incluidas las que se ignoraron
+    let ubics = S.state.meta.ubicacionesVistas || [];
+    if (!ubics.length) {
+      ubics = [];
+      S.state.productos.forEach(p => {
+        (p.ubicaciones || [p.ubicacion]).forEach(u => { if (u && ubics.indexOf(u) === -1) ubics.push(u); });
+      });
+    }
+    const cob = ubics.length ? Ub.cobertura(ubics, reglas) : null;
+
+    cont.innerHTML =
+      '<div class="reglas-head"><span>Patrón</span><span>Acción</span><span>Tipo</span>' +
+      '<span>Zona</span><span>Ámbito</span><span></span></div>' +
+      reglas.map((r, i) => {
+        const n = cob ? cob.conteo[i].n : null;
+        const ign = r.accion === 'ignorar';
+        return '<div class="regla-row' + (ign ? ' r-ign' : '') + '" data-i="' + i + '">' +
+          '<div><input type="text" data-campo="patron" value="' + U.esc(r.patron) + '">' +
+            (r.nota || n !== null
+              ? '<span class="regla-nota">' + U.esc(r.nota || '') +
+                (n !== null ? (r.nota ? ' · ' : '') + n + ' ubic.' : '') + '</span>'
+              : '') + '</div>' +
+          sel('accion', r.accion || 'usar', { usar: 'Usar', ignorar: 'Ignorar' }) +
+          sel('tipo', r.tipo || '', { '': '—', picking: 'Picking', altura: 'Altura' }, ign) +
+          sel('zona', r.zona || '', { '': '—', frio: '❄ Frío', ambiente: '🌡 Ambiente' }, ign) +
+          sel('ambito', r.ambito || '', { '': '—', vlm: 'VLM', externo: 'Fuera' }, ign) +
+          '<button class="btn btn-icon lab-row-del" title="Quitar regla">' +
+            '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
+          '</div>';
+      }).join('') +
+      (cob && cob.sinRegla
+        ? '<p class="muted small" style="margin-top:8px">' + cob.sinRegla +
+          ' ubicación(es) que ninguna regla cubre. Agregá una regla <code>*</code> al final para atraparlas.</p>'
+        : '');
+
+    function sel(campo, valor, opciones, deshabilitado) {
+      return '<select data-campo="' + campo + '"' + (deshabilitado ? ' disabled' : '') + '>' +
+        Object.keys(opciones).map(k => '<option value="' + k + '"' +
+          (valor === k ? ' selected' : '') + '>' + opciones[k] + '</option>').join('') +
+        '</select>';
+    }
+
+    U.$$('.regla-row', cont).forEach(row => {
+      const i = +row.dataset.i;
+      U.$$('input, select', row).forEach(campo => campo.addEventListener('change', () => {
+        const lista = S.state.reglasUbic.slice();
+        const r = Object.assign({}, lista[i]);
+        const v = campo.value.trim();
+        if (campo.dataset.campo === 'patron' && !v) { campo.value = r.patron; return; }
+        if (v === '') delete r[campo.dataset.campo]; else r[campo.dataset.campo] = v;
+        lista[i] = r;
+        S.setReglasUbic(lista);
+        pintarReglasEditor();
+      }));
+      U.$('.lab-row-del', row).addEventListener('click', () => {
+        S.setReglasUbic(S.state.reglasUbic.filter((_, j) => j !== i));
+        pintarReglasEditor();
+      });
+    });
+  }
+
+  function agregarRegla() {
+    const patron = (prompt('Patrón de posición (ej: BIOCAM*, *100, P*, SPP):') || '').trim();
+    if (!patron) return;
+    S.setReglasUbic(S.state.reglasUbic.concat([
+      { patron: patron, accion: 'usar', tipo: 'picking' }
+    ]));
+    pintarReglasEditor();
+    U.toast('Regla agregada al final. Reordenala editando si hace falta.', 'ok');
   }
 
   /* ---------- catálogo de laboratorios ---------- */
@@ -4364,6 +4712,14 @@ VLM.app = (function () {
       calculados = null;
       actualizarHistInfo();
       U.toast('Historial borrado');
+    });
+
+    $('#btnAddRegla').addEventListener('click', agregarRegla);
+    $('#btnResetReglas').addEventListener('click', () => {
+      if (!confirm('¿Restaurar las reglas de posición originales?')) return;
+      S.resetReglasUbic();
+      pintarReglasEditor();
+      U.toast('Reglas restauradas. Volvé a importar para aplicarlas.', 'ok');
     });
 
     $('#btnAddLab').addEventListener('click', agregarLab);

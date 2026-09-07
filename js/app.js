@@ -344,7 +344,7 @@ VLM.app = (function () {
 
   function pintarPreview() {
     const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
-                           { agrupar: $('#impAgrupar').checked });
+                           { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic });
     imp.resultado = r;
 
     // la opción de agrupar sólo aparece si la planilla realmente repite códigos
@@ -381,7 +381,7 @@ VLM.app = (function () {
   function confirmarImport() {
     if (!validarMapeo()) return;
     const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
-                                            { agrupar: $('#impAgrupar').checked });
+                                            { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic });
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
     S.setProductos(r.productos, {
@@ -389,7 +389,8 @@ VLM.app = (function () {
       hoja: imp.hoja,
       filas: r.productos.length,
       importadoEn: Date.now(),
-      mapeo: Object.assign({}, imp.mapa)
+      mapeo: Object.assign({}, imp.mapa),
+      ubicacionesVistas: r.ubicacionesVistas || []
     });
     $('#modalImport').hidden = true;
     U.toast('Importados ' + r.productos.length + ' productos', 'ok');
@@ -451,7 +452,7 @@ VLM.app = (function () {
 
   function cargarDemo() {
     const mapa = P.autoMapear(DEMO[0]);
-    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs);
+    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs, { reglas: S.state.reglasUbic });
     S.limpiarHistorial();
     if (S.state.cfg.historialActivo) sembrarHistorialDemo(r.productos, 21);
     S.setProductos(r.productos, {
@@ -526,6 +527,7 @@ VLM.app = (function () {
       else el.value = S.state.cfg[clave];
     });
     $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
+    pintarReglasEditor();
     pintarLabsEditor();
     actualizarHistInfo();
     $('#modalSettings').hidden = false;
@@ -541,6 +543,85 @@ VLM.app = (function () {
     el.textContent = h.length + (h.length === 1 ? ' importación guardada' : ' importaciones guardadas') +
       ' · del ' + h[0].dia + ' al ' + h[h.length - 1].dia +
       ' · máximo ' + S.MAX_SNAPSHOTS;
+  }
+
+  /* ---------- reglas de posición ---------- */
+
+  function pintarReglasEditor() {
+    const Ub = VLM.ubicaciones;
+    const reglas = S.state.reglasUbic;
+    const cont = $('#reglasEditor');
+
+    // cuántas ubicaciones de lo que está cargado cae en cada regla
+    // contra TODAS las posiciones del archivo, incluidas las que se ignoraron
+    let ubics = S.state.meta.ubicacionesVistas || [];
+    if (!ubics.length) {
+      ubics = [];
+      S.state.productos.forEach(p => {
+        (p.ubicaciones || [p.ubicacion]).forEach(u => { if (u && ubics.indexOf(u) === -1) ubics.push(u); });
+      });
+    }
+    const cob = ubics.length ? Ub.cobertura(ubics, reglas) : null;
+
+    cont.innerHTML =
+      '<div class="reglas-head"><span>Patrón</span><span>Acción</span><span>Tipo</span>' +
+      '<span>Zona</span><span>Ámbito</span><span></span></div>' +
+      reglas.map((r, i) => {
+        const n = cob ? cob.conteo[i].n : null;
+        const ign = r.accion === 'ignorar';
+        return '<div class="regla-row' + (ign ? ' r-ign' : '') + '" data-i="' + i + '">' +
+          '<div><input type="text" data-campo="patron" value="' + U.esc(r.patron) + '">' +
+            (r.nota || n !== null
+              ? '<span class="regla-nota">' + U.esc(r.nota || '') +
+                (n !== null ? (r.nota ? ' · ' : '') + n + ' ubic.' : '') + '</span>'
+              : '') + '</div>' +
+          sel('accion', r.accion || 'usar', { usar: 'Usar', ignorar: 'Ignorar' }) +
+          sel('tipo', r.tipo || '', { '': '—', picking: 'Picking', altura: 'Altura' }, ign) +
+          sel('zona', r.zona || '', { '': '—', frio: '❄ Frío', ambiente: '🌡 Ambiente' }, ign) +
+          sel('ambito', r.ambito || '', { '': '—', vlm: 'VLM', externo: 'Fuera' }, ign) +
+          '<button class="btn btn-icon lab-row-del" title="Quitar regla">' +
+            '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
+          '</div>';
+      }).join('') +
+      (cob && cob.sinRegla
+        ? '<p class="muted small" style="margin-top:8px">' + cob.sinRegla +
+          ' ubicación(es) que ninguna regla cubre. Agregá una regla <code>*</code> al final para atraparlas.</p>'
+        : '');
+
+    function sel(campo, valor, opciones, deshabilitado) {
+      return '<select data-campo="' + campo + '"' + (deshabilitado ? ' disabled' : '') + '>' +
+        Object.keys(opciones).map(k => '<option value="' + k + '"' +
+          (valor === k ? ' selected' : '') + '>' + opciones[k] + '</option>').join('') +
+        '</select>';
+    }
+
+    U.$$('.regla-row', cont).forEach(row => {
+      const i = +row.dataset.i;
+      U.$$('input, select', row).forEach(campo => campo.addEventListener('change', () => {
+        const lista = S.state.reglasUbic.slice();
+        const r = Object.assign({}, lista[i]);
+        const v = campo.value.trim();
+        if (campo.dataset.campo === 'patron' && !v) { campo.value = r.patron; return; }
+        if (v === '') delete r[campo.dataset.campo]; else r[campo.dataset.campo] = v;
+        lista[i] = r;
+        S.setReglasUbic(lista);
+        pintarReglasEditor();
+      }));
+      U.$('.lab-row-del', row).addEventListener('click', () => {
+        S.setReglasUbic(S.state.reglasUbic.filter((_, j) => j !== i));
+        pintarReglasEditor();
+      });
+    });
+  }
+
+  function agregarRegla() {
+    const patron = (prompt('Patrón de posición (ej: BIOCAM*, *100, P*, SPP):') || '').trim();
+    if (!patron) return;
+    S.setReglasUbic(S.state.reglasUbic.concat([
+      { patron: patron, accion: 'usar', tipo: 'picking' }
+    ]));
+    pintarReglasEditor();
+    U.toast('Regla agregada al final. Reordenala editando si hace falta.', 'ok');
   }
 
   /* ---------- catálogo de laboratorios ---------- */
@@ -638,6 +719,14 @@ VLM.app = (function () {
       calculados = null;
       actualizarHistInfo();
       U.toast('Historial borrado');
+    });
+
+    $('#btnAddRegla').addEventListener('click', agregarRegla);
+    $('#btnResetReglas').addEventListener('click', () => {
+      if (!confirm('¿Restaurar las reglas de posición originales?')) return;
+      S.resetReglasUbic();
+      pintarReglasEditor();
+      U.toast('Reglas restauradas. Volvé a importar para aplicarlas.', 'ok');
     });
 
     $('#btnAddLab').addEventListener('click', agregarLab);

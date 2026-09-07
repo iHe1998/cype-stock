@@ -374,6 +374,13 @@ VLM.views = (function () {
           '<span>' + quiebre + '</span>' +
         '</div>' +
       '</div>' +
+      (p.stockAltura > 0
+        ? '<div class="repo-altura" title="' + U.esc(p.ubicAltura.join(', ')) + '">' +
+            '<b>' + U.fmt(p.stockAltura) + '</b> en altura<br>' +
+            '<span>bajar de ' + U.esc(p.ubicAltura.slice(0, 2).join(', ')) +
+            (p.ubicAltura.length > 2 ? ' +' + (p.ubicAltura.length - 2) : '') + '</span>' +
+          '</div>'
+        : '') +
       '<div class="repo-metric"><b>' + U.fmt(p.stock) + '</b><span>stock actual</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + dias + '</b><span>días restantes</span></div>' +
@@ -416,6 +423,8 @@ VLM.views = (function () {
     { id: 'ambito',        label: 'Ámbito' },
     { id: 'ubicacion',     label: 'Ubicación', clase: 't-code' },
     { id: 'stock',         label: 'Stock',     num: true },
+    { id: 'stockPicking',  label: 'Picking',   num: true },
+    { id: 'stockAltura',   label: 'Altura',    num: true },
     { id: 'stockMin',      label: 'Mínimo',    num: true },
     { id: 'consumoDiario', label: 'Cons./día', num: true },
     { id: 'diasCobertura', label: 'Cobertura', num: true },
@@ -506,6 +515,10 @@ VLM.views = (function () {
           '<td>' + achip(p.ambito) + '</td>' +
           '<td class="t-code">' + U.esc(p.ubicacion || '—') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(p.stock) + '</strong></td>' +
+          '<td class="t-num">' + (p.stockPicking === undefined ? '—'
+            : (p.stockPicking > 0 ? U.fmt(p.stockPicking)
+               : '<span class="sin-pick">0</span>')) + '</td>' +
+          '<td class="t-num muted">' + (p.stockAltura ? U.fmt(p.stockAltura) : '—') + '</td>' +
           '<td class="t-num muted">' + (p.stockMin ? U.fmt(p.stockMin) : '—') + '</td>' +
           '<td class="t-num">' + (p.consumoDiario ? U.fmt(p.consumoDiario, true) : '—') + '</td>' +
           '<td class="t-num">' + U.fmtDias(p.diasCobertura) +

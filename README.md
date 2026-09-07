@@ -54,7 +54,7 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 | Campo | Obligatorio | Ejemplos de encabezado que reconoce |
 |---|---|---|
 | Código / SKU | ✅ | Codigo, SKU, Artículo, Referencia |
-| Descripción | ✅ | Descripcion, Producto, Denominación |
+| Descripción | — | Descripcion, Producto, Denominación |
 | Laboratorio | ✅ | Laboratorio, Lab, Proveedor, Marca |
 | Stock actual | ✅ | Stock, Cantidad, Existencia, Saldo |
 | Ubicación | — | Ubicacion, Bandeja, Charola, Posición |
@@ -111,6 +111,39 @@ Se resuelve con esta prioridad:
 
 Así un laboratorio puede tener productos en las dos zonas (Roche tiene los biológicos en
 frío y Xeloda o Tamiflu en ambiente) y aparece en los dos cuadrantes.
+
+---
+
+## Reglas de posición
+
+La posición dice más que el laboratorio: si se pickea o es stock de altura, si está en
+cámara o en ambiente, y si hay que ignorarla porque es una zona de tránsito.
+
+Las reglas se evalúan **en orden** y gana la primera que coincide, así que las de ignorar
+van arriba: `PACK` tiene que resolverse antes que `P*`. El comodín `*` vale al principio,
+al final o solo (`*` = todas). Se editan en **⚙ Configuración → Reglas de posición**, que
+muestra cuántas ubicaciones del archivo cargado cubre cada regla.
+
+| Patrón | Acción | |
+|---|---|---|
+| `SPP` `PACK` `STAGE` `ACONDI` `PICKTO` `FALDEP*` `ROTORI*` `C*` | ignorar | tránsito, packing, acondicionado: no es stock ubicado |
+| `BIOCAM*` | picking · cámara · fuera del VLM | picking de pasillo |
+| `*100` | picking · cámara · fuera del VLM | nivel 100 |
+| `P*` | picking · ambiente · fuera del VLM | |
+| `*` | altura | todo lo demás: no se pickea, pero es stock y dice de dónde bajar mercadería |
+
+> Provisionales, sacadas de un export de Biosidus. Las posiciones del VLM todavía no
+> aparecieron en ningún archivo.
+
+**Picking y altura** se separan por producto: la tabla de inventario muestra las dos
+columnas, y en la lista de reposición aparece cuánto hay en altura y de qué posiciones
+bajarlo.
+
+La zona y el ámbito de un artículo se deciden por peso entre sus posiciones, con el
+picking valiendo doble. **Sólo votan las filas con dato explícito** — una columna de la
+planilla o una regla de posición. Las que caen al default del laboratorio no votan: es una
+suposición y no puede ganarle a un dato real. Sin eso, el stock de altura (que suele no
+tener regla de zona) tapaba a las posiciones de picking.
 
 ---
 
@@ -193,6 +226,7 @@ build.ps1             arma la versión de un solo archivo (dist/)
 css/styles.css        sistema de diseño (tema oscuro/claro, modo TV)
 js/util.js            formateo de números y fechas, colores, helpers
 js/labs.js            catálogo de laboratorios, ámbito y conservación
+js/ubicaciones.js     reglas de posición (ignorar / picking / altura)
 js/store.js           estado global, configuración y persistencia
 js/parser.js          lectura de Excel, detección y mapeo de columnas
 js/analytics.js       cobertura, criticidad, historial de consumo y agregados
@@ -215,7 +249,7 @@ versiones y cómo actualizarlas.
 ## Próximos pasos
 
 - [x] ~~Calcular el consumo real por diferencia entre importaciones~~
-- [ ] Derivar el ámbito (VLM / fuera) de la **posición** en vez del laboratorio
+- [x] ~~Derivar el ámbito y la conservación de la **posición**~~
 - [ ] Exportar el historial de consumo a Excel
 - [ ] Conectar directo al **WMS / ERP** del VLM en vez de subir la planilla a mano
 - [ ] Auto-refresco leyendo un archivo desde una carpeta de red

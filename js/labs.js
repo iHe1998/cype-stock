@@ -124,7 +124,9 @@ VLM.labs = (function () {
     p.labId       = lab ? lab.id : null;
     p.labNombre   = lab ? lab.nombre : p.laboratorio;
     p.gestionado  = !!lab;
-    p.ambito      = lab ? lab.ambito : 'externo';
+    // el ámbito sale de la posición si una regla lo define: dónde está la
+    // mercadería es un hecho físico, el laboratorio es sólo el default
+    p.ambito      = p.ambitoPos || (lab ? lab.ambito : 'externo');
     p.conservacion = resolverZona(p.zonaPlanilla, lab);
     return p;
   }
