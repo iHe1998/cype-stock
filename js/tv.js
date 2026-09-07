@@ -179,7 +179,7 @@ VLM.tv = (function () {
           '<div class="tv-crit-name">' + U.esc(p.descripcion) +
             '<span class="tv-crit-lab"> · ' + U.esc(p.laboratorio) +
             (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
-          '<div class="tv-crit-val ' + (p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
+          '<div class="tv-crit-val ' + (p.estado === 'agotado' ? 'v-agotado' : p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
             '<span class="tv-crit-sub">días</span></div>' +
           '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
           '</div>';
@@ -212,7 +212,7 @@ VLM.tv = (function () {
               '<div class="tv-crit-name">' + U.esc(p.descripcion) +
                 '<span class="tv-crit-lab"> · ' + U.esc(p.labNombre || p.laboratorio) +
                 (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
-              '<div class="tv-crit-val ' + (p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
+              '<div class="tv-crit-val ' + (p.estado === 'agotado' ? 'v-agotado' : p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
                 '<span class="tv-crit-sub">días</span></div>' +
               '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
               '</div>';

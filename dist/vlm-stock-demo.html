@@ -39,6 +39,14 @@
   --info:        #a78bfa;
   --info-dim:    #2c2350;
 
+  /* Agotado: gris casi negro, no rojo. Crítico todavía tiene stock y hay que
+     correr; agotado ya no hay nada. Son dos cosas distintas y se ven distinto.
+     --agotado es el color de bloque (gráficos y barras), --agotado-dim el
+     fondo de la etiqueta y --agotado-txt el texto que va encima. */
+  --agotado:     #414c5c;
+  --agotado-dim: #0b1016;
+  --agotado-txt: #b8c3d1;
+
   /* zonas de conservación */
   --frio:        #22d3ee;
   --frio-dim:    #0c3a44;
@@ -80,6 +88,9 @@
   --crit-dim:    #fee2e2;
   --info:        #7c3aed;
   --info-dim:    #ede9fe;
+  --agotado:     #374151;
+  --agotado-dim: #dde1e7;
+  --agotado-txt: #1f2937;
   --frio:        #0891b2;
   --frio-dim:    #cffafe;
   --ambiente:    #b45309;
@@ -418,7 +429,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   border: 1px solid transparent; white-space: nowrap;
 }
 .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.b-agotado { color: var(--crit); background: var(--crit-dim); border-color: color-mix(in srgb, var(--crit) 45%, transparent); }
+.b-agotado { color: var(--agotado-txt); background: var(--agotado-dim); border-color: var(--agotado); }
 .b-critico { color: var(--crit); background: var(--crit-dim); border-color: color-mix(in srgb, var(--crit) 30%, transparent); }
 .b-bajo    { color: var(--warn); background: var(--warn-dim); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
 .b-ok      { color: var(--ok);   background: var(--ok-dim);   border-color: color-mix(in srgb, var(--ok) 25%, transparent); }
@@ -460,14 +471,15 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .table .t-code { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
 .table .t-desc { min-width: 220px; }
 .row-critico td { background: color-mix(in srgb, var(--crit) 7%, transparent); }
-.row-agotado td { background: color-mix(in srgb, var(--crit) 12%, transparent); }
+.row-agotado td { background: color-mix(in srgb, var(--agotado) 22%, transparent); }
 .row-bajo td    { background: color-mix(in srgb, var(--warn) 6%, transparent); }
 
 /* barra mini de cobertura */
 .minibar { height: 5px; border-radius: 3px; background: var(--surface-3); overflow: hidden; min-width: 60px; }
 .minibar > i { display: block; height: 100%; border-radius: 3px; background: var(--ok); }
 .minibar.m-bajo > i { background: var(--warn); }
-.minibar.m-critico > i, .minibar.m-agotado > i { background: var(--crit); }
+.minibar.m-critico > i { background: var(--crit); }
+.minibar.m-agotado > i { background: var(--agotado); }
 .minibar.m-exceso > i { background: var(--info); }
 
 /* ---------- toolbar de filtros ---------- */
@@ -512,7 +524,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .sb-ok { background: var(--ok); }
 .sb-bajo { background: var(--warn); }
 .sb-critico { background: var(--crit); }
-.sb-agotado { background: color-mix(in srgb, var(--crit) 60%, #000); }
+.sb-agotado { background: var(--agotado); }
 .sb-exceso { background: var(--info); }
 .sb-sd { background: var(--surface-3); }
 .lab-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 9px; font-size: 11.5px; color: var(--muted); }
@@ -533,7 +545,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   border-radius: var(--r);
 }
 .repo-item.r-bajo { border-left-color: var(--warn); }
-.repo-item.r-agotado { border-left-color: var(--crit); background: color-mix(in srgb, var(--crit) 8%, var(--surface)); }
+.repo-item.r-agotado { border-left-color: var(--agotado); background: color-mix(in srgb, var(--agotado) 16%, var(--surface)); }
 .repo-rank { font-size: 18px; font-weight: 700; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
 .repo-main strong { display: block; font-size: 14px; font-weight: 600; }
 .repo-meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
@@ -541,6 +553,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .repo-metric b { display: block; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .repo-metric span { font-size: 11px; color: var(--muted); }
 .repo-metric.m-crit b { color: var(--crit); }
+.repo-metric.m-agotado b { color: var(--agotado-txt); }
 .repo-metric.m-warn b { color: var(--warn); }
 .repo-metric.m-accent b { color: var(--accent); }
 
@@ -714,13 +727,14 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   font-size: clamp(13px, 1.25vw, 26px);
 }
 .tv-crit-row.r-bajo { border-left-color: var(--warn); }
-.tv-crit-row.r-agotado { background: color-mix(in srgb, var(--crit) 14%, var(--surface)); }
+.tv-crit-row.r-agotado { border-left-color: var(--agotado); background: color-mix(in srgb, var(--agotado) 26%, var(--surface)); }
 .tv-crit-rank { color: var(--muted); font-weight: 700; min-width: 1.6em; text-align: right; font-variant-numeric: tabular-nums; }
 .tv-crit-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv-crit-lab { font-size: .72em; color: var(--muted); font-weight: 400; }
 .tv-crit-val { font-weight: 750; font-variant-numeric: tabular-nums; text-align: right; letter-spacing: -.02em; }
 .tv-crit-val.v-crit { color: var(--crit); }
 .tv-crit-val.v-warn { color: var(--warn); }
+.tv-crit-val.v-agotado { color: var(--agotado-txt); }
 .tv-crit-sub { font-size: .6em; color: var(--muted); font-weight: 500; display: block; letter-spacing: 0; }
 
 .tv-labs { display: grid; grid-template-columns: repeat(auto-fit, minmax(15vw, 1fr)); gap: 1.2vw; flex: 1; min-height: 0; align-content: start; overflow: hidden; }
@@ -2403,12 +2417,17 @@ VLM.charts = (function () {
       ok:     U.cssVar('--ok') || '#22c55e',
       warn:   U.cssVar('--warn') || '#f59e0b',
       crit:   U.cssVar('--crit') || '#ef4444',
-      info:   U.cssVar('--info') || '#a78bfa'
+      info:   U.cssVar('--info') || '#a78bfa',
+      agotado: U.cssVar('--agotado') || '#414c5c'
     };
   }
 
+  /** Agotado va en gris casi negro, no en rojo: es otra cosa que crítico. */
   function colorEstado(estado, t) {
-    return { agotado: t.crit, critico: t.crit, bajo: t.warn, ok: t.ok, exceso: t.info, sd: t.muted }[estado] || t.muted;
+    return {
+      agotado: t.agotado, critico: t.crit, bajo: t.warn,
+      ok: t.ok, exceso: t.info, sd: t.muted
+    }[estado] || t.muted;
   }
 
   /** Destruye el gráfico anterior en ese canvas antes de dibujar. */
@@ -2634,7 +2653,8 @@ VLM.charts = (function () {
      ------------------------------------------------------------ */
   function quiebres(canvas, tramos, tv) {
     const t = tema();
-    const cols = [t.crit, t.crit, t.warn, t.accent, t.ok, t.ok];
+    // el primer tramo es "Ya agotado": gris, no rojo
+    const cols = [t.agotado, t.crit, t.warn, t.accent, t.ok, t.ok];
     const o = base(t, tv);
     o.scales.y.ticks.precision = 0;
     o.scales.x.grid.display = false;
@@ -3109,7 +3129,7 @@ VLM.views = (function () {
         '</div>' +
       '</div>' +
       '<div class="repo-metric"><b>' + U.fmt(p.stock) + '</b><span>stock actual</span></div>' +
-      '<div class="repo-metric ' + (p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
+      '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + dias + '</b><span>días restantes</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
       '</div>';
@@ -3465,7 +3485,7 @@ VLM.tv = (function () {
           '<div class="tv-crit-name">' + U.esc(p.descripcion) +
             '<span class="tv-crit-lab"> · ' + U.esc(p.laboratorio) +
             (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
-          '<div class="tv-crit-val ' + (p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
+          '<div class="tv-crit-val ' + (p.estado === 'agotado' ? 'v-agotado' : p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
             '<span class="tv-crit-sub">días</span></div>' +
           '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
           '</div>';
@@ -3498,7 +3518,7 @@ VLM.tv = (function () {
               '<div class="tv-crit-name">' + U.esc(p.descripcion) +
                 '<span class="tv-crit-lab"> · ' + U.esc(p.labNombre || p.laboratorio) +
                 (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
-              '<div class="tv-crit-val ' + (p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
+              '<div class="tv-crit-val ' + (p.estado === 'agotado' ? 'v-agotado' : p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
                 '<span class="tv-crit-sub">días</span></div>' +
               '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
               '</div>';

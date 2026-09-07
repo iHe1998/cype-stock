@@ -375,7 +375,7 @@ VLM.views = (function () {
         '</div>' +
       '</div>' +
       '<div class="repo-metric"><b>' + U.fmt(p.stock) + '</b><span>stock actual</span></div>' +
-      '<div class="repo-metric ' + (p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
+      '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + dias + '</b><span>días restantes</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
       '</div>';

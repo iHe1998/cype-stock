@@ -19,12 +19,17 @@ VLM.charts = (function () {
       ok:     U.cssVar('--ok') || '#22c55e',
       warn:   U.cssVar('--warn') || '#f59e0b',
       crit:   U.cssVar('--crit') || '#ef4444',
-      info:   U.cssVar('--info') || '#a78bfa'
+      info:   U.cssVar('--info') || '#a78bfa',
+      agotado: U.cssVar('--agotado') || '#414c5c'
     };
   }
 
+  /** Agotado va en gris casi negro, no en rojo: es otra cosa que crítico. */
   function colorEstado(estado, t) {
-    return { agotado: t.crit, critico: t.crit, bajo: t.warn, ok: t.ok, exceso: t.info, sd: t.muted }[estado] || t.muted;
+    return {
+      agotado: t.agotado, critico: t.crit, bajo: t.warn,
+      ok: t.ok, exceso: t.info, sd: t.muted
+    }[estado] || t.muted;
   }
 
   /** Destruye el gráfico anterior en ese canvas antes de dibujar. */
@@ -250,7 +255,8 @@ VLM.charts = (function () {
      ------------------------------------------------------------ */
   function quiebres(canvas, tramos, tv) {
     const t = tema();
-    const cols = [t.crit, t.crit, t.warn, t.accent, t.ok, t.ok];
+    // el primer tramo es "Ya agotado": gris, no rojo
+    const cols = [t.agotado, t.crit, t.warn, t.accent, t.ok, t.ok];
     const o = base(t, tv);
     o.scales.y.ticks.precision = 0;
     o.scales.x.grid.display = false;

@@ -162,7 +162,7 @@ El **estado** de cada producto es el peor de dos criterios:
 
 | Estado | Por cobertura | Por stock mínimo |
 |---|---|---|
-| 🔴 Agotado | stock = 0 | stock = 0 |
+| ⬛ Agotado | stock = 0 | stock = 0 |
 | 🔴 Crítico | ≤ 7 días | stock ≤ mínimo |
 | 🟡 Bajo | ≤ 15 días | stock ≤ mínimo × 1,5 |
 | 🟢 OK | > 15 días | > mínimo × 1,5 |
