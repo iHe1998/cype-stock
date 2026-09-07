@@ -63,6 +63,23 @@ foreach ($m in $modulos) {
   Write-Host "  + js/$m.js"
 }
 
+# --- sello de version ---
+# Sin esto no hay forma de saber que copia del .html esta abriendo alguien:
+# los file:// comparten localStorage, asi que una version vieja en Descargas
+# se ve igual que la nueva y trabaja sobre los mismos datos guardados.
+$fecha = Get-Date -Format 'dd/MM/yyyy HH:mm'
+$commit = '?'
+try { $commit = (& git -C $root rev-parse --short HEAD 2>$null) } catch {}
+if (-not $commit) { $commit = '?' }
+# El texto a reemplazar va sin acentos a proposito: PowerShell 5.1 lee los
+# .ps1 como ANSI, no como UTF-8, y un literal con acentos no matchearia el
+# del HTML (que si es UTF-8).
+$sello = "compilado $fecha - $commit"
+$marca = '>build local<'
+if ($html -notlike "*$marca*") { throw "No se encontro la marca de version ($marca) en index.html" }
+$html = $html.Replace($marca, ">$sello<")
+Write-Host "  sello: $sello"
+
 # --- control: no puede quedar ninguna referencia externa ---
 if ($html -match '<script src=' -or $html -match '<link rel="stylesheet"') {
   throw "Quedaron referencias externas sin embeber. Revisa las listas \$libs / \$modulos."
