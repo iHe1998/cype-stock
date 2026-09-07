@@ -222,8 +222,9 @@ VLM.parser = (function () {
       const k = p.codigo;
       if (!mapa[k]) {
         mapa[k] = Object.assign({}, p, {
-          ubicaciones: [], ubicPicking: [], ubicAltura: [], lotes: [],
+          ubicaciones: [], ubicPicking: [], ubicAltura: [], lotes: [], detalle: [],
           posiciones: 0, stockPicking: 0, stockAltura: 0,
+          minPos: 0, maxPos: 0, tieneConfigPos: false,
           zonaPeso: {}, ambitoPeso: {}
         });
         orden.push(k);
@@ -241,6 +242,19 @@ VLM.parser = (function () {
       }
       if (p.ubicacion && g.ubicaciones.indexOf(p.ubicacion) === -1) g.ubicaciones.push(p.ubicacion);
       if (p.lote && g.lotes.indexOf(p.lote) === -1) g.lotes.push(p.lote);
+
+      // detalle por posición: lo usa la vista de Posiciones
+      const yaD = g.detalle.filter(d => d.ubicacion === p.ubicacion)[0];
+      if (yaD) yaD.stock += p.stock;
+      else g.detalle.push({ ubicacion: p.ubicacion, stock: p.stock, tipo: p.tipoPos, zona: p.conservacion });
+
+      // min/max: los de la planilla son del artículo y se repiten en cada fila
+      // (se toma el mayor), pero los configurados por posición se SUMAN, porque
+      // cada posición aporta su propia capacidad.
+      if (p.minPos || p.maxPos) {
+        g.tieneConfigPos = true;
+        if (!yaD) { g.minPos += p.minPos || 0; g.maxPos += p.maxPos || 0; }
+      }
 
       // La zona y el ámbito se deciden por peso, pero SÓLO votan las filas
       // donde el dato es explícito: una columna de la planilla o una regla de
@@ -269,6 +283,8 @@ VLM.parser = (function () {
       g.ubicacion = g.ubicPicking.length ? g.ubicPicking[0] : (g.ubicaciones[0] || '');
       if (g.ubicaciones.length > 1) g.ubicacion += ' +' + (g.ubicaciones.length - 1);
       g.lote = g.lotes.length > 1 ? g.lotes.length + ' lotes' : (g.lotes[0] || '');
+      // la configuración de posiciones gana sobre lo que traiga la planilla
+      if (g.tieneConfigPos) { g.stockMin = g.minPos; g.stockMax = g.maxPos; }
       g.conservacion = mayor(g.zonaPeso) || g.conservacion;
       g.ambito       = mayor(g.ambitoPeso) || g.ambito;
       g.zonasMixtas  = Object.keys(g.zonaPeso).length > 1;
@@ -295,6 +311,7 @@ VLM.parser = (function () {
     catalogo = catalogo || VLM.labs.catalogoDefault();
     opciones = opciones || {};
     const reglas = opciones.reglas || VLM.ubicaciones.reglasDefault();
+    const cfgPosiciones = opciones.posiciones || {};
     let ignoradas = 0, sinRegla = 0;
     const ignoradasPorPatron = {};
     // todas las posiciones que aparecen en el archivo, incluidas las ignoradas:
@@ -338,6 +355,7 @@ VLM.parser = (function () {
       const ubic = String(get(fila, 'ubicacion') || '').trim();
       if (ubic) ubicVistas[ubic] = 1;
       const regla = VLM.ubicaciones.evaluar(ubic, reglas);
+      const cfgPos = ubic ? cfgPosiciones[ubic.toUpperCase()] : null;
       if (regla && regla.accion === 'ignorar') {
         ignoradas++;
         ignoradasPorPatron[regla.patron] = (ignoradasPorPatron[regla.patron] || 0) + 1;
@@ -363,8 +381,11 @@ VLM.parser = (function () {
         tipoPos:       (regla && regla.tipo) || 'picking',
         ubicacion:     ubic,
         stock:         stock,
-        stockMin:      U.toNum(get(fila, 'stockMin')) || 0,
-        stockMax:      U.toNum(get(fila, 'stockMax')) || 0,
+        // min/max configurados para ESTA posición (ver Posiciones)
+        minPos:        cfgPos ? (cfgPos.min || 0) : 0,
+        maxPos:        cfgPos ? (cfgPos.max || 0) : 0,
+        stockMin:      cfgPos && cfgPos.min ? cfgPos.min : (U.toNum(get(fila, 'stockMin')) || 0),
+        stockMax:      cfgPos && cfgPos.max ? cfgPos.max : (U.toNum(get(fila, 'stockMax')) || 0),
         consumoDiario: consumoDiario,
         consumoMensual: consMensual !== null ? consMensual : (consumoDiario ? consumoDiario * diasMes : 0),
         fuenteConsumo: fuenteConsumo,

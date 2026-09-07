@@ -29,6 +29,7 @@ VLM.app = (function () {
     wireSettings();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
+      if (motivo === 'posiciones') calculados = null;
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
       render();
     });
@@ -105,6 +106,7 @@ VLM.app = (function () {
       else if (vista === 'labs')  V.laboratorios(el, items, cfg);
       else if (vista === 'repo')  V.reposicion(el, items, cfg);
       else if (vista === 'inv')   V.inventario(el, items, cfg);
+      else if (vista === 'pos')   V.posiciones(el, items, cfg);
     } catch (e) {
       console.error(e);
       el.innerHTML = '<div class="no-results"><strong>Error al dibujar la vista</strong><br>' +
@@ -344,7 +346,7 @@ VLM.app = (function () {
 
   function pintarPreview() {
     const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
-                           { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic });
+                           { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic, posiciones: S.state.posiciones });
     imp.resultado = r;
 
     // la opción de agrupar sólo aparece si la planilla realmente repite códigos
@@ -381,7 +383,7 @@ VLM.app = (function () {
   function confirmarImport() {
     if (!validarMapeo()) return;
     const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
-                                            { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic });
+                                            { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic, posiciones: S.state.posiciones });
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
     S.setProductos(r.productos, {
@@ -452,7 +454,7 @@ VLM.app = (function () {
 
   function cargarDemo() {
     const mapa = P.autoMapear(DEMO[0]);
-    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs, { reglas: S.state.reglasUbic });
+    const r = P.normalizar(DEMO, 0, mapa, S.state.cfg, S.state.labs, { reglas: S.state.reglasUbic, posiciones: S.state.posiciones });
     S.limpiarHistorial();
     if (S.state.cfg.historialActivo) sembrarHistorialDemo(r.productos, 21);
     S.setProductos(r.productos, {

@@ -11,6 +11,7 @@ VLM.store = (function () {
   const KEY_LABS = 'vlm.labs.v1';
   const KEY_HIST = 'vlm.historial.v1';
   const KEY_UBIC = 'vlm.ubicaciones.v1';
+  const KEY_POS  = 'vlm.posiciones.v1';
 
   const MAX_SNAPSHOTS = 60;   // ~2 meses de importaciones diarias
 
@@ -53,6 +54,7 @@ VLM.store = (function () {
     cfg: Object.assign({}, CFG_DEFAULT),
     labs: [],           // catálogo de laboratorios (ver labs.js)
     reglasUbic: [],     // reglas de posición (ver ubicaciones.js)
+    posiciones: {},     // UBICACION -> { min, max } configurados a mano
     historial: [],      // snapshots de stock, uno por día (ver agregarSnapshot)
     ui: {
       tema: 'dark',
@@ -61,6 +63,8 @@ VLM.store = (function () {
       filtroEstado: null,
       filtroAmbito: null,   // 'vlm' | 'externo' | null (todos)
       filtroZona: null,     // 'frio' | 'ambiente' | null (todas)
+      filtroTipoPos: 'picking',
+      busquedaPos: '',
       busqueda: '',
       orden: { campo: 'diasCobertura', dir: 'asc' }
     }
@@ -105,6 +109,10 @@ VLM.store = (function () {
 
   function guardarReglasUbic() {
     try { localStorage.setItem(KEY_UBIC, JSON.stringify(state.reglasUbic)); } catch (e) {}
+  }
+
+  function guardarPosiciones() {
+    try { localStorage.setItem(KEY_POS, JSON.stringify(state.posiciones)); } catch (e) {}
   }
 
   /**
@@ -153,6 +161,10 @@ VLM.store = (function () {
     } catch (e) {
       state.reglasUbic = VLM.ubicaciones.reglasDefault();
     }
+    try {
+      const pos = JSON.parse(localStorage.getItem(KEY_POS) || 'null');
+      state.posiciones = (pos && typeof pos === 'object') ? pos : {};
+    } catch (e) { state.posiciones = {}; }
     try {
       const h = JSON.parse(localStorage.getItem(KEY_HIST) || 'null');
       state.historial = Array.isArray(h) ? h : [];
@@ -292,6 +304,27 @@ VLM.store = (function () {
     setReglasUbic(VLM.ubicaciones.reglasDefault());
   }
 
+  /** Configura min/max de una posición. min o max en 0 borra ese valor. */
+  function setPosicion(ubicacion, cfg) {
+    const k = String(ubicacion).trim().toUpperCase();
+    if (!k) return;
+    const actual = state.posiciones[k] || {};
+    const nueva = Object.assign({}, actual, cfg);
+    if (!nueva.min && !nueva.max) delete state.posiciones[k];
+    else state.posiciones[k] = nueva;
+    guardarPosiciones();
+    emit('posiciones');
+  }
+
+  /** Reemplaza todo el mapa de golpe (importar CSV). */
+  function setPosiciones(mapa) {
+    state.posiciones = mapa || {};
+    guardarPosiciones();
+    emit('posiciones');
+  }
+
+  function limpiarPosiciones() { setPosiciones({}); }
+
   function setUi(parcial, silencioso) {
     Object.assign(state.ui, parcial);
     guardarUi();
@@ -304,7 +337,8 @@ VLM.store = (function () {
     state, CFG_DEFAULT,
     on, emit, cargar, guardar,
     setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
-    setReglasUbic, resetReglasUbic, hayDatos,
+    setReglasUbic, resetReglasUbic,
+    setPosicion, setPosiciones, limpiarPosiciones, hayDatos,
     agregarSnapshot, limpiarHistorial, MAX_SNAPSHOTS
   };
 })();

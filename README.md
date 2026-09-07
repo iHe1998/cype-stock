@@ -119,18 +119,25 @@ frío y Xeloda o Tamiflu en ambiente) y aparece en los dos cuadrantes.
 La posición dice más que el laboratorio: si se pickea o es stock de altura, si está en
 cámara o en ambiente, y si hay que ignorarla porque es una zona de tránsito.
 
+Las posiciones numéricas son `PPPBBBNNN`: los tres primeros dígitos son el pasillo y los
+tres últimos el nivel. El pasillo define la zona (100 en adelante es cámara, por debajo
+ambiente) y el nivel define el tipo (100 se pickea, 200 en adelante es altura).
+
 Las reglas se evalúan **en orden** y gana la primera que coincide, así que las de ignorar
 van arriba: `PACK` tiene que resolverse antes que `P*`. El comodín `*` vale al principio,
-al final o solo (`*` = todas). Se editan en **⚙ Configuración → Reglas de posición**, que
+al final, en el medio (`103*100`) o solo (`*` = todas). Se editan en **⚙ Configuración → Reglas de posición**, que
 muestra cuántas ubicaciones del archivo cargado cubre cada regla.
 
 | Patrón | Acción | |
 |---|---|---|
 | `SPP` `PACK` `STAGE` `ACONDI` `PICKTO` `FALDEP*` `ROTORI*` `C*` | ignorar | tránsito, packing, acondicionado: no es stock ubicado |
-| `BIOCAM*` | picking · cámara · fuera del VLM | picking de pasillo |
-| `*100` | picking · cámara · fuera del VLM | nivel 100 |
-| `P*` | picking · ambiente · fuera del VLM | |
-| `*` | altura | todo lo demás: no se pickea, pero es stock y dice de dónde bajar mercadería |
+| `BIOCAM*` | picking · cámara | picking de pasillo |
+| `P*` | picking · ambiente | |
+| `1*100` | picking · cámara | pasillo 1xx, nivel 100 |
+| `0*100` | picking · ambiente | pasillo 0xx, nivel 100 |
+| `1*` | altura · cámara | pasillos 103, 104… |
+| `0*` | altura · ambiente | pasillos 013, 014… |
+| `*` | altura | red de seguridad: lo que no encaje en nada |
 
 > Provisionales, sacadas de un export de Biosidus. Las posiciones del VLM todavía no
 > aparecieron en ningún archivo.
@@ -144,6 +151,28 @@ picking valiendo doble. **Sólo votan las filas con dato explícito** — una co
 planilla o una regla de posición. Las que caen al default del laboratorio no votan: es una
 suposición y no puede ganarle a un dato real. Sin eso, el stock de altura (que suele no
 tener regla de zona) tapaba a las posiciones de picking.
+
+---
+
+## Posiciones: mínimo y máximo
+
+La pestaña **Posiciones** lista una fila por posición física —las ignoradas por reglas no
+aparecen— con el artículo que la ocupa, su stock, y el **mínimo** (cuándo rellenar) y el
+**máximo** (cuánto entra) editables ahí mismo. Se guardan solos y se aplican al volver a
+importar el stock.
+
+Un artículo puede estar en varias posiciones: en ese caso su mínimo y su máximo son la
+**suma** de los de sus posiciones. Eso se distingue de los mínimos que venga trayendo la
+planilla, que son del artículo y se repiten en cada fila (de esos se toma el mayor, no la
+suma). La configuración por posición tiene prioridad.
+
+Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con todas las
+posiciones, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve con
+**Importar completada**.
+
+> Es `.xlsx` y no CSV a propósito. En CSV, Excel lee `010004100` como número y le come el
+> cero de adelante; al reimportarlo la configuración no matchearía ninguna posición. En el
+> `.xlsx` las columnas Posición y Artículo van forzadas a texto.
 
 ---
 
@@ -231,7 +260,7 @@ js/store.js           estado global, configuración y persistencia
 js/parser.js          lectura de Excel, detección y mapeo de columnas
 js/analytics.js       cobertura, criticidad, historial de consumo y agregados
 js/charts.js          gráficos (Chart.js)
-js/views.js           las cuatro vistas
+js/views.js           las cinco vistas
 js/tv.js              modo televisor
 js/app.js             arranque, navegación, asistente de importación
 lib/                  SheetJS y Chart.js (ver lib/README.md)

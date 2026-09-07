@@ -555,8 +555,211 @@ VLM.views = (function () {
     });
   }
 
+  /* ============================================================
+     VISTA 5 · POSICIONES
+     Una fila por posición física, con su mínimo y su máximo editables.
+     Las posiciones ignoradas por reglas no llegan hasta acá: la app ya las
+     descartó al importar, y en esta pantalla sólo serían ruido.
+     ============================================================ */
+  function posiciones(el, items, cfg) {
+    const ui = VLM.store.state.ui;
+    const cfgPos = VLM.store.state.posiciones;
+    const Ub = VLM.ubicaciones;
+
+    // UNA fila por posición física. Si una posición tiene más de un artículo
+    // se listan juntos: el mínimo y el máximo son de la posición, no del
+    // artículo, así que no puede haber dos inputs para la misma ubicación.
+    const porUbic = {};
+    items.forEach(p => {
+      (p.detalle || []).forEach(d => {
+        if (!d.ubicacion) return;
+        const k = d.ubicacion.toUpperCase();
+        if (!porUbic[k]) {
+          const c = cfgPos[k] || {};
+          porUbic[k] = {
+            ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
+            arts: [], stock: 0, min: c.min || 0, max: c.max || 0
+          };
+        }
+        porUbic[k].stock += d.stock;
+        porUbic[k].arts.push({ codigo: p.codigo, descripcion: p.descripcion });
+      });
+    });
+    const filas = Object.keys(porUbic).map(k => porUbic[k])
+      .sort((a, b) => a.ubicacion.localeCompare(b.ubicacion, 'es'));
+
+    const tipoFiltro = ui.filtroTipoPos || 'picking';
+    const q = U.norm(ui.busquedaPos || '');
+    const vis = filas.filter(f => {
+      if (tipoFiltro !== 'todas' && f.tipo !== tipoFiltro) return false;
+      if (q && U.norm(f.ubicacion + ' ' + f.arts.map(a => a.codigo + ' ' + a.descripcion).join(' ')).indexOf(q) === -1) return false;
+      return true;
+    });
+
+    const configuradas = filas.filter(f => f.min || f.max).length;
+
+    let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
+      kpi('Posiciones', U.fmt(filas.length),
+          filas.filter(f => f.tipo === 'picking').length + ' de picking · ' +
+          filas.filter(f => f.tipo === 'altura').length + ' de altura') +
+      kpi('Con mín/máx cargado', U.fmt(configuradas),
+          filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
+          configuradas ? 'k-ok' : 'k-warn') +
+      kpi('Bajo el mínimo', U.fmt(filas.filter(f => f.min && f.stock < f.min).length),
+          'hay que rellenar', 'k-crit') +
+      kpi('Sobre el máximo', U.fmt(filas.filter(f => f.max && f.stock > f.max).length),
+          'no entra más', 'k-info') +
+      '</div>';
+
+    html += '<div class="toolbar">' +
+      '<input class="input" id="posSearch" type="search" placeholder="Buscar posición o artículo…" value="' + U.esc(ui.busquedaPos || '') + '">' +
+      '<div class="chip-row">' +
+        chipTipo('picking', 'Picking', tipoFiltro === 'picking') +
+        chipTipo('altura', 'Altura', tipoFiltro === 'altura') +
+        chipTipo('todas', 'Todas', tipoFiltro === 'todas') +
+      '</div>' +
+      '<div class="spacer"></div>' +
+      '<button class="btn" id="posExport">Exportar plantilla</button>' +
+      '<button class="btn" id="posImport">Importar completada</button>' +
+      '<input type="file" id="posFile" accept=".xlsx,.xls,.csv" hidden>' +
+      '<span class="muted small">' + vis.length + ' posiciones</span>' +
+      '</div>';
+
+    html += '<div class="notice" style="margin-bottom:12px">' +
+      '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
+        '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
+      '<div>Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
+      '(cuánto entra) de cada posición. Se guardan solos y se aplican al volver a importar.<br>' +
+      '<span class="small muted">Si son muchas, exportá la plantilla, completá las columnas Mínimo y Máximo en Excel y volvé a importarla.</span>' +
+      '</div></div>';
+
+    html += '<div class="table-wrap"><table class="table" id="posTable">' +
+      '<thead><tr>' +
+        '<th class="no-sort">Posición</th><th class="no-sort">Tipo</th><th class="no-sort">Zona</th>' +
+        '<th class="no-sort">Artículo</th><th class="no-sort t-num">Stock</th>' +
+        '<th class="no-sort t-num">Mínimo</th><th class="no-sort t-num">Máximo</th>' +
+        '<th class="no-sort">Estado</th>' +
+      '</tr></thead><tbody>';
+
+    if (!vis.length) {
+      html += '<tr><td colspan="8"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
+    } else {
+      vis.forEach(f => {
+        let est = '', clase = '';
+        if (f.min && f.stock < f.min)      { est = badge('critico'); clase = 'row-critico'; }
+        else if (f.max && f.stock > f.max) { est = badge('exceso'); }
+        else if (f.min || f.max)           { est = badge('ok'); }
+        else                                { est = '<span class="badge b-sd">Sin cargar</span>'; }
+        html += '<tr class="' + clase + '">' +
+          '<td class="t-code"><strong>' + U.esc(f.ubicacion) + '</strong></td>' +
+          '<td><span class="zchip ' + (f.tipo === 'altura' ? 'a-externo' : 'a-vlm') + '">' +
+            Ub.TIPOS[f.tipo].corto + '</span></td>' +
+          '<td>' + zchip(f.zona) + '</td>' +
+          '<td class="t-desc">' + f.arts.map(a => '<span class="t-code">' + U.esc(a.codigo) + '</span>' +
+            (a.descripcion && a.descripcion !== a.codigo ? ' ' + U.esc(a.descripcion) : '')).join('<br>') + '</td>' +
+          '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
+          '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
+            'data-ubic="' + U.esc(f.ubicacion) + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
+          '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
+            'data-ubic="' + U.esc(f.ubicacion) + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
+          '<td>' + est + '</td>' +
+          '</tr>';
+      });
+    }
+    html += '</tbody></table></div>';
+
+    el.innerHTML = html;
+
+    $('#posSearch', el).addEventListener('input', U.debounce(e => {
+      VLM.store.setUi({ busquedaPos: e.target.value });
+    }, 220));
+    U.$$('.chip', el).forEach(c => c.addEventListener('click', () =>
+      VLM.store.setUi({ filtroTipoPos: c.dataset.val })));
+    U.$$('.pos-inp', el).forEach(inp => inp.addEventListener('change', () => {
+      const v = parseInt(inp.value, 10);
+      VLM.store.setPosicion(inp.dataset.ubic, { [inp.dataset.campo]: isFinite(v) && v > 0 ? v : 0 });
+    }));
+    $('#posExport', el).addEventListener('click', () => exportarPosiciones(filas));
+    $('#posImport', el).addEventListener('click', () => $('#posFile', el).click());
+    $('#posFile', el).addEventListener('change', e => {
+      if (e.target.files[0]) importarPosiciones(e.target.files[0]);
+    });
+  }
+
+  function chipTipo(val, label, activo) {
+    return '<button class="chip' + (activo ? ' is-active' : '') + '" data-val="' + val + '">' + label + '</button>';
+  }
+
+  /**
+   * Exporta a .xlsx, no a CSV, y fuerza Posición y Artículo a texto.
+   * En CSV, Excel lee "010004100" como número y le come el cero de adelante:
+   * al reimportarlo la configuración no matchearía ninguna posición.
+   */
+  function exportarPosiciones(filas) {
+    const out = [['Posicion', 'Tipo', 'Zona', 'Articulo', 'Descripcion', 'Stock', 'Minimo', 'Maximo']];
+    filas.forEach(f => out.push([
+      f.ubicacion, f.tipo, f.zona || '',
+      f.arts.map(a => a.codigo).join(' '),
+      f.arts.map(a => a.descripcion === a.codigo ? '' : a.descripcion).filter(Boolean).join(' | '),
+      f.stock, f.min || '', f.max || ''
+    ]));
+
+    const ws = XLSX.utils.aoa_to_sheet(out);
+    for (let i = 1; i <= filas.length; i++) {
+      ['A', 'D'].forEach(col => {
+        const c = ws[col + (i + 1)];
+        if (c && c.v !== undefined && c.v !== '') { c.t = 's'; c.v = String(c.v); c.z = '@'; }
+      });
+    }
+    ws['!cols'] = [{ wch: 14 }, { wch: 9 }, { wch: 10 }, { wch: 14 },
+                   { wch: 30 }, { wch: 9 }, { wch: 9 }, { wch: 9 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Posiciones');
+    XLSX.writeFile(wb, 'posiciones_vlm.xlsx');
+    U.toast('Exportadas ' + filas.length + ' posiciones', 'ok');
+  }
+
+  /**
+   * Vuelve a leer el CSV exportado. Sólo mira Posicion, Minimo y Maximo: el
+   * resto de las columnas están para que sea legible en Excel.
+   */
+  function importarPosiciones(file) {
+    const fr = new FileReader();
+    fr.onload = e => {
+      try {
+        // raw:false devuelve el texto formateado de la celda, que es lo que
+        // conserva ceros a la izquierda en las posiciones numéricas
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],
+          { header: 1, blankrows: false, raw: false, defval: '' });
+        if (!filas.length) throw new Error('archivo vacío');
+
+        const head = filas[0].map(h => U.norm(h));
+        const iU = head.indexOf('posicion'), iMin = head.indexOf('minimo'), iMax = head.indexOf('maximo');
+        if (iU === -1) throw new Error('falta la columna Posicion');
+
+        const mapa = Object.assign({}, VLM.store.state.posiciones);
+        let n = 0;
+        for (let i = 1; i < filas.length; i++) {
+          const f = filas[i];
+          if (!f || !f[iU]) continue;
+          const k = String(f[iU]).trim().toUpperCase();
+          const min = iMin > -1 ? (U.toNum(f[iMin]) || 0) : 0;
+          const max = iMax > -1 ? (U.toNum(f[iMax]) || 0) : 0;
+          if (min || max) { mapa[k] = { min: min, max: max }; n++; }
+          else delete mapa[k];
+        }
+        VLM.store.setPosiciones(mapa);
+        U.toast(n + ' posiciones configuradas. Volvé a importar el stock para aplicarlas.', 'ok');
+      } catch (err) {
+        U.toast('No se pudo leer el archivo: ' + err.message, 'err');
+      }
+    };
+    fr.readAsArrayBuffer(file);
+  }
+
   return {
-    dashboard, laboratorios, reposicion, inventario,
+    dashboard, laboratorios, reposicion, inventario, posiciones,
     badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem, exportarRepo
   };
 })();

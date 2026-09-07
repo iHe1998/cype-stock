@@ -33,18 +33,30 @@ VLM.ubicaciones = (function () {
     { patron: 'ROTORI*', accion: 'ignorar', nota: 'rotura / origen' },
     { patron: 'C*',      accion: 'ignorar', nota: 'no se usa' },
 
-    // --- picking ---
+    // --- picking con nombre propio ---
     { patron: 'BIOCAM*', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
       nota: 'picking cámara, pasillo' },
-    { patron: '*100',    accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
-      nota: 'picking cámara, nivel 100' },
     { patron: 'P*',      accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'ambiente',
       nota: 'picking ambiente' },
 
-    // --- todo lo demás: stock de altura. No se pickea, pero es stock real
-    //     y dice de dónde bajar mercadería para rellenar el picking. ---
-    { patron: '*',       accion: 'usar', tipo: 'altura',
-      nota: 'stock de altura (niveles 200 en adelante)' }
+    /* --- posiciones numéricas: PPPBBBNNN ---
+       Los tres primeros dígitos son el pasillo y los tres últimos el nivel.
+       El pasillo define la zona (100 en adelante es cámara, por debajo es
+       ambiente) y el nivel define el tipo (100 se pickea, 200 en adelante es
+       altura). Por eso van primero las dos reglas de nivel 100: si no, la
+       regla del pasillo se las comería. */
+    { patron: '1*100', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
+      nota: 'pasillo 1xx (cámara), nivel 100' },
+    { patron: '0*100', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'ambiente',
+      nota: 'pasillo 0xx (ambiente), nivel 100' },
+    { patron: '1*',    accion: 'usar', tipo: 'altura', ambito: 'externo', zona: 'frio',
+      nota: 'altura de cámara (pasillos 103, 104…)' },
+    { patron: '0*',    accion: 'usar', tipo: 'altura', ambito: 'externo', zona: 'ambiente',
+      nota: 'altura de ambiente (pasillos 013, 014…)' },
+
+    // --- red de seguridad: lo que no encaje en nada queda como altura,
+    //     sin zona, para que se note en el editor en vez de desaparecer ---
+    { patron: '*', accion: 'usar', tipo: 'altura', nota: 'sin clasificar' }
   ];
 
   function reglasDefault() {
@@ -55,20 +67,37 @@ VLM.ubicaciones = (function () {
      Matcheo
      ------------------------------------------------------------ */
 
-  /** Glob simple: PREFIJO*, *SUFIJO, *CONTIENE*, * (todo) o exacto. */
+  /**
+   * Glob con `*` en cualquier posición: PREFIJO*, *SUFIJO, *CONTIENE*,
+   * PREFIJO*SUFIJO, `*` (todo) o exacto.
+   *
+   * El comodín en el medio es el que importa acá: el pasillo va al principio
+   * y el nivel al final, así que "103*100" es "pasillo 103, nivel 100".
+   */
   function coincide(ubicacion, patron) {
     const u = String(ubicacion == null ? '' : ubicacion).trim().toUpperCase();
     const p = String(patron == null ? '' : patron).trim().toUpperCase();
     if (!p) return false;
-    if (p === '*') return true;
-    const abre = p.charAt(0) === '*';
-    const cierra = p.charAt(p.length - 1) === '*';
-    const core = p.replace(/^\*/, '').replace(/\*$/, '');
-    if (!core) return true;
-    if (abre && cierra) return u.indexOf(core) > -1;
-    if (abre)  return u.length >= core.length && u.slice(-core.length) === core;
-    if (cierra) return u.indexOf(core) === 0;
-    return u === core;
+    if (p.indexOf('*') === -1) return u === p;
+
+    const partes = p.split('*');
+    let pos = 0;
+    for (let i = 0; i < partes.length; i++) {
+      const parte = partes[i];
+      if (!parte) continue;
+      if (i === 0) {                                  // ancla al inicio
+        if (u.indexOf(parte) !== 0) return false;
+        pos = parte.length;
+      } else if (i === partes.length - 1) {           // ancla al final
+        if (u.length - parte.length < pos) return false;
+        return u.slice(-parte.length) === parte;
+      } else {                                        // trozo del medio
+        const idx = u.indexOf(parte, pos);
+        if (idx === -1) return false;
+        pos = idx + parte.length;
+      }
+    }
+    return true;
   }
 
   /**

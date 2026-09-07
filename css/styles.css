@@ -814,3 +814,17 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   .reglas-head { display: none; }
   .regla-row { grid-template-columns: 1fr 1fr; }
 }
+
+/* ============================================================
+   VISTA DE POSICIONES
+   ============================================================ */
+.pos-inp {
+  width: 78px; height: 28px; padding: 0 7px;
+  font: inherit; font-size: 12.5px; text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 4px; outline: none;
+}
+.pos-inp:focus { border-color: var(--accent); background: var(--surface); }
+.pos-inp::placeholder { color: var(--muted); }
+#posTable td { padding: 6px 12px; }
