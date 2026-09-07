@@ -122,10 +122,20 @@ VLM.analytics = (function () {
      Agregados
      ------------------------------------------------------------ */
 
+  /**
+   * Agregado de un conjunto de productos.
+   *
+   * `unidades` es SÓLO el stock en posiciones de picking: es lo que se sirve
+   * y lo que hay que vigilar. La reserva de altura se cuenta aparte en
+   * `unidadesAltura` — si se sumara todo, un artículo con la posición de
+   * picking casi vacía y un pallet arriba se vería sano en los gráficos.
+   */
   function resumen(items, cfg) {
     const r = {
       skus: items.length,
-      unidades: 0,
+      unidades: 0,        // picking
+      unidadesAltura: 0,
+      unidadesTotal: 0,
       consumoDiario: 0,
       porEstado: { agotado: 0, critico: 0, bajo: 0, ok: 0, exceso: 0, sd: 0 },
       porZona:   { frio: 0, ambiente: 0 },
@@ -141,14 +151,21 @@ VLM.analytics = (function () {
     };
     const labs = {};
     items.forEach(p => {
-      r.unidades += p.stock;
+      // sin agrupar por posición (planilla vieja o sin ubicaciones) no hay
+      // separación picking/altura: ahí el stock total ES el de picking
+      const pick = p.stockPicking !== undefined ? p.stockPicking : p.stock;
+      const alt  = p.stockAltura !== undefined ? p.stockAltura : 0;
+
+      r.unidades += pick;
+      r.unidadesAltura += alt;
+      r.unidadesTotal += p.stock;
       r.consumoDiario += p.consumoDiario;
       r.porEstado[p.estado] = (r.porEstado[p.estado] || 0) + 1;
 
       const enAlerta = p.estado === 'agotado' || p.estado === 'critico' || p.estado === 'bajo';
       if (p.conservacion) {
         r.porZona[p.conservacion]++;
-        r.unidadesZona[p.conservacion] += p.stock;
+        r.unidadesZona[p.conservacion] += pick;
         if (enAlerta) r.alertaZona[p.conservacion]++;
       }
       if (p.ambito) {

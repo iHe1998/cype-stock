@@ -1100,7 +1100,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 07/09/2026 03:30 - 787638d</span>
+      <span class="muted small" id="appVersion">compilado 07/09/2026 03:34 - c5d36b1</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -2565,10 +2565,20 @@ VLM.analytics = (function () {
      Agregados
      ------------------------------------------------------------ */
 
+  /**
+   * Agregado de un conjunto de productos.
+   *
+   * `unidades` es SÓLO el stock en posiciones de picking: es lo que se sirve
+   * y lo que hay que vigilar. La reserva de altura se cuenta aparte en
+   * `unidadesAltura` — si se sumara todo, un artículo con la posición de
+   * picking casi vacía y un pallet arriba se vería sano en los gráficos.
+   */
   function resumen(items, cfg) {
     const r = {
       skus: items.length,
-      unidades: 0,
+      unidades: 0,        // picking
+      unidadesAltura: 0,
+      unidadesTotal: 0,
       consumoDiario: 0,
       porEstado: { agotado: 0, critico: 0, bajo: 0, ok: 0, exceso: 0, sd: 0 },
       porZona:   { frio: 0, ambiente: 0 },
@@ -2584,14 +2594,21 @@ VLM.analytics = (function () {
     };
     const labs = {};
     items.forEach(p => {
-      r.unidades += p.stock;
+      // sin agrupar por posición (planilla vieja o sin ubicaciones) no hay
+      // separación picking/altura: ahí el stock total ES el de picking
+      const pick = p.stockPicking !== undefined ? p.stockPicking : p.stock;
+      const alt  = p.stockAltura !== undefined ? p.stockAltura : 0;
+
+      r.unidades += pick;
+      r.unidadesAltura += alt;
+      r.unidadesTotal += p.stock;
       r.consumoDiario += p.consumoDiario;
       r.porEstado[p.estado] = (r.porEstado[p.estado] || 0) + 1;
 
       const enAlerta = p.estado === 'agotado' || p.estado === 'critico' || p.estado === 'bajo';
       if (p.conservacion) {
         r.porZona[p.conservacion]++;
-        r.unidadesZona[p.conservacion] += p.stock;
+        r.unidadesZona[p.conservacion] += pick;
         if (enAlerta) r.alertaZona[p.conservacion]++;
       }
       if (p.ambito) {
@@ -3056,7 +3073,7 @@ VLM.views = (function () {
     const r = g.resumen;
     return '<div class="grupo-head g-' + g.zona + '">' +
       '<h3><span class="g-ico">' + g.icono + '</span>' + U.esc(g.label) + '</h3>' +
-      '<span class="g-meta">' + r.skus + ' SKU · ' + U.fmtCompact(r.unidades) + ' unidades' +
+      '<span class="g-meta">' + r.skus + ' SKU · ' + U.fmtCompact(r.unidades) + ' u. en picking' +
         (g.alerta ? ' · <strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : '') +
       '</span></div>';
   }
@@ -3071,7 +3088,7 @@ VLM.views = (function () {
       '</div>' +
       '<div class="zona-card-nums">' +
         '<div><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
-        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>unidades</span></div>' +
+        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>en picking</span></div>' +
         '<div class="' + (g.alerta ? 'n-alerta' : '') + '"><b>' + U.fmt(g.alerta) + '</b><span>en alerta</span></div>' +
       '</div>' +
       stackbar(r) +
@@ -3123,7 +3140,7 @@ VLM.views = (function () {
     /* --- KPIs --- */
     html += '<div class="kpi-grid">' +
       kpi('Productos (SKU)', U.fmt(res.skus),
-          res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades') +
+          res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades en picking') +
       kpi('A reponer ya', U.fmt(res.aReponer),
           res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
           res.aReponer > 0 ? 'k-crit' : 'k-ok') +
@@ -3142,7 +3159,7 @@ VLM.views = (function () {
     /* --- gráficos --- */
     html += '<h3 class="section-title">Situación del stock</h3>';
     html += '<div class="grid grid-2">' +
-      cardChart('Stock por laboratorio', 'unidades', 'chLabStock', 300) +
+      cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       '</div>';
 
@@ -3249,7 +3266,7 @@ VLM.views = (function () {
       '</div>' +
       '<div class="lab-stats">' +
         '<div class="lab-stat"><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
-        '<div class="lab-stat"><b>' + U.fmtCompact(r.unidades) + '</b><span>unidades</span></div>' +
+        '<div class="lab-stat"><b>' + U.fmtCompact(r.unidades) + '</b><span>en picking</span></div>' +
         '<div class="lab-stat ' + (l.criticos ? 's-crit' : (r.porEstado.bajo ? 's-warn' : '')) + '">' +
           '<b>' + U.fmt(r.enAlerta) + '</b><span>en alerta</span></div>' +
       '</div>' +
@@ -3409,7 +3426,8 @@ VLM.views = (function () {
         '</div>' +
       '</div>' +
       fuentesAltura(p) +
-      '<div class="repo-metric"><b>' + U.fmt(p.stock) + '</b><span>stock actual</span></div>' +
+      '<div class="repo-metric"><b>' + U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock) +
+        '</b><span>en picking</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + dias + '</b><span>días restantes</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
@@ -3959,14 +3977,14 @@ VLM.tv = (function () {
 
     el.innerHTML =
       '<div class="tv-kpis">' +
-        tvKpi('Productos en el VLM', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' unidades') +
+        tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en picking') +
         tvKpi('A reponer YA', U.fmt(res.aReponer), res.porEstado.agotado + ' agotados', res.aReponer ? 'k-crit' : 'k-ok') +
         tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), '< ' + cfg.diasBajo + ' días de stock', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
         tvKpi('Cobertura global', cob, U.fmt(res.consumoDiario, true) + ' uds/día') +
       '</div>' +
       '<div class="tv-split">' +
         '<div class="tv-panel"><h3>Estado del stock</h3><div class="tv-chart"><canvas id="tvChEstados"></canvas></div></div>' +
-        '<div class="tv-panel"><h3>Stock por laboratorio</h3><div class="tv-chart"><canvas id="tvChLabs"></canvas></div></div>' +
+        '<div class="tv-panel"><h3>Stock en picking por laboratorio</h3><div class="tv-chart"><canvas id="tvChLabs"></canvas></div></div>' +
       '</div>';
 
     C.estados($('#tvChEstados', el), res, true);
@@ -4014,7 +4032,7 @@ VLM.tv = (function () {
     el.innerHTML =
       '<h2>❄ Cadena de frío · 2 a 8 °C</h2>' +
       '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
-        tvKpi('SKU refrigerados', U.fmt(res.skus), U.fmtCompact(res.unidades) + ' unidades') +
+        tvKpi('SKU refrigerados', U.fmt(res.skus), U.fmtCompact(res.unidades) + ' u. en picking') +
         tvKpi('En alerta', U.fmt(res.enAlerta),
               res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
               res.enAlerta ? 'k-crit' : 'k-ok') +
@@ -4044,7 +4062,7 @@ VLM.tv = (function () {
   function slideZonas(el, items, cfg) {
     const grupos = A.porGrupo(items, cfg);
     el.innerHTML =
-      '<h2>Stock por zona de almacenamiento</h2>' +
+      '<h2>Stock en picking por zona</h2>' +
       '<div class="tv-labs">' + grupos.map(g => {
         const r = g.resumen;
         return '<div class="tv-lab">' +
@@ -4065,7 +4083,7 @@ VLM.tv = (function () {
   function slideLabs(el, items, cfg) {
     const labs = A.porLaboratorio(items, cfg).slice(0, 8);
     el.innerHTML =
-      '<h2>Stock por laboratorio</h2>' +
+      '<h2>Stock en picking por laboratorio</h2>' +
       '<div class="tv-labs">' + labs.map(l => {
         const r = l.resumen;
         return '<div class="tv-lab">' +

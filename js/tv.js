@@ -140,14 +140,14 @@ VLM.tv = (function () {
 
     el.innerHTML =
       '<div class="tv-kpis">' +
-        tvKpi('Productos en el VLM', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' unidades') +
+        tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en picking') +
         tvKpi('A reponer YA', U.fmt(res.aReponer), res.porEstado.agotado + ' agotados', res.aReponer ? 'k-crit' : 'k-ok') +
         tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), '< ' + cfg.diasBajo + ' días de stock', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
         tvKpi('Cobertura global', cob, U.fmt(res.consumoDiario, true) + ' uds/día') +
       '</div>' +
       '<div class="tv-split">' +
         '<div class="tv-panel"><h3>Estado del stock</h3><div class="tv-chart"><canvas id="tvChEstados"></canvas></div></div>' +
-        '<div class="tv-panel"><h3>Stock por laboratorio</h3><div class="tv-chart"><canvas id="tvChLabs"></canvas></div></div>' +
+        '<div class="tv-panel"><h3>Stock en picking por laboratorio</h3><div class="tv-chart"><canvas id="tvChLabs"></canvas></div></div>' +
       '</div>';
 
     C.estados($('#tvChEstados', el), res, true);
@@ -195,7 +195,7 @@ VLM.tv = (function () {
     el.innerHTML =
       '<h2>❄ Cadena de frío · 2 a 8 °C</h2>' +
       '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
-        tvKpi('SKU refrigerados', U.fmt(res.skus), U.fmtCompact(res.unidades) + ' unidades') +
+        tvKpi('SKU refrigerados', U.fmt(res.skus), U.fmtCompact(res.unidades) + ' u. en picking') +
         tvKpi('En alerta', U.fmt(res.enAlerta),
               res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
               res.enAlerta ? 'k-crit' : 'k-ok') +
@@ -225,7 +225,7 @@ VLM.tv = (function () {
   function slideZonas(el, items, cfg) {
     const grupos = A.porGrupo(items, cfg);
     el.innerHTML =
-      '<h2>Stock por zona de almacenamiento</h2>' +
+      '<h2>Stock en picking por zona</h2>' +
       '<div class="tv-labs">' + grupos.map(g => {
         const r = g.resumen;
         return '<div class="tv-lab">' +
@@ -246,7 +246,7 @@ VLM.tv = (function () {
   function slideLabs(el, items, cfg) {
     const labs = A.porLaboratorio(items, cfg).slice(0, 8);
     el.innerHTML =
-      '<h2>Stock por laboratorio</h2>' +
+      '<h2>Stock en picking por laboratorio</h2>' +
       '<div class="tv-labs">' + labs.map(l => {
         const r = l.resumen;
         return '<div class="tv-lab">' +

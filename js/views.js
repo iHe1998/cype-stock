@@ -35,7 +35,7 @@ VLM.views = (function () {
     const r = g.resumen;
     return '<div class="grupo-head g-' + g.zona + '">' +
       '<h3><span class="g-ico">' + g.icono + '</span>' + U.esc(g.label) + '</h3>' +
-      '<span class="g-meta">' + r.skus + ' SKU · ' + U.fmtCompact(r.unidades) + ' unidades' +
+      '<span class="g-meta">' + r.skus + ' SKU · ' + U.fmtCompact(r.unidades) + ' u. en picking' +
         (g.alerta ? ' · <strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : '') +
       '</span></div>';
   }
@@ -50,7 +50,7 @@ VLM.views = (function () {
       '</div>' +
       '<div class="zona-card-nums">' +
         '<div><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
-        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>unidades</span></div>' +
+        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>en picking</span></div>' +
         '<div class="' + (g.alerta ? 'n-alerta' : '') + '"><b>' + U.fmt(g.alerta) + '</b><span>en alerta</span></div>' +
       '</div>' +
       stackbar(r) +
@@ -102,7 +102,7 @@ VLM.views = (function () {
     /* --- KPIs --- */
     html += '<div class="kpi-grid">' +
       kpi('Productos (SKU)', U.fmt(res.skus),
-          res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades') +
+          res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades en picking') +
       kpi('A reponer ya', U.fmt(res.aReponer),
           res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
           res.aReponer > 0 ? 'k-crit' : 'k-ok') +
@@ -121,7 +121,7 @@ VLM.views = (function () {
     /* --- gráficos --- */
     html += '<h3 class="section-title">Situación del stock</h3>';
     html += '<div class="grid grid-2">' +
-      cardChart('Stock por laboratorio', 'unidades', 'chLabStock', 300) +
+      cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       '</div>';
 
@@ -228,7 +228,7 @@ VLM.views = (function () {
       '</div>' +
       '<div class="lab-stats">' +
         '<div class="lab-stat"><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
-        '<div class="lab-stat"><b>' + U.fmtCompact(r.unidades) + '</b><span>unidades</span></div>' +
+        '<div class="lab-stat"><b>' + U.fmtCompact(r.unidades) + '</b><span>en picking</span></div>' +
         '<div class="lab-stat ' + (l.criticos ? 's-crit' : (r.porEstado.bajo ? 's-warn' : '')) + '">' +
           '<b>' + U.fmt(r.enAlerta) + '</b><span>en alerta</span></div>' +
       '</div>' +
@@ -388,7 +388,8 @@ VLM.views = (function () {
         '</div>' +
       '</div>' +
       fuentesAltura(p) +
-      '<div class="repo-metric"><b>' + U.fmt(p.stock) + '</b><span>stock actual</span></div>' +
+      '<div class="repo-metric"><b>' + U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock) +
+        '</b><span>en picking</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + dias + '</b><span>días restantes</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +

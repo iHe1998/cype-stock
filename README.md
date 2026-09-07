@@ -154,9 +154,15 @@ muestra cuántas ubicaciones del archivo cargado cubre cada regla.
 > Provisionales, sacadas de un export de Biosidus. Las posiciones del VLM todavía no
 > aparecieron en ningún archivo.
 
-**Picking y altura** se separan por producto: la tabla de inventario muestra las dos
-columnas, y en la lista de reposición aparece cuánto hay en altura y de qué posiciones
-bajarlo.
+**Picking y altura** se separan por producto. Todos los KPIs y gráficos muestran
+**sólo el stock en posiciones de picking**: es lo que se sirve y lo que hay que vigilar.
+Si se sumara la reserva de altura, un artículo con la posición casi vacía y un pallet
+arriba se vería sano. En el archivo de prueba son 64.917 unidades en picking contra
+238.321 en altura — el 79% del total es reserva que no se pickea.
+
+La altura sigue estando donde sirve: la tabla de inventario tiene las dos columnas, el
+gráfico "Picking vs altura" muestra el reparto por laboratorio, y la lista de reposición
+dice de qué posiciones bajar.
 
 La zona y el ámbito de un artículo se deciden por peso entre sus posiciones, con el
 picking valiendo doble. **Sólo votan las filas con dato explícito** — una columna de la
