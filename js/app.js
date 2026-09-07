@@ -252,6 +252,7 @@ VLM.app = (function () {
       releerHeaders(true);
     });
     $('#btnDoImport').addEventListener('click', confirmarImport);
+    $('#impAgrupar').addEventListener('change', pintarPreview);
   }
 
   function procesarArchivo(file) {
@@ -342,11 +343,21 @@ VLM.app = (function () {
   }
 
   function pintarPreview() {
-    const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs);
+    const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
+                           { agrupar: $('#impAgrupar').checked });
     imp.resultado = r;
+
+    // la opción de agrupar sólo aparece si la planilla realmente repite códigos
+    $('#impAgruparWrap').hidden = !r.repetidos;
+    $('#impAgruparInfo').textContent = r.repetidos
+      ? (r.agrupado ? '· ' + r.filasLeidas + ' filas → ' + r.productos.length + ' productos'
+                    : '· ' + r.filasLeidas + ' filas sin agrupar')
+      : '';
+
     const muestra = r.productos.slice(0, 8);
     $('#prevCount').textContent = r.productos.length
-      ? '· ' + r.productos.length + ' filas detectadas' + (r.descartadas ? ' (' + r.descartadas + ' omitidas)' : '')
+      ? '· ' + r.productos.length + (r.agrupado ? ' productos' : ' filas') +
+        (r.descartadas ? ' (' + r.descartadas + ' omitidas)' : '')
       : '· sin filas válidas';
 
     if (!muestra.length) {
@@ -369,7 +380,8 @@ VLM.app = (function () {
 
   function confirmarImport() {
     if (!validarMapeo()) return;
-    const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs);
+    const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
+                                            { agrupar: $('#impAgrupar').checked });
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
     S.setProductos(r.productos, {

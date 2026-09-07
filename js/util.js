@@ -77,8 +77,13 @@ VLM.util = (function () {
     return d < 10 ? nf1.format(d) : nf0.format(Math.round(d));
   }
 
-  /** Fecha Excel (serial) o string/Date → Date | null. */
-  function toDate(v) {
+  /**
+   * Fecha Excel (serial) o string/Date → Date | null.
+   * @param formato 'dmy' (por defecto) o 'mdy'. Con "10/31/26" el orden no se
+   *   puede adivinar celda por celda, así que lo decide quien llama mirando
+   *   toda la columna (ver parser.detectarFormatoFecha).
+   */
+  function toDate(v, formato) {
     if (!v && v !== 0) return null;
     if (v instanceof Date) return isNaN(v) ? null : v;
     if (typeof v === 'number') {
@@ -88,10 +93,15 @@ VLM.util = (function () {
       return isNaN(d) ? null : d;
     }
     const s = String(v).trim();
-    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);   // dd/mm/aaaa
+    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
     if (m) {
       let y = +m[3]; if (y < 100) y += y < 70 ? 2000 : 1900;
-      const d = new Date(y, +m[2] - 1, +m[1]);
+      let dia = +m[1], mes = +m[2];
+      if (formato === 'mdy') { dia = +m[2]; mes = +m[1]; }
+      // si el orden elegido da un mes imposible, probar el otro antes de rendirse
+      if (mes > 12 && dia <= 12) { const t = dia; dia = mes; mes = t; }
+      if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+      const d = new Date(y, mes - 1, dia);
       return isNaN(d) ? null : d;
     }
     m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);          // aaaa-mm-dd

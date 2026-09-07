@@ -931,6 +931,12 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
           <div class="imp-file"><span class="muted">Archivo:</span> <strong id="impFileName">—</strong></div>
         </div>
 
+        <label class="field field-check" id="impAgruparWrap" hidden style="margin-top:12px">
+          <input type="checkbox" id="impAgrupar" checked>
+          <span>Agrupar filas por código y sumar las cantidades
+            <span class="muted" id="impAgruparInfo"></span></span>
+        </label>
+
         <h3 class="section-title">Mapeo de columnas</h3>
         <p class="muted small">Asociá cada campo de la app con la columna de tu planilla. Los campos con * son obligatorios.</p>
         <div class="map-list" id="mapList"></div>
@@ -1157,8 +1163,13 @@ VLM.util = (function () {
     return d < 10 ? nf1.format(d) : nf0.format(Math.round(d));
   }
 
-  /** Fecha Excel (serial) o string/Date → Date | null. */
-  function toDate(v) {
+  /**
+   * Fecha Excel (serial) o string/Date → Date | null.
+   * @param formato 'dmy' (por defecto) o 'mdy'. Con "10/31/26" el orden no se
+   *   puede adivinar celda por celda, así que lo decide quien llama mirando
+   *   toda la columna (ver parser.detectarFormatoFecha).
+   */
+  function toDate(v, formato) {
     if (!v && v !== 0) return null;
     if (v instanceof Date) return isNaN(v) ? null : v;
     if (typeof v === 'number') {
@@ -1168,10 +1179,15 @@ VLM.util = (function () {
       return isNaN(d) ? null : d;
     }
     const s = String(v).trim();
-    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);   // dd/mm/aaaa
+    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
     if (m) {
       let y = +m[3]; if (y < 100) y += y < 70 ? 2000 : 1900;
-      const d = new Date(y, +m[2] - 1, +m[1]);
+      let dia = +m[1], mes = +m[2];
+      if (formato === 'mdy') { dia = +m[2]; mes = +m[1]; }
+      // si el orden elegido da un mes imposible, probar el otro antes de rendirse
+      if (mes > 12 && dia <= 12) { const t = dia; dia = mes; mes = t; }
+      if (mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+      const d = new Date(y, mes - 1, dia);
       return isNaN(d) ? null : d;
     }
     m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);          // aaaa-mm-dd
@@ -1742,20 +1758,20 @@ VLM.parser = (function () {
       hint: 'Identificador único del artículo',
       alias: ['codigo', 'cod', 'sku', 'articulo', 'art', 'item', 'referencia', 'ref', 'id', 'codigo articulo', 'codigo producto', 'cod art'] },
 
-    { id: 'descripcion', label: 'Descripción', req: true, tipo: 'texto',
-      hint: 'Nombre del producto',
-      alias: ['descripcion', 'desc', 'producto', 'nombre', 'detalle', 'articulo', 'denominacion', 'descripcion articulo'] },
+    { id: 'descripcion', label: 'Descripción', req: false, tipo: 'texto',
+      hint: 'Si falta, se muestra el código',
+      alias: ['descripcion', 'desc', 'producto', 'nombre', 'detalle', 'denominacion', 'descripcion articulo'] },
 
     { id: 'laboratorio', label: 'Laboratorio', req: true, tipo: 'texto',
       hint: 'Se usa para agrupar los productos',
-      alias: ['laboratorio', 'lab', 'proveedor', 'marca', 'fabricante', 'droguería', 'drogueria', 'laboratorio proveedor'] },
+      alias: ['laboratorio', 'lab', 'proveedor', 'propietario', 'marca', 'fabricante', 'droguería', 'drogueria', 'laboratorio proveedor', 'dueño'] },
 
     { id: 'stock', label: 'Stock actual', req: true, tipo: 'numero',
       hint: 'Unidades disponibles hoy',
-      alias: ['stock', 'stock actual', 'cantidad', 'cant', 'existencia', 'existencias', 'saldo', 'disponible', 'unidades', 'qty', 'cantidad actual', 'stock real'] },
+      alias: ['cantidad disponible', 'stock disponible', 'stock', 'stock actual', 'cantidad', 'cant', 'existencia', 'existencias', 'saldo', 'disponible', 'unidades', 'qty', 'cantidad actual', 'stock real'] },
 
-    { id: 'ubicacion', label: 'Ubicación en VLM', req: false, tipo: 'texto',
-      hint: 'Bandeja / charola / posición',
+    { id: 'ubicacion', label: 'Ubicación', req: false, tipo: 'texto',
+      hint: 'Bandeja / posición / rack',
       alias: ['ubicacion', 'ubic', 'bandeja', 'charola', 'tray', 'posicion', 'pos', 'localizacion', 'locacion', 'estante', 'casillero'] },
 
     { id: 'stockMin', label: 'Stock mínimo', req: false, tipo: 'numero',
@@ -1851,13 +1867,17 @@ VLM.parser = (function () {
     return null;
   }
 
-  /** Puntaje difuso: exacto > empieza-con > contiene. */
+  /**
+   * Puntaje difuso: exacto > empieza-con > contiene.
+   * Entre dos coincidencias exactas gana la más específica, así una planilla
+   * con "Cantidad" y "Cantidad disponible" mapea el stock a la segunda.
+   */
   function puntuarAlias(header, campo) {
     const n = U.norm(header);
     if (!n) return 0;
     let mejor = 0;
     for (const a of campo.alias) {
-      if (n === a) return 100;
+      if (n === a) return 100 + a.length;
       if (n.indexOf(a) === 0) mejor = Math.max(mejor, 70 - (n.length - a.length));
       else if (n.indexOf(a) > -1) mejor = Math.max(mejor, 50 - (n.length - a.length));
       else if (a.indexOf(n) === 0 && n.length >= 3) mejor = Math.max(mejor, 40);
@@ -1890,6 +1910,88 @@ VLM.parser = (function () {
   }
 
   /* ------------------------------------------------------------
+     Fechas ambiguas
+     ------------------------------------------------------------ */
+
+  /**
+   * Decide si una columna de fechas viene en d/m/a o m/d/a mirando toda la
+   * columna: alcanza con que UNA fila tenga el primer número > 12 (o el
+   * segundo) para desempatar. Celda por celda "10/31/26" es indecidible.
+   * Ante la duda, d/m/a, que es lo habitual acá.
+   */
+  function detectarFormatoFecha(matriz, filaHeader, idx) {
+    if (idx === undefined || idx === null) return 'dmy';
+    let dmy = 0, mdy = 0;
+    for (let i = filaHeader + 1; i < matriz.length; i++) {
+      const fila = matriz[i];
+      if (!fila) continue;
+      const v = fila[idx];
+      if (typeof v !== 'string') continue;
+      const m = v.trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+      if (!m) continue;
+      const a = +m[1], b = +m[2];
+      if (a > 12 && b <= 12) dmy++;
+      else if (b > 12 && a <= 12) mdy++;
+    }
+    return mdy > dmy ? 'mdy' : 'dmy';
+  }
+
+  /* ------------------------------------------------------------
+     Agrupación por código
+     ------------------------------------------------------------ */
+
+  /** ¿Hay más de una fila por código? (export por posición o por lote) */
+  function hayRepetidos(productos) {
+    const vistos = {};
+    for (const p of productos) {
+      if (vistos[p.codigo]) return true;
+      vistos[p.codigo] = true;
+    }
+    return false;
+  }
+
+  /**
+   * Junta las filas del mismo código en un solo producto.
+   *
+   * El stock se suma, porque cada fila es una posición o un lote distinto.
+   * El mínimo, el máximo y el consumo NO se suman: son atributos del artículo
+   * repetidos en cada fila, así que se toma el mayor (que con datos sanos es
+   * el mismo valor). Del vencimiento queda el más próximo, que es el que
+   * manda para decidir.
+   */
+  function agrupar(productos) {
+    const mapa = {}, orden = [];
+    productos.forEach(p => {
+      const k = p.codigo;
+      if (!mapa[k]) {
+        mapa[k] = Object.assign({}, p, { ubicaciones: [], lotes: [], posiciones: 0 });
+        orden.push(k);
+        mapa[k].stock = 0;
+      }
+      const g = mapa[k];
+      g.stock += p.stock;
+      g.posiciones++;
+      if (p.ubicacion && g.ubicaciones.indexOf(p.ubicacion) === -1) g.ubicaciones.push(p.ubicacion);
+      if (p.lote && g.lotes.indexOf(p.lote) === -1) g.lotes.push(p.lote);
+      g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
+      g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
+      g.consumoDiario  = Math.max(g.consumoDiario || 0, p.consumoDiario || 0);
+      g.consumoMensual = Math.max(g.consumoMensual || 0, p.consumoMensual || 0);
+      if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
+      if (!g.descripcion || g.descripcion === '(sin descripción)') g.descripcion = p.descripcion;
+    });
+
+    return orden.map(k => {
+      const g = mapa[k];
+      g.ubicacion = g.ubicaciones.length > 1
+        ? g.ubicaciones[0] + ' +' + (g.ubicaciones.length - 1)
+        : (g.ubicaciones[0] || '');
+      g.lote = g.lotes.length > 1 ? g.lotes.length + ' lotes' : (g.lotes[0] || '');
+      return g;
+    });
+  }
+
+  /* ------------------------------------------------------------
      Normalización de filas -> productos
      ------------------------------------------------------------ */
 
@@ -1898,12 +2000,14 @@ VLM.parser = (function () {
    * contra el catálogo de laboratorios (ámbito VLM/externo y conservación).
    * @returns { productos, descartadas, avisos, noListados }
    */
-  function normalizar(matriz, filaHeader, mapa, cfg, catalogo) {
+  function normalizar(matriz, filaHeader, mapa, cfg, catalogo, opciones) {
     const productos = [];
     const avisos = [];
     let descartadas = 0;
     const diasMes = (cfg && cfg.diasMes) || 30;
     catalogo = catalogo || VLM.labs.catalogoDefault();
+    opciones = opciones || {};
+    const fmtFecha = detectarFormatoFecha(matriz, filaHeader, mapa.vencimiento);
 
     // encabezado de la columna de conservación: cambia cómo se lee un "SI"
     const filaHeaders = matriz[filaHeader] || [];
@@ -1937,9 +2041,11 @@ VLM.parser = (function () {
 
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
+      const cod = String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1));
       productos.push(VLM.labs.clasificar({
-        codigo:        String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1)),
-        descripcion:   String(desc === null ? '' : desc).trim() || '(sin descripción)',
+        codigo:        cod,
+        // sin columna de descripcion se muestra el codigo, que es lo unico que hay
+        descripcion:   String(desc === null ? '' : desc).trim() || cod,
         laboratorio:   lab,
         zonaPlanilla:  VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons),
         ubicacion:     String(get(fila, 'ubicacion') || '').trim(),
@@ -1950,13 +2056,19 @@ VLM.parser = (function () {
         consumoMensual: consMensual !== null ? consMensual : (consumoDiario ? consumoDiario * diasMes : 0),
         fuenteConsumo: fuenteConsumo,
         lote:          String(get(fila, 'lote') || '').trim(),
-        vencimiento:   U.toDate(get(fila, 'vencimiento'))
+        vencimiento:   U.toDate(get(fila, 'vencimiento'), fmtFecha)
       }, catalogo));
     }
 
+    // un export por posicion trae varias filas del mismo articulo
+    const repetidos = hayRepetidos(productos);
+    const agrupado = repetidos && opciones.agrupar !== false;
+    const filasLeidas = productos.length;
+    let lista = agrupado ? agrupar(productos) : productos;
+
     // --- laboratorios de la planilla que no están en el catálogo ---
     const noListados = {};
-    productos.forEach(p => {
+    lista.forEach(p => {
       if (p.gestionado) return;
       if (!noListados[p.laboratorio]) noListados[p.laboratorio] = 0;
       noListados[p.laboratorio]++;
@@ -1965,6 +2077,15 @@ VLM.parser = (function () {
 
     if (!productos.length) avisos.push('No se pudo leer ninguna fila válida. Revisá la fila de encabezados y el mapeo.');
     if (descartadas > 0)   avisos.push(descartadas + ' fila(s) omitidas por estar vacías o sin stock numérico.');
+    if (agrupado) {
+      avisos.push('La planilla trae varias filas por artículo: se agruparon ' + filasLeidas +
+                  ' filas en ' + lista.length + ' productos, sumando las cantidades.');
+    } else if (repetidos) {
+      avisos.push('Hay códigos repetidos y la agrupación está desactivada: cada fila cuenta como un producto aparte.');
+    }
+    if (fmtFecha === 'mdy') {
+      avisos.push('Las fechas se leyeron como mes/día/año (formato de EE.UU.).');
+    }
     if (mapa.consumoDiario === undefined && mapa.consumoMensual === undefined) {
       avisos.push('Sin columna de consumo: se calcula restando importaciones sucesivas. ' +
                   'Importá una vez por día y desde la segunda vas a ver la cobertura.');
@@ -1980,7 +2101,8 @@ VLM.parser = (function () {
         nombresNoListados.slice(0, 4).join(', ') +
         (nombresNoListados.length > 4 ? '…' : '') + '.');
     }
-    return { productos, descartadas, avisos, noListados, nombresNoListados };
+    return { productos: lista, descartadas, avisos, noListados, nombresNoListados,
+             repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha };
   }
 
   /* ------------------------------------------------------------
@@ -2005,7 +2127,8 @@ VLM.parser = (function () {
 
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
-    autoMapear, normalizar, generarPlantilla
+    autoMapear, normalizar, generarPlantilla,
+    detectarFormatoFecha, hayRepetidos, agrupar
   };
 })();
 
@@ -3855,6 +3978,7 @@ VLM.app = (function () {
       releerHeaders(true);
     });
     $('#btnDoImport').addEventListener('click', confirmarImport);
+    $('#impAgrupar').addEventListener('change', pintarPreview);
   }
 
   function procesarArchivo(file) {
@@ -3945,11 +4069,21 @@ VLM.app = (function () {
   }
 
   function pintarPreview() {
-    const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs);
+    const r = P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
+                           { agrupar: $('#impAgrupar').checked });
     imp.resultado = r;
+
+    // la opción de agrupar sólo aparece si la planilla realmente repite códigos
+    $('#impAgruparWrap').hidden = !r.repetidos;
+    $('#impAgruparInfo').textContent = r.repetidos
+      ? (r.agrupado ? '· ' + r.filasLeidas + ' filas → ' + r.productos.length + ' productos'
+                    : '· ' + r.filasLeidas + ' filas sin agrupar')
+      : '';
+
     const muestra = r.productos.slice(0, 8);
     $('#prevCount').textContent = r.productos.length
-      ? '· ' + r.productos.length + ' filas detectadas' + (r.descartadas ? ' (' + r.descartadas + ' omitidas)' : '')
+      ? '· ' + r.productos.length + (r.agrupado ? ' productos' : ' filas') +
+        (r.descartadas ? ' (' + r.descartadas + ' omitidas)' : '')
       : '· sin filas válidas';
 
     if (!muestra.length) {
@@ -3972,7 +4106,8 @@ VLM.app = (function () {
 
   function confirmarImport() {
     if (!validarMapeo()) return;
-    const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs);
+    const r = imp.resultado || P.normalizar(imp.matriz, imp.filaHeader, imp.mapa, S.state.cfg, S.state.labs,
+                                            { agrupar: $('#impAgrupar').checked });
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
     S.setProductos(r.productos, {

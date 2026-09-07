@@ -15,20 +15,20 @@ VLM.parser = (function () {
       hint: 'Identificador único del artículo',
       alias: ['codigo', 'cod', 'sku', 'articulo', 'art', 'item', 'referencia', 'ref', 'id', 'codigo articulo', 'codigo producto', 'cod art'] },
 
-    { id: 'descripcion', label: 'Descripción', req: true, tipo: 'texto',
-      hint: 'Nombre del producto',
-      alias: ['descripcion', 'desc', 'producto', 'nombre', 'detalle', 'articulo', 'denominacion', 'descripcion articulo'] },
+    { id: 'descripcion', label: 'Descripción', req: false, tipo: 'texto',
+      hint: 'Si falta, se muestra el código',
+      alias: ['descripcion', 'desc', 'producto', 'nombre', 'detalle', 'denominacion', 'descripcion articulo'] },
 
     { id: 'laboratorio', label: 'Laboratorio', req: true, tipo: 'texto',
       hint: 'Se usa para agrupar los productos',
-      alias: ['laboratorio', 'lab', 'proveedor', 'marca', 'fabricante', 'droguería', 'drogueria', 'laboratorio proveedor'] },
+      alias: ['laboratorio', 'lab', 'proveedor', 'propietario', 'marca', 'fabricante', 'droguería', 'drogueria', 'laboratorio proveedor', 'dueño'] },
 
     { id: 'stock', label: 'Stock actual', req: true, tipo: 'numero',
       hint: 'Unidades disponibles hoy',
-      alias: ['stock', 'stock actual', 'cantidad', 'cant', 'existencia', 'existencias', 'saldo', 'disponible', 'unidades', 'qty', 'cantidad actual', 'stock real'] },
+      alias: ['cantidad disponible', 'stock disponible', 'stock', 'stock actual', 'cantidad', 'cant', 'existencia', 'existencias', 'saldo', 'disponible', 'unidades', 'qty', 'cantidad actual', 'stock real'] },
 
-    { id: 'ubicacion', label: 'Ubicación en VLM', req: false, tipo: 'texto',
-      hint: 'Bandeja / charola / posición',
+    { id: 'ubicacion', label: 'Ubicación', req: false, tipo: 'texto',
+      hint: 'Bandeja / posición / rack',
       alias: ['ubicacion', 'ubic', 'bandeja', 'charola', 'tray', 'posicion', 'pos', 'localizacion', 'locacion', 'estante', 'casillero'] },
 
     { id: 'stockMin', label: 'Stock mínimo', req: false, tipo: 'numero',
@@ -124,13 +124,17 @@ VLM.parser = (function () {
     return null;
   }
 
-  /** Puntaje difuso: exacto > empieza-con > contiene. */
+  /**
+   * Puntaje difuso: exacto > empieza-con > contiene.
+   * Entre dos coincidencias exactas gana la más específica, así una planilla
+   * con "Cantidad" y "Cantidad disponible" mapea el stock a la segunda.
+   */
   function puntuarAlias(header, campo) {
     const n = U.norm(header);
     if (!n) return 0;
     let mejor = 0;
     for (const a of campo.alias) {
-      if (n === a) return 100;
+      if (n === a) return 100 + a.length;
       if (n.indexOf(a) === 0) mejor = Math.max(mejor, 70 - (n.length - a.length));
       else if (n.indexOf(a) > -1) mejor = Math.max(mejor, 50 - (n.length - a.length));
       else if (a.indexOf(n) === 0 && n.length >= 3) mejor = Math.max(mejor, 40);
@@ -163,6 +167,88 @@ VLM.parser = (function () {
   }
 
   /* ------------------------------------------------------------
+     Fechas ambiguas
+     ------------------------------------------------------------ */
+
+  /**
+   * Decide si una columna de fechas viene en d/m/a o m/d/a mirando toda la
+   * columna: alcanza con que UNA fila tenga el primer número > 12 (o el
+   * segundo) para desempatar. Celda por celda "10/31/26" es indecidible.
+   * Ante la duda, d/m/a, que es lo habitual acá.
+   */
+  function detectarFormatoFecha(matriz, filaHeader, idx) {
+    if (idx === undefined || idx === null) return 'dmy';
+    let dmy = 0, mdy = 0;
+    for (let i = filaHeader + 1; i < matriz.length; i++) {
+      const fila = matriz[i];
+      if (!fila) continue;
+      const v = fila[idx];
+      if (typeof v !== 'string') continue;
+      const m = v.trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+      if (!m) continue;
+      const a = +m[1], b = +m[2];
+      if (a > 12 && b <= 12) dmy++;
+      else if (b > 12 && a <= 12) mdy++;
+    }
+    return mdy > dmy ? 'mdy' : 'dmy';
+  }
+
+  /* ------------------------------------------------------------
+     Agrupación por código
+     ------------------------------------------------------------ */
+
+  /** ¿Hay más de una fila por código? (export por posición o por lote) */
+  function hayRepetidos(productos) {
+    const vistos = {};
+    for (const p of productos) {
+      if (vistos[p.codigo]) return true;
+      vistos[p.codigo] = true;
+    }
+    return false;
+  }
+
+  /**
+   * Junta las filas del mismo código en un solo producto.
+   *
+   * El stock se suma, porque cada fila es una posición o un lote distinto.
+   * El mínimo, el máximo y el consumo NO se suman: son atributos del artículo
+   * repetidos en cada fila, así que se toma el mayor (que con datos sanos es
+   * el mismo valor). Del vencimiento queda el más próximo, que es el que
+   * manda para decidir.
+   */
+  function agrupar(productos) {
+    const mapa = {}, orden = [];
+    productos.forEach(p => {
+      const k = p.codigo;
+      if (!mapa[k]) {
+        mapa[k] = Object.assign({}, p, { ubicaciones: [], lotes: [], posiciones: 0 });
+        orden.push(k);
+        mapa[k].stock = 0;
+      }
+      const g = mapa[k];
+      g.stock += p.stock;
+      g.posiciones++;
+      if (p.ubicacion && g.ubicaciones.indexOf(p.ubicacion) === -1) g.ubicaciones.push(p.ubicacion);
+      if (p.lote && g.lotes.indexOf(p.lote) === -1) g.lotes.push(p.lote);
+      g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
+      g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
+      g.consumoDiario  = Math.max(g.consumoDiario || 0, p.consumoDiario || 0);
+      g.consumoMensual = Math.max(g.consumoMensual || 0, p.consumoMensual || 0);
+      if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
+      if (!g.descripcion || g.descripcion === '(sin descripción)') g.descripcion = p.descripcion;
+    });
+
+    return orden.map(k => {
+      const g = mapa[k];
+      g.ubicacion = g.ubicaciones.length > 1
+        ? g.ubicaciones[0] + ' +' + (g.ubicaciones.length - 1)
+        : (g.ubicaciones[0] || '');
+      g.lote = g.lotes.length > 1 ? g.lotes.length + ' lotes' : (g.lotes[0] || '');
+      return g;
+    });
+  }
+
+  /* ------------------------------------------------------------
      Normalización de filas -> productos
      ------------------------------------------------------------ */
 
@@ -171,12 +257,14 @@ VLM.parser = (function () {
    * contra el catálogo de laboratorios (ámbito VLM/externo y conservación).
    * @returns { productos, descartadas, avisos, noListados }
    */
-  function normalizar(matriz, filaHeader, mapa, cfg, catalogo) {
+  function normalizar(matriz, filaHeader, mapa, cfg, catalogo, opciones) {
     const productos = [];
     const avisos = [];
     let descartadas = 0;
     const diasMes = (cfg && cfg.diasMes) || 30;
     catalogo = catalogo || VLM.labs.catalogoDefault();
+    opciones = opciones || {};
+    const fmtFecha = detectarFormatoFecha(matriz, filaHeader, mapa.vencimiento);
 
     // encabezado de la columna de conservación: cambia cómo se lee un "SI"
     const filaHeaders = matriz[filaHeader] || [];
@@ -210,9 +298,11 @@ VLM.parser = (function () {
 
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
+      const cod = String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1));
       productos.push(VLM.labs.clasificar({
-        codigo:        String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1)),
-        descripcion:   String(desc === null ? '' : desc).trim() || '(sin descripción)',
+        codigo:        cod,
+        // sin columna de descripcion se muestra el codigo, que es lo unico que hay
+        descripcion:   String(desc === null ? '' : desc).trim() || cod,
         laboratorio:   lab,
         zonaPlanilla:  VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons),
         ubicacion:     String(get(fila, 'ubicacion') || '').trim(),
@@ -223,13 +313,19 @@ VLM.parser = (function () {
         consumoMensual: consMensual !== null ? consMensual : (consumoDiario ? consumoDiario * diasMes : 0),
         fuenteConsumo: fuenteConsumo,
         lote:          String(get(fila, 'lote') || '').trim(),
-        vencimiento:   U.toDate(get(fila, 'vencimiento'))
+        vencimiento:   U.toDate(get(fila, 'vencimiento'), fmtFecha)
       }, catalogo));
     }
 
+    // un export por posicion trae varias filas del mismo articulo
+    const repetidos = hayRepetidos(productos);
+    const agrupado = repetidos && opciones.agrupar !== false;
+    const filasLeidas = productos.length;
+    let lista = agrupado ? agrupar(productos) : productos;
+
     // --- laboratorios de la planilla que no están en el catálogo ---
     const noListados = {};
-    productos.forEach(p => {
+    lista.forEach(p => {
       if (p.gestionado) return;
       if (!noListados[p.laboratorio]) noListados[p.laboratorio] = 0;
       noListados[p.laboratorio]++;
@@ -238,6 +334,15 @@ VLM.parser = (function () {
 
     if (!productos.length) avisos.push('No se pudo leer ninguna fila válida. Revisá la fila de encabezados y el mapeo.');
     if (descartadas > 0)   avisos.push(descartadas + ' fila(s) omitidas por estar vacías o sin stock numérico.');
+    if (agrupado) {
+      avisos.push('La planilla trae varias filas por artículo: se agruparon ' + filasLeidas +
+                  ' filas en ' + lista.length + ' productos, sumando las cantidades.');
+    } else if (repetidos) {
+      avisos.push('Hay códigos repetidos y la agrupación está desactivada: cada fila cuenta como un producto aparte.');
+    }
+    if (fmtFecha === 'mdy') {
+      avisos.push('Las fechas se leyeron como mes/día/año (formato de EE.UU.).');
+    }
     if (mapa.consumoDiario === undefined && mapa.consumoMensual === undefined) {
       avisos.push('Sin columna de consumo: se calcula restando importaciones sucesivas. ' +
                   'Importá una vez por día y desde la segunda vas a ver la cobertura.');
@@ -253,7 +358,8 @@ VLM.parser = (function () {
         nombresNoListados.slice(0, 4).join(', ') +
         (nombresNoListados.length > 4 ? '…' : '') + '.');
     }
-    return { productos, descartadas, avisos, noListados, nombresNoListados };
+    return { productos: lista, descartadas, avisos, noListados, nombresNoListados,
+             repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha };
   }
 
   /* ------------------------------------------------------------
@@ -278,6 +384,7 @@ VLM.parser = (function () {
 
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
-    autoMapear, normalizar, generarPlantilla
+    autoMapear, normalizar, generarPlantilla,
+    detectarFormatoFecha, hayRepetidos, agrupar
   };
 })();
