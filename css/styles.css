@@ -244,8 +244,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 }
 .seg-btn:hover { color: var(--text); }
 .seg-btn.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
-.seg-btn.z-frio.is-active { color: var(--frio); background: var(--frio-dim); }
-.seg-btn.z-amb.is-active  { color: var(--ambiente); background: var(--ambiente-dim); }
+.seg-btn.sg-frio.is-active { color: var(--frio); background: var(--frio-dim); }
+.seg-btn.sg-amb.is-active  { color: var(--ambiente); background: var(--ambiente-dim); }
 
 /* chips de zona y ámbito */
 .zchip {
@@ -255,10 +255,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   padding: 2px 7px; border-radius: 4px; white-space: nowrap;
   border: 1px solid transparent;
 }
-.z-frio     { color: var(--frio);     background: var(--frio-dim);     border-color: color-mix(in srgb, var(--frio) 30%, transparent); }
-.z-ambiente { color: var(--ambiente); background: var(--ambiente-dim); border-color: color-mix(in srgb, var(--ambiente) 30%, transparent); }
-.a-vlm      { color: var(--accent);   background: var(--accent-dim);   border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
-.a-externo  { color: var(--muted);    background: var(--surface-3);    border-color: var(--border); }
+.zchip.z-frio     { color: var(--frio);     background: var(--frio-dim);     border-color: color-mix(in srgb, var(--frio) 30%, transparent); }
+.zchip.z-ambiente { color: var(--ambiente); background: var(--ambiente-dim); border-color: color-mix(in srgb, var(--ambiente) 30%, transparent); }
+.zchip.a-vlm      { color: var(--accent);   background: var(--accent-dim);   border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.zchip.a-externo  { color: var(--muted);    background: var(--surface-3);    border-color: var(--border); }
 
 /* encabezado de grupo (VLM · Cámara de frío) */
 .grupo-head {
