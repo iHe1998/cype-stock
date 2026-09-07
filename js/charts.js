@@ -199,64 +199,6 @@ VLM.charts = (function () {
   }
 
   /* ------------------------------------------------------------
-     4. Quiebres por tramo (barras)
-     ------------------------------------------------------------ */
-  function quiebres(canvas, tramos, tv) {
-    const t = tema();
-    // el primer tramo es "Ya agotado": gris, no rojo
-    const cols = [t.agotado, t.crit, t.warn, t.accent, t.ok, t.ok];
-    const o = base(t, tv);
-    o.scales.y.ticks.precision = 0;
-    o.scales.x.grid.display = false;
-    o.plugins.tooltip.callbacks = { label: c => c.parsed.y + ' producto(s)' };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: tramos.map(x => x.label),
-        datasets: [{
-          data: tramos.map(x => x.n),
-          backgroundColor: cols,
-          borderRadius: 5,
-          maxBarThickness: tv ? 80 : 52
-        }]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
-     5. Menor cobertura (top N barras horizontales)
-     ------------------------------------------------------------ */
-  function menorCobertura(canvas, items, cfg, tv, n) {
-    const t = tema();
-    const top = items
-      .filter(p => p.diasCobertura !== null && isFinite(p.diasCobertura))
-      .sort((a, b) => a.diasCobertura - b.diasCobertura)
-      .slice(0, n || (tv ? 8 : 10));
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.y.grid.display = false;
-    o.scales.x.ticks.callback = v => v + 'd';
-    o.plugins.tooltip.callbacks = {
-      title: c => top[c[0].dataIndex].descripcion,
-      label: c => U.fmtDias(c.parsed.x) + ' días de cobertura · stock ' + U.fmt(top[c.dataIndex].stock)
-    };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(p => recortar(p.descripcion, tv ? 26 : 30)),
-        datasets: [{
-          data: top.map(p => Math.round(p.diasCobertura * 10) / 10),
-          backgroundColor: top.map(p => colorEstado(p.estado, t)),
-          borderRadius: 4,
-          barThickness: tv ? 24 : 15
-        }]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
      6. Estados apilados por laboratorio
      ------------------------------------------------------------ */
   function estadosPorLab(canvas, labs, tv) {
@@ -296,6 +238,6 @@ VLM.charts = (function () {
 
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, estados, pickingVsAltura, quiebres, menorCobertura, estadosPorLab
+    stockPorLab, estados, pickingVsAltura, estadosPorLab
   };
 })();

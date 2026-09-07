@@ -353,15 +353,15 @@ VLM.app = (function () {
         '</div></td></tr></tbody>';
       return;
     }
-    const cols = ['codigo', 'descripcion', 'laboratorio', 'ubicacion', 'stock', 'stockMin', 'consumoDiario'];
-    const labels = ['Código', 'Descripción', 'Laboratorio', 'Ubicación', 'Stock', 'Mínimo', 'Cons./día'];
+    const cols = ['codigo', 'descripcion', 'laboratorio', 'ubicacion', 'stock', 'stockMin', 'stockMax'];
+    const labels = ['Código', 'Descripción', 'Laboratorio', 'Ubicación', 'Stock', 'Mínimo', 'Máximo'];
     $('#prevTable').innerHTML =
       '<thead><tr>' + labels.map(l => '<th class="no-sort">' + l + '</th>').join('') + '</tr></thead>' +
       '<tbody>' + muestra.map(p => '<tr>' + cols.map(c => {
         const v = p[c];
         const num = typeof v === 'number';
         return '<td class="' + (num ? 't-num' : '') + '">' +
-          U.esc(num ? U.fmt(v, c === 'consumoDiario') : (v || '—')) + '</td>';
+          U.esc(num ? U.fmt(v) : (v || '—')) + '</td>';
       }).join('') + '</tr>').join('') + '</tbody>';
   }
 
@@ -456,9 +456,6 @@ VLM.app = (function () {
      CONFIGURACIÓN
      ============================================================ */
   const CAMPOS_CFG = [
-    ['cfgDiasCritico', 'diasCritico', 'int'],
-    ['cfgDiasBajo', 'diasBajo', 'int'],
-    ['cfgDiasObjetivo', 'diasObjetivo', 'int'],
     ['cfgPctCritico', 'pctCritico', 'int'],
     ['cfgPctBajo', 'pctBajo', 'int'],
     ['cfgTvSegundos', 'tvSegundos', 'int'],

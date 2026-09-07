@@ -39,14 +39,6 @@ VLM.parser = (function () {
       hint: 'Capacidad de la ubicación',
       alias: ['stock maximo', 'maximo', 'max', 'stock max', 'capacidad', 'cap', 'nivel maximo'] },
 
-    { id: 'consumoDiario', label: 'Consumo diario', req: false, tipo: 'numero',
-      hint: 'Unidades por día (si no, se calcula del mensual)',
-      alias: ['consumo diario', 'consumo dia', 'cons diario', 'consumo por dia', 'promedio diario', 'demanda diaria', 'uds dia'] },
-
-    { id: 'consumoMensual', label: 'Consumo mensual', req: false, tipo: 'numero',
-      hint: 'Salidas del último mes o promedio mensual',
-      alias: ['consumo mensual', 'consumo mes', 'cons mensual', 'salidas mes', 'salidas', 'egresos mes', 'demanda mensual', 'promedio mensual', 'consumo 30 dias', 'venta mensual', 'movimiento mensual'] },
-
     { id: 'conservacion', label: 'Conservación', req: false, tipo: 'texto',
       hint: 'Frío o ambiente; si falta se usa el default del laboratorio',
       alias: ['conservacion', 'cadena de frio', 'cadena frio', 'temperatura', 'refrigerado',
@@ -288,8 +280,6 @@ VLM.parser = (function () {
 
       g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
       g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
-      g.consumoDiario  = Math.max(g.consumoDiario || 0, p.consumoDiario || 0);
-      g.consumoMensual = Math.max(g.consumoMensual || 0, p.consumoMensual || 0);
       if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
       if (!g.descripcion || g.descripcion === g.codigo) g.descripcion = p.descripcion;
     });
@@ -327,7 +317,6 @@ VLM.parser = (function () {
     const productos = [];
     const avisos = [];
     let descartadas = 0;
-    const diasMes = (cfg && cfg.diasMes) || 30;
     catalogo = catalogo || VLM.labs.catalogoDefault();
     opciones = opciones || {};
     const reglas = opciones.reglas || VLM.ubicaciones.reglasDefault();
@@ -364,12 +353,6 @@ VLM.parser = (function () {
       // fila inútil: sin identificador o sin stock numérico
       if ((codigo === null || codigo === '') && (desc === null || desc === '')) { descartadas++; continue; }
       if (stock === null) { descartadas++; continue; }
-
-      const consDiario  = U.toNum(get(fila, 'consumoDiario'));
-      const consMensual = U.toNum(get(fila, 'consumoMensual'));
-      let consumoDiario = 0, fuenteConsumo = 'ninguna';
-      if (consDiario !== null && consDiario > 0)       { consumoDiario = consDiario;             fuenteConsumo = 'diario'; }
-      else if (consMensual !== null && consMensual > 0) { consumoDiario = consMensual / diasMes; fuenteConsumo = 'mensual'; }
 
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
@@ -416,9 +399,6 @@ VLM.parser = (function () {
         maxPos:        cfgVigente ? (cfgPos.max || 0) : 0,
         stockMin:      cfgVigente && cfgPos.min ? cfgPos.min : (U.toNum(get(fila, 'stockMin')) || 0),
         stockMax:      cfgVigente && cfgPos.max ? cfgPos.max : (U.toNum(get(fila, 'stockMax')) || 0),
-        consumoDiario: consumoDiario,
-        consumoMensual: consMensual !== null ? consMensual : (consumoDiario ? consumoDiario * diasMes : 0),
-        fuenteConsumo: fuenteConsumo,
         lote:          String(get(fila, 'lote') || '').trim(),
         lote2:         String(get(fila, 'lote2') || '').trim(),
         vencimiento:   U.toDate(get(fila, 'vencimiento'), fmtFecha)
@@ -465,10 +445,6 @@ VLM.parser = (function () {
     if (fmtFecha === 'mdy') {
       avisos.push('Las fechas se leyeron como mes/día/año (formato de EE.UU.).');
     }
-    if (mapa.consumoDiario === undefined && mapa.consumoMensual === undefined) {
-      avisos.push('Sin columna de consumo: se calcula restando importaciones sucesivas. ' +
-                  'Importá una vez por día y desde la segunda vas a ver la cobertura.');
-    }
     if (mapa.stockMin === undefined) {
       avisos.push('Sin stock mínimo: las alertas salen sólo de los días de cobertura.');
     }
@@ -491,16 +467,16 @@ VLM.parser = (function () {
      ------------------------------------------------------------ */
   function generarPlantilla() {
     const headers = ['Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ubicacion', 'Stock',
-                     'Stock Minimo', 'Stock Maximo', 'Consumo Mensual', 'Lote', 'Vencimiento'];
+                     'Stock Minimo', 'Stock Maximo', 'Lote', 'Vencimiento'];
     const filas = [
-      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320,  95, 'AZ4411', '2027-08-31'],
-      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40,  14, 'RO8801', '2027-05-31'],
-      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60,  22, 'AM9901', '2027-06-30'],
-      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200,  72, 'BS1101', '2027-04-30']
+      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320, 'AZ4411', '2027-08-31'],
+      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40, 'RO8801', '2027-05-31'],
+      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60, 'AM9901', '2027-06-30'],
+      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200, 'BS1101', '2027-04-30']
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers].concat(filas));
     ws['!cols'] = [{ wch: 10 }, { wch: 32 }, { wch: 20 }, { wch: 13 }, { wch: 11 }, { wch: 8 },
-                   { wch: 12 }, { wch: 14 }, { wch: 15 }, { wch: 10 }, { wch: 13 }];
+                   { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 13 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Stock VLM');
     XLSX.writeFile(wb, 'plantilla_vlm.xlsx');

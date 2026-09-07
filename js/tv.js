@@ -136,14 +136,13 @@ VLM.tv = (function () {
      ------------------------------------------------------------ */
   function slideResumen(el, items, cfg) {
     const res = A.resumen(items, cfg);
-    const cob = res.coberturaGlobal !== null ? U.fmtDias(res.coberturaGlobal) + ' días' : 's/d';
 
     el.innerHTML =
       '<div class="tv-kpis">' +
         tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en picking') +
         tvKpi('A reponer YA', U.fmt(res.aReponer), res.porEstado.agotado + ' agotados', res.aReponer ? 'k-crit' : 'k-ok') +
-        tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), '< ' + cfg.diasBajo + ' días de stock', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
-        tvKpi('Cobertura global', cob, U.fmt(res.consumoDiario, true) + ' uds/día') +
+        tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), 'bajo el ' + cfg.pctBajo + '% de su capacidad', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
+        tvKpi('En altura', U.fmtCompact(res.unidadesAltura), 'reserva para rellenar') +
       '</div>' +
       '<div class="tv-split">' +
         '<div class="tv-panel"><h3>Estado del stock</h3><div class="tv-chart"><canvas id="tvChEstados"></canvas></div></div>' +
@@ -171,14 +170,14 @@ VLM.tv = (function () {
     el.innerHTML =
       '<h2>⚠ Reponer ahora · ' + lista.length + ' productos · ' + U.fmt(total) + ' unidades</h2>' +
       '<div class="tv-crit">' + lista.map((p, i) => {
-        const dias = p.diasCobertura !== null && isFinite(p.diasCobertura) ? U.fmtDias(p.diasCobertura) : 's/d';
+        const dias = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
         return '<div class="tv-crit-row r-' + p.estado + '">' +
           '<div class="tv-crit-rank">' + (i + 1) + '</div>' +
           '<div class="tv-crit-name">' + U.esc(p.descripcion) +
             '<span class="tv-crit-lab"> · ' + U.esc(p.laboratorio) +
             (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
           '<div class="tv-crit-val ' + (p.estado === 'agotado' ? 'v-agotado' : p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
-            '<span class="tv-crit-sub">días</span></div>' +
+            '<span class="tv-crit-sub">lleno</span></div>' +
           '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
           '</div>';
       }).join('') + '</div>';
@@ -200,18 +199,18 @@ VLM.tv = (function () {
               res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
               res.enAlerta ? 'k-crit' : 'k-ok') +
         tvKpi('Unidades a reponer', U.fmtCompact(frio.reduce((s, p) => s + p.sugerido, 0)),
-              'para cubrir ' + cfg.diasObjetivo + ' días') +
+              'hasta llenar las posiciones') +
       '</div>' +
       (urgentes.length
         ? '<div class="tv-crit" style="margin-top:1.6vh">' + urgentes.map((p, i) => {
-            const dias = p.diasCobertura !== null && isFinite(p.diasCobertura) ? U.fmtDias(p.diasCobertura) : 's/d';
+            const dias = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
             return '<div class="tv-crit-row r-' + p.estado + '">' +
               '<div class="tv-crit-rank">' + (i + 1) + '</div>' +
               '<div class="tv-crit-name">' + U.esc(p.descripcion) +
                 '<span class="tv-crit-lab"> · ' + U.esc(p.labNombre || p.laboratorio) +
                 (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
               '<div class="tv-crit-val ' + (p.estado === 'agotado' ? 'v-agotado' : p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
-                '<span class="tv-crit-sub">días</span></div>' +
+                '<span class="tv-crit-sub">lleno</span></div>' +
               '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
               '</div>';
           }).join('') + '</div>'

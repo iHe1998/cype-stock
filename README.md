@@ -7,8 +7,8 @@ vea de un vistazo qué hay que reponer.
 - 📊 Gráficos de stock, picking vs altura y estado por laboratorio
 - 🏭 Catálogo cerrado de **laboratorios**, con los de fuera separados y contados
 - ❄️ Separa **cámara de frío** (2-8 °C) de **ambiente**, y **dentro** de **fuera del VLM**
-- 🔴 Marca los productos **próximos a vaciarse** y los ya agotados
-- 📅 Calcula **días de cobertura** y la **fecha estimada de quiebre**
+- 🔴 Marca las posiciones **próximas a vaciarse** por porcentaje de su capacidad
+- 📦 Dice **de qué posición de altura bajar**, cruzando artículo, lote y Atributo02
 - 📺 **Modo TV**: pantallas rotativas a gran escala
 - 📥 Importa `.xlsx` / `.xls` / `.csv` con **detección automática de columnas**
 
@@ -60,15 +60,13 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 | Ubicación | — | Ubicacion, Bandeja, Charola, Posición |
 | Stock mínimo | — | Minimo, Punto de Pedido, Stock Min |
 | Stock máximo | — | Maximo, Capacidad |
-| Consumo diario | — | Consumo Diario, Promedio Diario |
 | Conservación | — | Conservacion, Cadena de Frío, Temperatura, Refrigerado |
-| Consumo mensual | — | Consumo Mensual, Salidas Mes, Demanda Mensual |
 | Lote | — | Lote, Partida, Batch |
 | Lote secundario | — | Atributo02, Lote Proveedor |
 | Vencimiento | — | Vencimiento, Vto, Caducidad |
 
-> Si la planilla no trae consumo, no hay días de cobertura ni fecha de quiebre: las
-> alertas salen del **mínimo y el máximo por posición** (ver más abajo).
+> El panel mira el día a día, no el stock a futuro: no hay proyección ni días de
+> cobertura. Las alertas salen del **máximo por posición** (ver más abajo).
 
 Hay una planilla de ejemplo en [`data/plantilla_vlm.csv`](data/plantilla_vlm.csv), y desde la
 pantalla inicial podés **descargar la plantilla en `.xlsx`**.
@@ -216,28 +214,27 @@ posiciones, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve
 
 ## Cómo calcula las alertas
 
+El panel mira **el día de hoy**: qué tan llena está cada posición, como porcentaje de su
+capacidad. No hay proyección ni días de cobertura — el consumo se maneja en vivo con la
+transmisión del momento, no acá.
+
 ```
-días de cobertura = stock / consumo diario
-fecha de quiebre  = hoy + días de cobertura
-a reponer         = máximo - lo que hay en la posición
+llenado   = lo que hay en la posición / máximo
+a reponer = máximo - lo que hay
 ```
 
-El criterio principal es **qué tan llena está la posición**, como porcentaje de su
-capacidad. El punto de pedido no siempre existe; la capacidad sí, y una posición de
-picking al 10% de lo que le entra hay que reponerla ya.
+| Estado | Llenado |
+|---|---|
+| ⬛ Agotado | vacía y sin reserva en altura |
+| 🔴 Crítico | **≤ 10% del máximo** · o vacía con reserva arriba |
+| 🟡 Bajo | **≤ 25% del máximo** |
+| 🟢 OK | > 25% |
+| 🟣 Exceso | > 105% del máximo |
+| ⬜ Sin datos | sin máximo ni mínimo cargados |
 
-| Estado | Por llenado | Por cobertura |
-|---|---|---|
-| ⬛ Agotado | vacía y sin reserva en altura | stock = 0 |
-| 🔴 Crítico | **≤ 10% del máximo** · o vacía con reserva arriba | ≤ 7 días |
-| 🟡 Bajo | **≤ 25% del máximo** | ≤ 15 días |
-| 🟢 OK | > 25% | > 15 días |
-| 🟣 Exceso | > 105% del máximo | — |
-
-El estado final es el **peor de los dos**. Si no hay máximo cargado se usa el mínimo como
-punto de pedido; si no hay ninguno de los dos, ese criterio no opina.
-
-Reponer sugiere **hasta llenar la posición**: `máximo − lo que hay`.
+Sin máximo se usa el mínimo como punto de pedido. Sin ninguno de los dos el producto queda
+en **sin datos** y no genera alerta — el Resumen avisa cuántos están así, para que no pasen
+por buenos.
 
 ### Contra qué stock se mide
 

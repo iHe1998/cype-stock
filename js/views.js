@@ -94,7 +94,6 @@ VLM.views = (function () {
     const res  = A.resumen(items, cfg);
     const labs = A.porLaboratorio(items, cfg);
     const grupos = A.porGrupo(items, cfg);
-    const tramos = A.quiebresPorTramo(items, cfg);
     const urgentes = A.topUrgentes(items, 6);
 
     let html = '';
@@ -125,19 +124,9 @@ VLM.views = (function () {
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       '</div>';
 
-    /* --- análisis de detalle: cuándo se agota cada producto --- */
-    // ojo: un producto agotado tiene cobertura 0, que es finita. Lo que define
-    // si se puede analizar el agotamiento es que haya consumo conocido.
-    const hayCobertura = items.some(p => p.consumoDiario > 0);
-    html += '<h3 class="section-title">Análisis de detalle</h3>';
-    if (hayCobertura) {
-      html += '<div class="grid grid-2">' +
-        cardChart('¿Cuándo se agota cada producto?', 'SKU por tramo, según el consumo observado', 'chQuiebres', 300) +
-        cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
-        '</div>';
-    } else {
-      html += avisoSinConsumo(cfg);
-    }
+    /* --- posiciones sin configurar: sin máximo no hay alerta posible --- */
+    const sinConfig = items.filter(p => !(p.stockMax > 0) && !(p.stockMin > 0)).length;
+    if (sinConfig) html += avisoSinConfig(sinConfig, items.length, cfg);
 
     /* --- top urgentes --- */
     if (urgentes.length) {
@@ -151,27 +140,22 @@ VLM.views = (function () {
     /* --- montaje de gráficos --- */
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
-    if (hayCobertura) {
-      C.quiebres($('#chQuiebres', el), tramos);
-      C.menorCobertura($('#chCobertura', el), items, cfg, false, 10);
-    }
   }
 
   /**
-   * No hay ningún dato de consumo: ni columna en la planilla ni historial.
-   * Sin eso no se puede saber cuándo se agota nada.
+   * Sin máximo cargado no hay contra qué medir: esos productos quedan en
+   * "sin datos" y no generan alerta. Conviene que se vea, no que pasen por OK.
    */
-  function avisoSinConsumo(cfg) {
-    return '<div class="notice">' +
-      '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
-        '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
-      '<div><strong>No se puede calcular cuándo se agota cada producto.</strong><br>' +
-      'La planilla no trae columna de consumo, y sin saber cuánto sale por día no hay ' +
-      'forma de anticipar el quiebre.' +
-      '<br><span class="small muted">' +
-      'Las alertas salen igual del <strong>máximo</strong> que cargues en Posiciones: ' +
-      'crítico por debajo del ' + cfg.pctCritico + '%, bajo por debajo del ' + cfg.pctBajo + '%.' +
-      '</span></div></div>';
+  function avisoSinConfig(n, total, cfg) {
+    return '<div class="notice n-warn" style="margin-top:14px">' +
+      '<svg viewBox="0 0 24 24" class="ico"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 ' +
+        '1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
+      '<div><strong>' + U.fmt(n) + ' de ' + U.fmt(total) + ' productos no tienen máximo cargado.</strong><br>' +
+      'Sin capacidad no hay contra qué medir, así que no generan alerta: quedan como ' +
+      '<em>sin datos</em>.' +
+      '<br><span class="small muted">Cargalos en <strong>Posiciones</strong>. ' +
+      'Crítico por debajo del ' + cfg.pctCritico + '%, bajo por debajo del ' + cfg.pctBajo + '%.</span>' +
+      '</div></div>';
   }
 
   /* ============================================================
@@ -220,7 +204,6 @@ VLM.views = (function () {
 
   function labCard(l, cfg, zona) {
     const r = l.resumen;
-    const cob = r.coberturaGlobal !== null ? U.fmtDias(r.coberturaGlobal) + ' d' : 's/d';
     return '<div class="card lab-card" data-lab="' + U.esc(l.nombre) + '">' +
       '<div class="lab-top">' +
         '<div class="lab-name"><i class="lab-swatch" style="background:' + l.color + '"></i>' + U.esc(l.nombre) + '</div>' +
@@ -235,8 +218,7 @@ VLM.views = (function () {
       '</div>' +
       stackbar(r) +
       '<div class="lab-legend">' +
-        '<span>Cobertura ' + cob + '</span>' +
-        (r.consumoDiario > 0 ? '<span>Consumo ' + U.fmt(r.consumoDiario, true) + ' uds/día</span>' : '') +
+        '<span>' + U.fmtCompact(r.unidadesAltura) + ' en altura</span>' +
       '</div>' +
       '</div>';
   }
@@ -265,7 +247,7 @@ VLM.views = (function () {
       kpi('Productos a reponer', U.fmt(filtrados.length),
           criticos.filter(p => p.estado === 'agotado').length + ' agotados', 'k-crit') +
       kpi('Unidades sugeridas', U.fmtCompact(totalUds),
-          'para cubrir ' + cfg.diasObjetivo + ' días', 'k-info') +
+          'hasta llenar las posiciones', 'k-info') +
       kpi('❄ En cadena de frío', U.fmt(enFrio),
           'de ' + filtrados.length + ' a reponer', enFrio > 0 ? 'k-warn' : 'k-ok') +
       kpi('Laboratorios afectados', U.fmt(new Set(filtrados.map(p => p.labNombre || p.laboratorio)).size),
@@ -291,8 +273,8 @@ VLM.views = (function () {
 
     if (!filtrados.length) {
       html += '<div class="no-results"><strong>Sin productos en alerta</strong><br>' +
-        '<span class="small">Con los umbrales actuales (' + cfg.diasCritico + '/' + cfg.diasBajo +
-        ' días) no hay nada por reponer.</span></div>';
+        '<span class="small">Con los umbrales actuales (' + cfg.pctCritico + '% / ' + cfg.pctBajo +
+        '% de la capacidad) no hay nada por reponer.</span></div>';
     } else {
       html += '<div class="repo-list">' + filtrados.map((p, i) => repoItem(p, i + 1, cfg)).join('') + '</div>';
     }
@@ -372,9 +354,7 @@ VLM.views = (function () {
 
   function repoItem(p, rank, cfg) {
     const clase = p.estado === 'agotado' ? 'r-agotado' : (p.estado === 'bajo' ? 'r-bajo' : '');
-    const dias = p.diasCobertura !== null && isFinite(p.diasCobertura)
-      ? U.fmtDias(p.diasCobertura) : 's/d';
-    const quiebre = p.fechaQuiebre ? 'se agota ' + U.fmtFechaCorta(p.fechaQuiebre) : 'sin consumo cargado';
+    const pct = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
 
     return '<div class="repo-item ' + clase + '">' +
       '<div class="repo-rank">' + rank + '</div>' +
@@ -385,14 +365,13 @@ VLM.views = (function () {
           '<span>' + U.esc(p.labNombre || p.laboratorio) + '</span>' +
           '<span>' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</span>' +
           (p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
-          '<span>' + quiebre + '</span>' +
         '</div>' +
       '</div>' +
       fuentesAltura(p) +
       '<div class="repo-metric"><b>' + U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock) +
         '</b><span>en picking</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
-        '<b>' + dias + '</b><span>días restantes</span></div>' +
+        '<b>' + pct + '</b><span>de su capacidad</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
       '</div>';
   }
@@ -401,8 +380,8 @@ VLM.views = (function () {
     if (!lista.length) { U.toast('No hay nada para exportar', 'err'); return; }
     const filas = [[
       'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ambito', 'Ubicacion', 'Estado',
-      'Stock actual', 'Stock minimo', 'Consumo diario', 'Dias de cobertura',
-      'Fecha estimada de quiebre', 'Unidades a reponer'
+      'Stock en picking', 'Minimo', 'Maximo', 'Porcentaje de llenado',
+      'Stock en altura', 'Unidades a reponer'
     ]];
     lista.forEach(p => filas.push([
       p.codigo, p.descripcion, p.labNombre || p.laboratorio,
@@ -410,10 +389,10 @@ VLM.views = (function () {
       VLM.labs.AMBITOS[p.ambito] ? VLM.labs.AMBITOS[p.ambito].label : '',
       p.ubicacion,
       A.ESTADOS[p.estado].label,
-      p.stock, p.stockMin,
-      Math.round(p.consumoDiario * 100) / 100,
-      p.diasCobertura !== null && isFinite(p.diasCobertura) ? Math.round(p.diasCobertura * 10) / 10 : '',
-      p.fechaQuiebre ? U.fmtFecha(p.fechaQuiebre) : '',
+      p.stockPicking !== undefined ? p.stockPicking : p.stock,
+      p.stockMin, p.stockMax,
+      p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : '',
+      p.stockAltura || 0,
       p.sugerido
     ]));
     const hoy = new Date().toISOString().slice(0, 10);
@@ -435,9 +414,8 @@ VLM.views = (function () {
     { id: 'stockPicking',  label: 'Picking',   num: true },
     { id: 'stockAltura',   label: 'Altura',    num: true },
     { id: 'stockMin',      label: 'Mínimo',    num: true },
-    { id: 'consumoDiario', label: 'Cons./día', num: true },
-    { id: 'diasCobertura', label: 'Cobertura', num: true },
-    { id: 'fechaQuiebre',  label: 'Se agota', num: true },
+    { id: 'stockMax',      label: 'Máximo',    num: true },
+    { id: 'ocupacion',     label: 'Llenado',   num: true },
     { id: 'sugerido',      label: 'A reponer', num: true },
     { id: 'estado',        label: 'Estado' }
   ];
@@ -513,8 +491,7 @@ VLM.views = (function () {
       html += '<tr><td colspan="' + COLUMNAS.length + '"><div class="no-results">Sin resultados para ese filtro</div></td></tr>';
     } else {
       filtrados.forEach(p => {
-        const pct = p.diasCobertura !== null && isFinite(p.diasCobertura)
-          ? Math.min(100, p.diasCobertura / (cfg.diasObjetivo || 30) * 100) : 0;
+        const pct = p.ocupacion !== null ? Math.min(100, p.ocupacion * 100) : 0;
         html += '<tr class="row-' + p.estado + '">' +
           '<td class="t-code">' + U.esc(p.codigo) + '</td>' +
           '<td class="t-desc">' + U.esc(p.descripcion) + '</td>' +
@@ -529,10 +506,9 @@ VLM.views = (function () {
                : '<span class="sin-pick">0</span>')) + '</td>' +
           '<td class="t-num muted">' + (p.stockAltura ? U.fmt(p.stockAltura) : '—') + '</td>' +
           '<td class="t-num muted">' + (p.stockMin ? U.fmt(p.stockMin) : '—') + '</td>' +
-          '<td class="t-num">' + (p.consumoDiario ? U.fmt(p.consumoDiario, true) : '—') + '</td>' +
-          '<td class="t-num">' + U.fmtDias(p.diasCobertura) +
+          '<td class="t-num muted">' + (p.stockMax ? U.fmt(p.stockMax) : '—') + '</td>' +
+          '<td class="t-num">' + (p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : '—') +
             '<div class="minibar m-' + p.estado + '"><i style="width:' + pct + '%"></i></div></td>' +
-          '<td class="t-num muted">' + (p.fechaQuiebre ? U.fmtFechaCorta(p.fechaQuiebre) : '—') + '</td>' +
           '<td class="t-num">' + (p.sugerido ? '<strong>+' + U.fmt(p.sugerido) + '</strong>' : '—') + '</td>' +
           '<td>' + badge(p.estado) + '</td>' +
           '</tr>';

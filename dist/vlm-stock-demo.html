@@ -1038,15 +1038,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
     </header>
     <div class="modal-body">
       <h3 class="section-title">Umbrales de alerta</h3>
+      <p class="muted small" style="margin:0 0 10px">Sobre la capacidad (mÃ¡ximo) de la posiciÃ³n.</p>
       <div class="cfg-grid">
-        <label class="field">
-          <span>Días de cobertura · CRÍTICO ≤</span>
-          <input type="number" id="cfgDiasCritico" min="0" step="1">
-        </label>
-        <label class="field">
-          <span>Días de cobertura · BAJO ≤</span>
-          <input type="number" id="cfgDiasBajo" min="0" step="1">
-        </label>
         <label class="field">
           <span>% del máximo · CRÍTICO ≤</span>
           <input type="number" id="cfgPctCritico" min="1" max="99" step="1">
@@ -1105,7 +1098,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 07/09/2026 04:05 - e7a306f</span>
+      <span class="muted small" id="appVersion">compilado 07/09/2026 04:15 - 153f397</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1696,16 +1689,11 @@ VLM.store = (function () {
   const VERSION = 3;
 
   const CFG_DEFAULT = {
-    diasCritico:   7,    // <= N días de cobertura => CRÍTICO
-    diasBajo:      15,   // <= N días de cobertura => BAJO
-    diasObjetivo:  30,   // stock objetivo al reponer, en días de consumo
-
     // Qué tan llena está la posición, como porcentaje de su capacidad.
     // Es el criterio principal: una posición de picking al 10% de su máximo
     // hay que reponerla ya, esté donde esté el punto de pedido.
     pctCritico:    10,   // stock <= 10% del máximo => CRÍTICO
     pctBajo:       25,   // stock <= 25% del máximo => BAJO
-    diasMes:       30,   // divisor consumo mensual -> diario
     tvSegundos:    20,
     tvSoloCriticos: false,
     // qué hacer con laboratorios que no están en el catálogo:
@@ -1737,7 +1725,7 @@ VLM.store = (function () {
       filtroTipoPos: 'picking',
       busquedaPos: '',
       busqueda: '',
-      orden: { campo: 'diasCobertura', dir: 'asc' }
+      orden: { campo: 'ocupacion', dir: 'asc' }
     }
   };
 
@@ -1972,14 +1960,6 @@ VLM.parser = (function () {
     { id: 'stockMax', label: 'Stock máximo / capacidad', req: false, tipo: 'numero',
       hint: 'Capacidad de la ubicación',
       alias: ['stock maximo', 'maximo', 'max', 'stock max', 'capacidad', 'cap', 'nivel maximo'] },
-
-    { id: 'consumoDiario', label: 'Consumo diario', req: false, tipo: 'numero',
-      hint: 'Unidades por día (si no, se calcula del mensual)',
-      alias: ['consumo diario', 'consumo dia', 'cons diario', 'consumo por dia', 'promedio diario', 'demanda diaria', 'uds dia'] },
-
-    { id: 'consumoMensual', label: 'Consumo mensual', req: false, tipo: 'numero',
-      hint: 'Salidas del último mes o promedio mensual',
-      alias: ['consumo mensual', 'consumo mes', 'cons mensual', 'salidas mes', 'salidas', 'egresos mes', 'demanda mensual', 'promedio mensual', 'consumo 30 dias', 'venta mensual', 'movimiento mensual'] },
 
     { id: 'conservacion', label: 'Conservación', req: false, tipo: 'texto',
       hint: 'Frío o ambiente; si falta se usa el default del laboratorio',
@@ -2222,8 +2202,6 @@ VLM.parser = (function () {
 
       g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
       g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
-      g.consumoDiario  = Math.max(g.consumoDiario || 0, p.consumoDiario || 0);
-      g.consumoMensual = Math.max(g.consumoMensual || 0, p.consumoMensual || 0);
       if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
       if (!g.descripcion || g.descripcion === g.codigo) g.descripcion = p.descripcion;
     });
@@ -2261,7 +2239,6 @@ VLM.parser = (function () {
     const productos = [];
     const avisos = [];
     let descartadas = 0;
-    const diasMes = (cfg && cfg.diasMes) || 30;
     catalogo = catalogo || VLM.labs.catalogoDefault();
     opciones = opciones || {};
     const reglas = opciones.reglas || VLM.ubicaciones.reglasDefault();
@@ -2298,12 +2275,6 @@ VLM.parser = (function () {
       // fila inútil: sin identificador o sin stock numérico
       if ((codigo === null || codigo === '') && (desc === null || desc === '')) { descartadas++; continue; }
       if (stock === null) { descartadas++; continue; }
-
-      const consDiario  = U.toNum(get(fila, 'consumoDiario'));
-      const consMensual = U.toNum(get(fila, 'consumoMensual'));
-      let consumoDiario = 0, fuenteConsumo = 'ninguna';
-      if (consDiario !== null && consDiario > 0)       { consumoDiario = consDiario;             fuenteConsumo = 'diario'; }
-      else if (consMensual !== null && consMensual > 0) { consumoDiario = consMensual / diasMes; fuenteConsumo = 'mensual'; }
 
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
@@ -2350,9 +2321,6 @@ VLM.parser = (function () {
         maxPos:        cfgVigente ? (cfgPos.max || 0) : 0,
         stockMin:      cfgVigente && cfgPos.min ? cfgPos.min : (U.toNum(get(fila, 'stockMin')) || 0),
         stockMax:      cfgVigente && cfgPos.max ? cfgPos.max : (U.toNum(get(fila, 'stockMax')) || 0),
-        consumoDiario: consumoDiario,
-        consumoMensual: consMensual !== null ? consMensual : (consumoDiario ? consumoDiario * diasMes : 0),
-        fuenteConsumo: fuenteConsumo,
         lote:          String(get(fila, 'lote') || '').trim(),
         lote2:         String(get(fila, 'lote2') || '').trim(),
         vencimiento:   U.toDate(get(fila, 'vencimiento'), fmtFecha)
@@ -2399,10 +2367,6 @@ VLM.parser = (function () {
     if (fmtFecha === 'mdy') {
       avisos.push('Las fechas se leyeron como mes/día/año (formato de EE.UU.).');
     }
-    if (mapa.consumoDiario === undefined && mapa.consumoMensual === undefined) {
-      avisos.push('Sin columna de consumo: se calcula restando importaciones sucesivas. ' +
-                  'Importá una vez por día y desde la segunda vas a ver la cobertura.');
-    }
     if (mapa.stockMin === undefined) {
       avisos.push('Sin stock mínimo: las alertas salen sólo de los días de cobertura.');
     }
@@ -2425,16 +2389,16 @@ VLM.parser = (function () {
      ------------------------------------------------------------ */
   function generarPlantilla() {
     const headers = ['Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ubicacion', 'Stock',
-                     'Stock Minimo', 'Stock Maximo', 'Consumo Mensual', 'Lote', 'Vencimiento'];
+                     'Stock Minimo', 'Stock Maximo', 'Lote', 'Vencimiento'];
     const filas = [
-      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320,  95, 'AZ4411', '2027-08-31'],
-      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40,  14, 'RO8801', '2027-05-31'],
-      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60,  22, 'AM9901', '2027-06-30'],
-      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200,  72, 'BS1101', '2027-04-30']
+      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320, 'AZ4411', '2027-08-31'],
+      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40, 'RO8801', '2027-05-31'],
+      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60, 'AM9901', '2027-06-30'],
+      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200, 'BS1101', '2027-04-30']
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers].concat(filas));
     ws['!cols'] = [{ wch: 10 }, { wch: 32 }, { wch: 20 }, { wch: 13 }, { wch: 11 }, { wch: 8 },
-                   { wch: 12 }, { wch: 14 }, { wch: 15 }, { wch: 10 }, { wch: 13 }];
+                   { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 13 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Stock VLM');
     XLSX.writeFile(wb, 'plantilla_vlm.xlsx');
@@ -2477,64 +2441,31 @@ VLM.analytics = (function () {
     return productos.map(p => {
       const r = Object.assign({}, p);
 
-      const cd = r.consumoDiario > 0 ? r.consumoDiario : 0;
-
-      // --- días de cobertura ---
-      if (cd > 0)          r.diasCobertura = r.stock / cd;
-      else if (r.stock > 0) r.diasCobertura = null;   // sin consumo: desconocido
-      else                  r.diasCobertura = 0;
-
-      // --- fecha estimada de quiebre (dato de detalle) ---
-      r.fechaQuiebre = (r.diasCobertura !== null && isFinite(r.diasCobertura) && cd > 0)
-        ? U.addDias(hoy, r.diasCobertura) : null;
-
-      // --- estado: se toma el peor entre criterio por días y por mínimo ---
-      const porDias = estadoPorDias(r.diasCobertura, cfg);
-      const porNivel = estadoPorNivel(r, cfg);
-      r.estado = peor(porDias, porNivel);
-      if (r.stock <= 0) r.estado = 'agotado';
-
-      // --- qué tan llena está la posición ---
+      // contra qué se mide: si el máximo sale de la configuración de una
+      // posición, lo que importa es lo que hay EN esa posición. Si no, la
+      // reserva de altura tapa que el picking está por vaciarse.
       const ref = r.stockRef !== undefined ? r.stockRef : r.stock;
+
       r.ocupacion = r.stockMax > 0 ? ref / r.stockMax : null;
+      r.estado    = estadoPorNivel(r, cfg, ref);
+      r.sugerido  = calcularSugerido(r, ref);
 
-      // --- sugerencia de reposición ---
-      r.sugerido = calcularSugerido(r, cfg);
-
-      // --- vencimiento ---
       r.diasAVencer = r.vencimiento
         ? Math.round((r.vencimiento - hoy) / 86400000) : null;
 
       // urgencia: menor = más urgente (para ordenar la reposición)
-      r.urgencia = calcularUrgencia(r, cfg);
+      r.urgencia = calcularUrgencia(r, ref);
       return r;
     });
   }
 
-  function estadoPorDias(dias, cfg) {
-    if (dias === null || dias === undefined) return null;
-    if (dias <= 0) return 'agotado';
-    if (dias <= cfg.diasCritico) return 'critico';
-    if (dias <= cfg.diasBajo) return 'bajo';
-    return 'ok';
-  }
-
   /**
-   * Estado según qué tan llena está la posición.
-   *
-   * El criterio es el porcentaje de la CAPACIDAD (máximo), no el punto de
-   * pedido: una posición de picking al 10% de lo que le entra hay que
-   * reponerla ya. Si no hay máximo cargado se cae al mínimo, que es lo único
-   * que queda.
-   *
-   * Se mide contra p.stockRef, no contra el stock total: si el máximo sale de
-   * la configuración de una posición, lo que importa es lo que hay EN esa
-   * posición. Si no, la reserva de altura tapa que el picking está por
-   * vaciarse, que es justo lo que hay que ver.
+   * Estado según qué tan llena está la posición, como porcentaje de su
+   * capacidad. Sin máximo cargado se cae al mínimo, que es lo único que queda;
+   * sin ninguno de los dos no hay con qué opinar.
    */
-  function estadoPorNivel(p, cfg) {
-    if (!(p.stockMax > 0) && !(p.stockMin > 0)) return null;
-    const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
+  function estadoPorNivel(p, cfg, ref) {
+    if (!(p.stockMax > 0) && !(p.stockMin > 0)) return 'sd';
 
     // posición de picking vacía pero con reserva en altura: es crítico
     // (hay que bajar ya), no agotado (agotado es que no hay en ningún lado)
@@ -2547,41 +2478,23 @@ VLM.analytics = (function () {
       if (ref > p.stockMax * 1.05) return 'exceso';
       return 'ok';
     }
-    // sin máximo: se usa el mínimo como punto de pedido
     if (ref <= p.stockMin) return 'critico';
     if (ref <= p.stockMin * 1.25) return 'bajo';
     return 'ok';
   }
 
-  function peor(a, b) {
-    if (!a && !b) return 'sd';
-    if (!a) return b;
-    if (!b) return a;
-    return ESTADOS[a].orden <= ESTADOS[b].orden ? a : b;
-  }
-
-  /**
-   * Cuánto reponer: hasta llenar la posición.
-   * Sin máximo cargado se usa el consumo o el mínimo, que es lo que haya.
-   */
-  function calcularSugerido(p, cfg) {
-    let objetivo = p.stockMax > 0 ? p.stockMax : 0;
-    if (!objetivo && p.consumoDiario > 0) objetivo = p.consumoDiario * cfg.diasObjetivo;
-    if (!objetivo && p.stockMin > 0)      objetivo = p.stockMin * 1.25;
+  /** Cuánto reponer: hasta llenar la posición. */
+  function calcularSugerido(p, ref) {
+    const objetivo = p.stockMax > 0 ? p.stockMax : (p.stockMin > 0 ? p.stockMin * 1.25 : 0);
     if (objetivo <= 0) return 0;
-    const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
     return Math.max(0, Math.ceil(objetivo - ref));
   }
 
-  /** Score de urgencia: días de cobertura, con penalización por estado. */
-  function calcularUrgencia(p, cfg) {
-    if (p.stock <= 0) return -1;
-    if (p.diasCobertura !== null && isFinite(p.diasCobertura)) return p.diasCobertura;
-    // sin consumo: la urgencia es qué tan vacía está la posición
-    const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
-    if (p.stockMax > 0) return cfg.diasCritico * (ref / p.stockMax) * (100 / cfg.pctBajo);
-    if (p.stockMin > 0 && ref < p.stockMin) return cfg.diasCritico * (ref / p.stockMin);
-    return 9999;
+  /** Qué tan vacía está la posición, de 0 (vacía) a 1 (llena). */
+  function calcularUrgencia(p, ref) {
+    if (p.stockMax > 0) return ref / p.stockMax;
+    if (p.stockMin > 0) return ref / (p.stockMin * 1.25);
+    return 9999;   // sin configurar: al fondo de la lista
   }
 
   /* ------------------------------------------------------------
@@ -2602,7 +2515,6 @@ VLM.analytics = (function () {
       unidades: 0,        // picking
       unidadesAltura: 0,
       unidadesTotal: 0,
-      consumoDiario: 0,
       porEstado: { agotado: 0, critico: 0, bajo: 0, ok: 0, exceso: 0, sd: 0 },
       porZona:   { frio: 0, ambiente: 0 },
       porAmbito: { vlm: 0, externo: 0 },
@@ -2610,7 +2522,6 @@ VLM.analytics = (function () {
       alertaAmbito: { vlm: 0, externo: 0 },
       unidadesZona: { frio: 0, ambiente: 0 },
       labs: 0,
-      sinConsumo: 0,
       venceEn30: 0,
       vencido: 0,
       noGestionados: 0
@@ -2625,7 +2536,6 @@ VLM.analytics = (function () {
       r.unidades += pick;
       r.unidadesAltura += alt;
       r.unidadesTotal += p.stock;
-      r.consumoDiario += p.consumoDiario;
       r.porEstado[p.estado] = (r.porEstado[p.estado] || 0) + 1;
 
       const enAlerta = p.estado === 'agotado' || p.estado === 'critico' || p.estado === 'bajo';
@@ -2640,7 +2550,6 @@ VLM.analytics = (function () {
       }
       if (!p.gestionado) r.noGestionados++;
 
-      if (!p.consumoDiario) r.sinConsumo++;
       if (p.diasAVencer !== null) {
         if (p.diasAVencer < 0) r.vencido++;
         else if (p.diasAVencer <= 30) r.venceEn30++;
@@ -2650,7 +2559,6 @@ VLM.analytics = (function () {
     r.labs = Object.keys(labs).length;
     r.aReponer = r.porEstado.agotado + r.porEstado.critico;
     r.enAlerta = r.aReponer + r.porEstado.bajo;
-    r.coberturaGlobal = r.consumoDiario > 0 ? r.unidades / r.consumoDiario : null;
     return r;
   }
 
@@ -2720,24 +2628,6 @@ VLM.analytics = (function () {
     });
   }
 
-  /** Cuántos SKU se agotan en cada tramo de días. */
-  function quiebresPorTramo(items, cfg) {
-    const tramos = [
-      { label: 'Ya agotado', max: 0,   n: 0 },
-      { label: '1-7 días',   max: 7,   n: 0 },
-      { label: '8-15 días',  max: 15,  n: 0 },
-      { label: '16-30 días', max: 30,  n: 0 },
-      { label: '31-60 días', max: 60,  n: 0 },
-      { label: '+60 días',   max: 1e9, n: 0 }
-    ];
-    items.forEach(p => {
-      const d = p.diasCobertura;
-      if (d === null || !isFinite(d)) return;
-      for (const t of tramos) { if (d <= t.max) { t.n++; break; } }
-    });
-    return tramos;
-  }
-
   /** Top N por urgencia (los que hay que reponer primero). */
   function topUrgentes(items, n) {
     return items
@@ -2749,7 +2639,7 @@ VLM.analytics = (function () {
   return {
     ESTADOS, ORDEN_ESTADOS,
     calcular, resumen, porLaboratorio, porGrupo, filtrarPorZona,
-    quiebresPorTramo, topUrgentes
+    topUrgentes
   };
 })();
 
@@ -2956,64 +2846,6 @@ VLM.charts = (function () {
   }
 
   /* ------------------------------------------------------------
-     4. Quiebres por tramo (barras)
-     ------------------------------------------------------------ */
-  function quiebres(canvas, tramos, tv) {
-    const t = tema();
-    // el primer tramo es "Ya agotado": gris, no rojo
-    const cols = [t.agotado, t.crit, t.warn, t.accent, t.ok, t.ok];
-    const o = base(t, tv);
-    o.scales.y.ticks.precision = 0;
-    o.scales.x.grid.display = false;
-    o.plugins.tooltip.callbacks = { label: c => c.parsed.y + ' producto(s)' };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: tramos.map(x => x.label),
-        datasets: [{
-          data: tramos.map(x => x.n),
-          backgroundColor: cols,
-          borderRadius: 5,
-          maxBarThickness: tv ? 80 : 52
-        }]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
-     5. Menor cobertura (top N barras horizontales)
-     ------------------------------------------------------------ */
-  function menorCobertura(canvas, items, cfg, tv, n) {
-    const t = tema();
-    const top = items
-      .filter(p => p.diasCobertura !== null && isFinite(p.diasCobertura))
-      .sort((a, b) => a.diasCobertura - b.diasCobertura)
-      .slice(0, n || (tv ? 8 : 10));
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.y.grid.display = false;
-    o.scales.x.ticks.callback = v => v + 'd';
-    o.plugins.tooltip.callbacks = {
-      title: c => top[c[0].dataIndex].descripcion,
-      label: c => U.fmtDias(c.parsed.x) + ' días de cobertura · stock ' + U.fmt(top[c.dataIndex].stock)
-    };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(p => recortar(p.descripcion, tv ? 26 : 30)),
-        datasets: [{
-          data: top.map(p => Math.round(p.diasCobertura * 10) / 10),
-          backgroundColor: top.map(p => colorEstado(p.estado, t)),
-          borderRadius: 4,
-          barThickness: tv ? 24 : 15
-        }]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
      6. Estados apilados por laboratorio
      ------------------------------------------------------------ */
   function estadosPorLab(canvas, labs, tv) {
@@ -3053,7 +2885,7 @@ VLM.charts = (function () {
 
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, estados, pickingVsAltura, quiebres, menorCobertura, estadosPorLab
+    stockPorLab, estados, pickingVsAltura, estadosPorLab
   };
 })();
 
@@ -3155,7 +2987,6 @@ VLM.views = (function () {
     const res  = A.resumen(items, cfg);
     const labs = A.porLaboratorio(items, cfg);
     const grupos = A.porGrupo(items, cfg);
-    const tramos = A.quiebresPorTramo(items, cfg);
     const urgentes = A.topUrgentes(items, 6);
 
     let html = '';
@@ -3186,19 +3017,9 @@ VLM.views = (function () {
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       '</div>';
 
-    /* --- análisis de detalle: cuándo se agota cada producto --- */
-    // ojo: un producto agotado tiene cobertura 0, que es finita. Lo que define
-    // si se puede analizar el agotamiento es que haya consumo conocido.
-    const hayCobertura = items.some(p => p.consumoDiario > 0);
-    html += '<h3 class="section-title">Análisis de detalle</h3>';
-    if (hayCobertura) {
-      html += '<div class="grid grid-2">' +
-        cardChart('¿Cuándo se agota cada producto?', 'SKU por tramo, según el consumo observado', 'chQuiebres', 300) +
-        cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
-        '</div>';
-    } else {
-      html += avisoSinConsumo(cfg);
-    }
+    /* --- posiciones sin configurar: sin máximo no hay alerta posible --- */
+    const sinConfig = items.filter(p => !(p.stockMax > 0) && !(p.stockMin > 0)).length;
+    if (sinConfig) html += avisoSinConfig(sinConfig, items.length, cfg);
 
     /* --- top urgentes --- */
     if (urgentes.length) {
@@ -3212,27 +3033,22 @@ VLM.views = (function () {
     /* --- montaje de gráficos --- */
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
-    if (hayCobertura) {
-      C.quiebres($('#chQuiebres', el), tramos);
-      C.menorCobertura($('#chCobertura', el), items, cfg, false, 10);
-    }
   }
 
   /**
-   * No hay ningún dato de consumo: ni columna en la planilla ni historial.
-   * Sin eso no se puede saber cuándo se agota nada.
+   * Sin máximo cargado no hay contra qué medir: esos productos quedan en
+   * "sin datos" y no generan alerta. Conviene que se vea, no que pasen por OK.
    */
-  function avisoSinConsumo(cfg) {
-    return '<div class="notice">' +
-      '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
-        '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
-      '<div><strong>No se puede calcular cuándo se agota cada producto.</strong><br>' +
-      'La planilla no trae columna de consumo, y sin saber cuánto sale por día no hay ' +
-      'forma de anticipar el quiebre.' +
-      '<br><span class="small muted">' +
-      'Las alertas salen igual del <strong>máximo</strong> que cargues en Posiciones: ' +
-      'crítico por debajo del ' + cfg.pctCritico + '%, bajo por debajo del ' + cfg.pctBajo + '%.' +
-      '</span></div></div>';
+  function avisoSinConfig(n, total, cfg) {
+    return '<div class="notice n-warn" style="margin-top:14px">' +
+      '<svg viewBox="0 0 24 24" class="ico"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 ' +
+        '1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
+      '<div><strong>' + U.fmt(n) + ' de ' + U.fmt(total) + ' productos no tienen máximo cargado.</strong><br>' +
+      'Sin capacidad no hay contra qué medir, así que no generan alerta: quedan como ' +
+      '<em>sin datos</em>.' +
+      '<br><span class="small muted">Cargalos en <strong>Posiciones</strong>. ' +
+      'Crítico por debajo del ' + cfg.pctCritico + '%, bajo por debajo del ' + cfg.pctBajo + '%.</span>' +
+      '</div></div>';
   }
 
   /* ============================================================
@@ -3281,7 +3097,6 @@ VLM.views = (function () {
 
   function labCard(l, cfg, zona) {
     const r = l.resumen;
-    const cob = r.coberturaGlobal !== null ? U.fmtDias(r.coberturaGlobal) + ' d' : 's/d';
     return '<div class="card lab-card" data-lab="' + U.esc(l.nombre) + '">' +
       '<div class="lab-top">' +
         '<div class="lab-name"><i class="lab-swatch" style="background:' + l.color + '"></i>' + U.esc(l.nombre) + '</div>' +
@@ -3296,8 +3111,7 @@ VLM.views = (function () {
       '</div>' +
       stackbar(r) +
       '<div class="lab-legend">' +
-        '<span>Cobertura ' + cob + '</span>' +
-        (r.consumoDiario > 0 ? '<span>Consumo ' + U.fmt(r.consumoDiario, true) + ' uds/día</span>' : '') +
+        '<span>' + U.fmtCompact(r.unidadesAltura) + ' en altura</span>' +
       '</div>' +
       '</div>';
   }
@@ -3326,7 +3140,7 @@ VLM.views = (function () {
       kpi('Productos a reponer', U.fmt(filtrados.length),
           criticos.filter(p => p.estado === 'agotado').length + ' agotados', 'k-crit') +
       kpi('Unidades sugeridas', U.fmtCompact(totalUds),
-          'para cubrir ' + cfg.diasObjetivo + ' días', 'k-info') +
+          'hasta llenar las posiciones', 'k-info') +
       kpi('❄ En cadena de frío', U.fmt(enFrio),
           'de ' + filtrados.length + ' a reponer', enFrio > 0 ? 'k-warn' : 'k-ok') +
       kpi('Laboratorios afectados', U.fmt(new Set(filtrados.map(p => p.labNombre || p.laboratorio)).size),
@@ -3352,8 +3166,8 @@ VLM.views = (function () {
 
     if (!filtrados.length) {
       html += '<div class="no-results"><strong>Sin productos en alerta</strong><br>' +
-        '<span class="small">Con los umbrales actuales (' + cfg.diasCritico + '/' + cfg.diasBajo +
-        ' días) no hay nada por reponer.</span></div>';
+        '<span class="small">Con los umbrales actuales (' + cfg.pctCritico + '% / ' + cfg.pctBajo +
+        '% de la capacidad) no hay nada por reponer.</span></div>';
     } else {
       html += '<div class="repo-list">' + filtrados.map((p, i) => repoItem(p, i + 1, cfg)).join('') + '</div>';
     }
@@ -3433,9 +3247,7 @@ VLM.views = (function () {
 
   function repoItem(p, rank, cfg) {
     const clase = p.estado === 'agotado' ? 'r-agotado' : (p.estado === 'bajo' ? 'r-bajo' : '');
-    const dias = p.diasCobertura !== null && isFinite(p.diasCobertura)
-      ? U.fmtDias(p.diasCobertura) : 's/d';
-    const quiebre = p.fechaQuiebre ? 'se agota ' + U.fmtFechaCorta(p.fechaQuiebre) : 'sin consumo cargado';
+    const pct = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
 
     return '<div class="repo-item ' + clase + '">' +
       '<div class="repo-rank">' + rank + '</div>' +
@@ -3446,14 +3258,13 @@ VLM.views = (function () {
           '<span>' + U.esc(p.labNombre || p.laboratorio) + '</span>' +
           '<span>' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</span>' +
           (p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
-          '<span>' + quiebre + '</span>' +
         '</div>' +
       '</div>' +
       fuentesAltura(p) +
       '<div class="repo-metric"><b>' + U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock) +
         '</b><span>en picking</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
-        '<b>' + dias + '</b><span>días restantes</span></div>' +
+        '<b>' + pct + '</b><span>de su capacidad</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
       '</div>';
   }
@@ -3462,8 +3273,8 @@ VLM.views = (function () {
     if (!lista.length) { U.toast('No hay nada para exportar', 'err'); return; }
     const filas = [[
       'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ambito', 'Ubicacion', 'Estado',
-      'Stock actual', 'Stock minimo', 'Consumo diario', 'Dias de cobertura',
-      'Fecha estimada de quiebre', 'Unidades a reponer'
+      'Stock en picking', 'Minimo', 'Maximo', 'Porcentaje de llenado',
+      'Stock en altura', 'Unidades a reponer'
     ]];
     lista.forEach(p => filas.push([
       p.codigo, p.descripcion, p.labNombre || p.laboratorio,
@@ -3471,10 +3282,10 @@ VLM.views = (function () {
       VLM.labs.AMBITOS[p.ambito] ? VLM.labs.AMBITOS[p.ambito].label : '',
       p.ubicacion,
       A.ESTADOS[p.estado].label,
-      p.stock, p.stockMin,
-      Math.round(p.consumoDiario * 100) / 100,
-      p.diasCobertura !== null && isFinite(p.diasCobertura) ? Math.round(p.diasCobertura * 10) / 10 : '',
-      p.fechaQuiebre ? U.fmtFecha(p.fechaQuiebre) : '',
+      p.stockPicking !== undefined ? p.stockPicking : p.stock,
+      p.stockMin, p.stockMax,
+      p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : '',
+      p.stockAltura || 0,
       p.sugerido
     ]));
     const hoy = new Date().toISOString().slice(0, 10);
@@ -3496,9 +3307,8 @@ VLM.views = (function () {
     { id: 'stockPicking',  label: 'Picking',   num: true },
     { id: 'stockAltura',   label: 'Altura',    num: true },
     { id: 'stockMin',      label: 'Mínimo',    num: true },
-    { id: 'consumoDiario', label: 'Cons./día', num: true },
-    { id: 'diasCobertura', label: 'Cobertura', num: true },
-    { id: 'fechaQuiebre',  label: 'Se agota', num: true },
+    { id: 'stockMax',      label: 'Máximo',    num: true },
+    { id: 'ocupacion',     label: 'Llenado',   num: true },
     { id: 'sugerido',      label: 'A reponer', num: true },
     { id: 'estado',        label: 'Estado' }
   ];
@@ -3574,8 +3384,7 @@ VLM.views = (function () {
       html += '<tr><td colspan="' + COLUMNAS.length + '"><div class="no-results">Sin resultados para ese filtro</div></td></tr>';
     } else {
       filtrados.forEach(p => {
-        const pct = p.diasCobertura !== null && isFinite(p.diasCobertura)
-          ? Math.min(100, p.diasCobertura / (cfg.diasObjetivo || 30) * 100) : 0;
+        const pct = p.ocupacion !== null ? Math.min(100, p.ocupacion * 100) : 0;
         html += '<tr class="row-' + p.estado + '">' +
           '<td class="t-code">' + U.esc(p.codigo) + '</td>' +
           '<td class="t-desc">' + U.esc(p.descripcion) + '</td>' +
@@ -3590,10 +3399,9 @@ VLM.views = (function () {
                : '<span class="sin-pick">0</span>')) + '</td>' +
           '<td class="t-num muted">' + (p.stockAltura ? U.fmt(p.stockAltura) : '—') + '</td>' +
           '<td class="t-num muted">' + (p.stockMin ? U.fmt(p.stockMin) : '—') + '</td>' +
-          '<td class="t-num">' + (p.consumoDiario ? U.fmt(p.consumoDiario, true) : '—') + '</td>' +
-          '<td class="t-num">' + U.fmtDias(p.diasCobertura) +
+          '<td class="t-num muted">' + (p.stockMax ? U.fmt(p.stockMax) : '—') + '</td>' +
+          '<td class="t-num">' + (p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : '—') +
             '<div class="minibar m-' + p.estado + '"><i style="width:' + pct + '%"></i></div></td>' +
-          '<td class="t-num muted">' + (p.fechaQuiebre ? U.fmtFechaCorta(p.fechaQuiebre) : '—') + '</td>' +
           '<td class="t-num">' + (p.sugerido ? '<strong>+' + U.fmt(p.sugerido) + '</strong>' : '—') + '</td>' +
           '<td>' + badge(p.estado) + '</td>' +
           '</tr>';
@@ -4023,14 +3831,13 @@ VLM.tv = (function () {
      ------------------------------------------------------------ */
   function slideResumen(el, items, cfg) {
     const res = A.resumen(items, cfg);
-    const cob = res.coberturaGlobal !== null ? U.fmtDias(res.coberturaGlobal) + ' días' : 's/d';
 
     el.innerHTML =
       '<div class="tv-kpis">' +
         tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en picking') +
         tvKpi('A reponer YA', U.fmt(res.aReponer), res.porEstado.agotado + ' agotados', res.aReponer ? 'k-crit' : 'k-ok') +
-        tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), '< ' + cfg.diasBajo + ' días de stock', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
-        tvKpi('Cobertura global', cob, U.fmt(res.consumoDiario, true) + ' uds/día') +
+        tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), 'bajo el ' + cfg.pctBajo + '% de su capacidad', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
+        tvKpi('En altura', U.fmtCompact(res.unidadesAltura), 'reserva para rellenar') +
       '</div>' +
       '<div class="tv-split">' +
         '<div class="tv-panel"><h3>Estado del stock</h3><div class="tv-chart"><canvas id="tvChEstados"></canvas></div></div>' +
@@ -4058,14 +3865,14 @@ VLM.tv = (function () {
     el.innerHTML =
       '<h2>⚠ Reponer ahora · ' + lista.length + ' productos · ' + U.fmt(total) + ' unidades</h2>' +
       '<div class="tv-crit">' + lista.map((p, i) => {
-        const dias = p.diasCobertura !== null && isFinite(p.diasCobertura) ? U.fmtDias(p.diasCobertura) : 's/d';
+        const dias = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
         return '<div class="tv-crit-row r-' + p.estado + '">' +
           '<div class="tv-crit-rank">' + (i + 1) + '</div>' +
           '<div class="tv-crit-name">' + U.esc(p.descripcion) +
             '<span class="tv-crit-lab"> · ' + U.esc(p.laboratorio) +
             (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
           '<div class="tv-crit-val ' + (p.estado === 'agotado' ? 'v-agotado' : p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
-            '<span class="tv-crit-sub">días</span></div>' +
+            '<span class="tv-crit-sub">lleno</span></div>' +
           '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
           '</div>';
       }).join('') + '</div>';
@@ -4087,18 +3894,18 @@ VLM.tv = (function () {
               res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
               res.enAlerta ? 'k-crit' : 'k-ok') +
         tvKpi('Unidades a reponer', U.fmtCompact(frio.reduce((s, p) => s + p.sugerido, 0)),
-              'para cubrir ' + cfg.diasObjetivo + ' días') +
+              'hasta llenar las posiciones') +
       '</div>' +
       (urgentes.length
         ? '<div class="tv-crit" style="margin-top:1.6vh">' + urgentes.map((p, i) => {
-            const dias = p.diasCobertura !== null && isFinite(p.diasCobertura) ? U.fmtDias(p.diasCobertura) : 's/d';
+            const dias = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
             return '<div class="tv-crit-row r-' + p.estado + '">' +
               '<div class="tv-crit-rank">' + (i + 1) + '</div>' +
               '<div class="tv-crit-name">' + U.esc(p.descripcion) +
                 '<span class="tv-crit-lab"> · ' + U.esc(p.labNombre || p.laboratorio) +
                 (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</span></div>' +
               '<div class="tv-crit-val ' + (p.estado === 'agotado' ? 'v-agotado' : p.estado === 'bajo' ? 'v-warn' : 'v-crit') + '">' + dias +
-                '<span class="tv-crit-sub">días</span></div>' +
+                '<span class="tv-crit-sub">lleno</span></div>' +
               '<div class="tv-crit-val">+' + U.fmt(p.sugerido) + '<span class="tv-crit-sub">reponer</span></div>' +
               '</div>';
           }).join('') + '</div>'
@@ -4505,15 +4312,15 @@ VLM.app = (function () {
         '</div></td></tr></tbody>';
       return;
     }
-    const cols = ['codigo', 'descripcion', 'laboratorio', 'ubicacion', 'stock', 'stockMin', 'consumoDiario'];
-    const labels = ['Código', 'Descripción', 'Laboratorio', 'Ubicación', 'Stock', 'Mínimo', 'Cons./día'];
+    const cols = ['codigo', 'descripcion', 'laboratorio', 'ubicacion', 'stock', 'stockMin', 'stockMax'];
+    const labels = ['Código', 'Descripción', 'Laboratorio', 'Ubicación', 'Stock', 'Mínimo', 'Máximo'];
     $('#prevTable').innerHTML =
       '<thead><tr>' + labels.map(l => '<th class="no-sort">' + l + '</th>').join('') + '</tr></thead>' +
       '<tbody>' + muestra.map(p => '<tr>' + cols.map(c => {
         const v = p[c];
         const num = typeof v === 'number';
         return '<td class="' + (num ? 't-num' : '') + '">' +
-          U.esc(num ? U.fmt(v, c === 'consumoDiario') : (v || '—')) + '</td>';
+          U.esc(num ? U.fmt(v) : (v || '—')) + '</td>';
       }).join('') + '</tr>').join('') + '</tbody>';
   }
 
@@ -4608,9 +4415,6 @@ VLM.app = (function () {
      CONFIGURACIÓN
      ============================================================ */
   const CAMPOS_CFG = [
-    ['cfgDiasCritico', 'diasCritico', 'int'],
-    ['cfgDiasBajo', 'diasBajo', 'int'],
-    ['cfgDiasObjetivo', 'diasObjetivo', 'int'],
     ['cfgPctCritico', 'pctCritico', 'int'],
     ['cfgPctBajo', 'pctBajo', 'int'],
     ['cfgTvSegundos', 'tvSegundos', 'int'],
