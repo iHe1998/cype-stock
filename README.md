@@ -175,8 +175,9 @@ tener regla de zona) tapaba a las posiciones de picking.
 ## Posiciones: mínimo y máximo
 
 La pestaña **Posiciones** lista una fila por posición física —las ignoradas por reglas no
-aparecen— con el artículo que la ocupa, su stock, y el **mínimo** (cuándo rellenar) y el
-**máximo** (cuánto entra) editables ahí mismo. Se guardan solos y se aplican al volver a
+aparecen— con el artículo que la ocupa, su stock, y el **mínimo** y el **máximo** editables ahí
+mismo. El **máximo** es el que manda: de él salen los umbrales de crítico y bajo, y el
+porcentaje de llenado que muestra cada fila. Se guardan solos y se aplican al volver a
 importar el stock.
 
 Un artículo puede estar en varias posiciones: en ese caso su mínimo y su máximo son la
@@ -218,32 +219,37 @@ posiciones, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve
 ```
 días de cobertura = stock / consumo diario
 fecha de quiebre  = hoy + días de cobertura
-a reponer         = objetivo - stock       (objetivo = consumo diario × días objetivo,
-                                            acotado por el stock máximo)
+a reponer         = máximo - lo que hay en la posición
 ```
 
-El **estado** de cada producto es el peor de dos criterios:
+El criterio principal es **qué tan llena está la posición**, como porcentaje de su
+capacidad. El punto de pedido no siempre existe; la capacidad sí, y una posición de
+picking al 10% de lo que le entra hay que reponerla ya.
 
-| Estado | Por cobertura | Por stock mínimo |
+| Estado | Por llenado | Por cobertura |
 |---|---|---|
-| ⬛ Agotado | stock = 0 | no hay en ningún lado |
-| 🔴 Crítico | ≤ 7 días | ≤ mínimo · o la posición vacía con reserva en altura |
-| 🟡 Bajo | ≤ 15 días | **≤ mínimo × 1,25** (a menos del 25% de tocar el mínimo) |
-| 🟢 OK | > 15 días | > mínimo × 1,25 |
-| 🟣 Exceso | — | > máximo |
+| ⬛ Agotado | vacía y sin reserva en altura | stock = 0 |
+| 🔴 Crítico | **≤ 10% del máximo** · o vacía con reserva arriba | ≤ 7 días |
+| 🟡 Bajo | **≤ 25% del máximo** | ≤ 15 días |
+| 🟢 OK | > 25% | > 15 días |
+| 🟣 Exceso | > 105% del máximo | — |
 
-### Contra qué stock se mide el mínimo
+El estado final es el **peor de los dos**. Si no hay máximo cargado se usa el mínimo como
+punto de pedido; si no hay ninguno de los dos, ese criterio no opina.
 
-Si el mínimo sale de la **configuración de una posición**, se compara contra lo que hay
-**en esa posición**, no contra el stock total del artículo. Un artículo con 1.282 unidades
-en sus dos posiciones de picking y 7.800 en altura está **bajo** si el mínimo de picking es
-1.200: lo que importa es que la posición desde donde se sirve está por vaciarse, no que
-sobre mercadería arriba.
+Reponer sugiere **hasta llenar la posición**: `máximo − lo que hay`.
+
+### Contra qué stock se mide
+
+Si el máximo sale de la **configuración de una posición**, se compara contra lo que hay
+**en esa posición**, no contra el stock total del artículo. Un artículo con 1.034 unidades
+en su posición de picking y 7.800 en altura está **bajo** si esa posición admite 4.200: lo
+que importa es que desde donde se sirve está por vaciarse, no que sobre mercadería arriba.
 
 Por eso también, una posición de picking vacía con reserva en altura es **crítica**, no
 agotada: agotado es que no hay en ningún lado.
 
-Todos los umbrales se cambian desde **⚙ Configuración**.
+Los porcentajes se cambian desde **⚙ Configuración**.
 
 ---
 

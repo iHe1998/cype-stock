@@ -22,9 +22,12 @@ VLM.store = (function () {
     diasCritico:   7,    // <= N días de cobertura => CRÍTICO
     diasBajo:      15,   // <= N días de cobertura => BAJO
     diasObjetivo:  30,   // stock objetivo al reponer, en días de consumo
-    // Un stock a menos del 25% por encima del minimo ya cuenta como bajo:
-    // da margen para reponer antes de tocar el punto de pedido.
-    factorBajo:    1.25, // stock <= min * factor => BAJO
+
+    // Qué tan llena está la posición, como porcentaje de su capacidad.
+    // Es el criterio principal: una posición de picking al 10% de su máximo
+    // hay que reponerla ya, esté donde esté el punto de pedido.
+    pctCritico:    10,   // stock <= 10% del máximo => CRÍTICO
+    pctBajo:       25,   // stock <= 25% del máximo => BAJO
     diasMes:       30,   // divisor consumo mensual -> diario
     tvSegundos:    20,
     tvSoloCriticos: false,

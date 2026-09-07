@@ -39,14 +39,13 @@ VLM.analytics = (function () {
 
       // --- estado: se toma el peor entre criterio por días y por mínimo ---
       const porDias = estadoPorDias(r.diasCobertura, cfg);
-      const porMin  = estadoPorMinimo(r, cfg);
-      r.estado = peor(porDias, porMin);
+      const porNivel = estadoPorNivel(r, cfg);
+      r.estado = peor(porDias, porNivel);
       if (r.stock <= 0) r.estado = 'agotado';
 
-      // --- ocupación de la ubicación ---
+      // --- qué tan llena está la posición ---
       const ref = r.stockRef !== undefined ? r.stockRef : r.stock;
-      r.ocupacion = r.stockMax > 0 ? Math.min(1, ref / r.stockMax) : null;
-      if (r.stockMax > 0 && ref > r.stockMax * 1.05 && r.estado === 'ok') r.estado = 'exceso';
+      r.ocupacion = r.stockMax > 0 ? ref / r.stockMax : null;
 
       // --- sugerencia de reposición ---
       r.sugerido = calcularSugerido(r, cfg);
@@ -70,21 +69,36 @@ VLM.analytics = (function () {
   }
 
   /**
-   * Estado segun el minimo.
+   * Estado según qué tan llena está la posición.
    *
-   * Se compara contra p.stockRef, no contra el stock total: si el minimo sale
-   * de la configuracion de una posicion, lo que importa es lo que hay EN esa
-   * posicion. Si no, la reserva de altura tapa que el picking esta por
+   * El criterio es el porcentaje de la CAPACIDAD (máximo), no el punto de
+   * pedido: una posición de picking al 10% de lo que le entra hay que
+   * reponerla ya. Si no hay máximo cargado se cae al mínimo, que es lo único
+   * que queda.
+   *
+   * Se mide contra p.stockRef, no contra el stock total: si el máximo sale de
+   * la configuración de una posición, lo que importa es lo que hay EN esa
+   * posición. Si no, la reserva de altura tapa que el picking está por
    * vaciarse, que es justo lo que hay que ver.
    */
-  function estadoPorMinimo(p, cfg) {
-    if (!(p.stockMin > 0)) return null;
+  function estadoPorNivel(p, cfg) {
+    if (!(p.stockMax > 0) && !(p.stockMin > 0)) return null;
     const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
+
     // posición de picking vacía pero con reserva en altura: es crítico
     // (hay que bajar ya), no agotado (agotado es que no hay en ningún lado)
     if (ref <= 0) return (p.tieneConfigPos && p.stock > 0) ? 'critico' : 'agotado';
+
+    if (p.stockMax > 0) {
+      const pct = ref / p.stockMax * 100;
+      if (pct <= cfg.pctCritico) return 'critico';
+      if (pct <= cfg.pctBajo)    return 'bajo';
+      if (ref > p.stockMax * 1.05) return 'exceso';
+      return 'ok';
+    }
+    // sin máximo: se usa el mínimo como punto de pedido
     if (ref <= p.stockMin) return 'critico';
-    if (ref <= p.stockMin * cfg.factorBajo) return 'bajo';
+    if (ref <= p.stockMin * 1.25) return 'bajo';
     return 'ok';
   }
 
@@ -95,13 +109,15 @@ VLM.analytics = (function () {
     return ESTADOS[a].orden <= ESTADOS[b].orden ? a : b;
   }
 
-  /** Cuánto pedir: hasta capacidad, o hasta cubrir N días de consumo. */
+  /**
+   * Cuánto reponer: hasta llenar la posición.
+   * Sin máximo cargado se usa el consumo o el mínimo, que es lo que haya.
+   */
   function calcularSugerido(p, cfg) {
-    let objetivo = 0;
-    if (p.consumoDiario > 0) objetivo = p.consumoDiario * cfg.diasObjetivo;
-    if (p.stockMin > 0)      objetivo = Math.max(objetivo, p.stockMin * cfg.factorBajo);
-    if (p.stockMax > 0)      objetivo = Math.min(Math.max(objetivo, p.stockMin || 0), p.stockMax);
-    if (objetivo <= 0)       return 0;
+    let objetivo = p.stockMax > 0 ? p.stockMax : 0;
+    if (!objetivo && p.consumoDiario > 0) objetivo = p.consumoDiario * cfg.diasObjetivo;
+    if (!objetivo && p.stockMin > 0)      objetivo = p.stockMin * 1.25;
+    if (objetivo <= 0) return 0;
     const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
     return Math.max(0, Math.ceil(objetivo - ref));
   }
@@ -110,11 +126,10 @@ VLM.analytics = (function () {
   function calcularUrgencia(p, cfg) {
     if (p.stock <= 0) return -1;
     if (p.diasCobertura !== null && isFinite(p.diasCobertura)) return p.diasCobertura;
-    // sin consumo: usar el déficit contra el mínimo como proxy
+    // sin consumo: la urgencia es qué tan vacía está la posición
     const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
-    if (p.stockMin > 0 && ref < p.stockMin) {
-      return cfg.diasCritico * (ref / p.stockMin);
-    }
+    if (p.stockMax > 0) return cfg.diasCritico * (ref / p.stockMax) * (100 / cfg.pctBajo);
+    if (p.stockMin > 0 && ref < p.stockMin) return cfg.diasCritico * (ref / p.stockMin);
     return 9999;
   }
 

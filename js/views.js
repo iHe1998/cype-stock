@@ -104,10 +104,10 @@ VLM.views = (function () {
       kpi('Productos (SKU)', U.fmt(res.skus),
           res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades en picking') +
       kpi('A reponer ya', U.fmt(res.aReponer),
-          res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
+          'por debajo del ' + cfg.pctCritico + '% · ' + res.porEstado.agotado + ' agotados',
           res.aReponer > 0 ? 'k-crit' : 'k-ok') +
       kpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo),
-          'menos de ' + cfg.diasBajo + ' días de cobertura',
+          'por debajo del ' + cfg.pctBajo + '% de su capacidad',
           res.porEstado.bajo > 0 ? 'k-warn' : 'k-ok') +
       kpi('❄ Cadena de frío en alerta', U.fmt(res.alertaZona.frio),
           'de ' + res.porZona.frio + ' SKU refrigerados',
@@ -136,7 +136,7 @@ VLM.views = (function () {
         cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
         '</div>';
     } else {
-      html += avisoSinConsumo();
+      html += avisoSinConsumo(cfg);
     }
 
     /* --- top urgentes --- */
@@ -161,7 +161,7 @@ VLM.views = (function () {
    * No hay ningún dato de consumo: ni columna en la planilla ni historial.
    * Sin eso no se puede saber cuándo se agota nada.
    */
-  function avisoSinConsumo() {
+  function avisoSinConsumo(cfg) {
     return '<div class="notice">' +
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
@@ -169,7 +169,8 @@ VLM.views = (function () {
       'La planilla no trae columna de consumo, y sin saber cuánto sale por día no hay ' +
       'forma de anticipar el quiebre.' +
       '<br><span class="small muted">' +
-      'Las alertas salen igual del mínimo y el máximo que cargues en <strong>Posiciones</strong>.' +
+      'Las alertas salen igual del <strong>máximo</strong> que cargues en Posiciones: ' +
+      'crítico por debajo del ' + cfg.pctCritico + '%, bajo por debajo del ' + cfg.pctBajo + '%.' +
       '</span></div></div>';
   }
 
@@ -618,11 +619,12 @@ VLM.views = (function () {
       kpi('Posiciones', U.fmt(filas.length),
           filas.filter(f => f.tipo === 'picking').length + ' de picking · ' +
           filas.filter(f => f.tipo === 'altura').length + ' de altura') +
-      kpi('Con mín/máx cargado', U.fmt(configuradas),
+      kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
-      kpi('Bajo el mínimo', U.fmt(filas.filter(f => !f.reasignada && f.min && f.stock < f.min).length),
-          'hay que rellenar', 'k-crit') +
+      kpi('Para rellenar', U.fmt(filas.filter(f => !f.reasignada &&
+            ['critico','bajo','agotado'].indexOf(estadoPosicion(f, cfg)) > -1).length),
+          'bajo el ' + cfg.pctBajo + '% de su capacidad', 'k-crit') +
       kpi('Cambiaron de artículo', U.fmt(filas.filter(f => f.reasignada).length),
           'el mín/máx guardado no se aplica',
           filas.some(f => f.reasignada) ? 'k-warn' : 'k-ok') +
@@ -671,10 +673,16 @@ VLM.views = (function () {
                 '<svg viewBox="0 0 24 24" class="ico"><path d="M20 6 9 17l-5-5"/></svg></button>';
           clase = 'row-bajo';
         }
-        else if (f.min && f.stock < f.min) { est = badge('critico'); clase = 'row-critico'; }
-        else if (f.max && f.stock > f.max) { est = badge('exceso'); }
-        else if (f.min || f.max)           { est = badge('ok'); }
-        else                                { est = '<span class="badge b-sd">Sin cargar</span>'; }
+        else {
+          const e = estadoPosicion(f, cfg);
+          if (e === 'sd') est = '<span class="badge b-sd">Sin cargar</span>';
+          else {
+            est = badge(e) + (f.max ? ' <span class="pos-pct">' +
+              Math.round(f.stock / f.max * 100) + '%</span>' : '');
+            if (e === 'critico' || e === 'agotado') clase = 'row-critico';
+            else if (e === 'bajo') clase = 'row-bajo';
+          }
+        }
         html += '<tr class="' + clase + '">' +
           '<td class="t-code"><strong>' + U.esc(f.ubicacion) + '</strong></td>' +
           '<td><span class="zchip ' + (f.tipo === 'altura' ? 'a-externo' : 'a-vlm') + '">' +
@@ -715,6 +723,25 @@ VLM.views = (function () {
     $('#posFile', el).addEventListener('change', e => {
       if (e.target.files[0]) importarPosiciones(e.target.files[0]);
     });
+  }
+
+  /**
+   * Estado de UNA posición, con la misma regla que usa el resto de la app:
+   * porcentaje de la capacidad. Sin máximo se cae al mínimo.
+   */
+  function estadoPosicion(f, cfg) {
+    if (!f.max && !f.min) return 'sd';
+    if (f.stock <= 0) return 'agotado';
+    if (f.max) {
+      const pct = f.stock / f.max * 100;
+      if (pct <= cfg.pctCritico) return 'critico';
+      if (pct <= cfg.pctBajo)    return 'bajo';
+      if (f.stock > f.max * 1.05) return 'exceso';
+      return 'ok';
+    }
+    if (f.stock <= f.min) return 'critico';
+    if (f.stock <= f.min * 1.25) return 'bajo';
+    return 'ok';
   }
 
   function chipTipo(val, label, activo) {

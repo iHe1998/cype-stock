@@ -459,7 +459,8 @@ VLM.app = (function () {
     ['cfgDiasCritico', 'diasCritico', 'int'],
     ['cfgDiasBajo', 'diasBajo', 'int'],
     ['cfgDiasObjetivo', 'diasObjetivo', 'int'],
-    ['cfgFactorBajo', 'factorBajo', 'float'],
+    ['cfgPctCritico', 'pctCritico', 'int'],
+    ['cfgPctBajo', 'pctBajo', 'int'],
     ['cfgTvSegundos', 'tvSegundos', 'int'],
     ['cfgTvSoloCriticos', 'tvSoloCriticos', 'bool']
   ];

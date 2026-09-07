@@ -848,6 +848,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 #posTable td { padding: 6px 12px; }
 .pos-ok { width: 24px; height: 24px; margin-left: 6px; vertical-align: middle; color: var(--ok); }
 .pos-ok:hover { background: var(--ok-dim); border-color: var(--ok); }
+.pos-pct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
 
 </style>
 </head>
@@ -1047,12 +1048,16 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
           <input type="number" id="cfgDiasBajo" min="0" step="1">
         </label>
         <label class="field">
-          <span>Días objetivo de stock (reposición)</span>
-          <input type="number" id="cfgDiasObjetivo" min="1" step="1">
+          <span>% del máximo · CRÍTICO ≤</span>
+          <input type="number" id="cfgPctCritico" min="1" max="99" step="1">
         </label>
         <label class="field">
-          <span>Margen sobre el mínimo para marcar BAJO (1,25 = 25%)</span>
-          <input type="number" id="cfgFactorBajo" min="1" step="0.1">
+          <span>% del máximo · BAJO ≤</span>
+          <input type="number" id="cfgPctBajo" min="1" max="99" step="1">
+        </label>
+        <label class="field">
+          <span>Días objetivo de stock (si no hay máximo)</span>
+          <input type="number" id="cfgDiasObjetivo" min="1" step="1">
         </label>
       </div>
 
@@ -1100,7 +1105,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 07/09/2026 03:34 - c5d36b1</span>
+      <span class="muted small" id="appVersion">compilado 07/09/2026 04:05 - e7a306f</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1694,9 +1699,12 @@ VLM.store = (function () {
     diasCritico:   7,    // <= N días de cobertura => CRÍTICO
     diasBajo:      15,   // <= N días de cobertura => BAJO
     diasObjetivo:  30,   // stock objetivo al reponer, en días de consumo
-    // Un stock a menos del 25% por encima del minimo ya cuenta como bajo:
-    // da margen para reponer antes de tocar el punto de pedido.
-    factorBajo:    1.25, // stock <= min * factor => BAJO
+
+    // Qué tan llena está la posición, como porcentaje de su capacidad.
+    // Es el criterio principal: una posición de picking al 10% de su máximo
+    // hay que reponerla ya, esté donde esté el punto de pedido.
+    pctCritico:    10,   // stock <= 10% del máximo => CRÍTICO
+    pctBajo:       25,   // stock <= 25% del máximo => BAJO
     diasMes:       30,   // divisor consumo mensual -> diario
     tvSegundos:    20,
     tvSoloCriticos: false,
@@ -2482,14 +2490,13 @@ VLM.analytics = (function () {
 
       // --- estado: se toma el peor entre criterio por días y por mínimo ---
       const porDias = estadoPorDias(r.diasCobertura, cfg);
-      const porMin  = estadoPorMinimo(r, cfg);
-      r.estado = peor(porDias, porMin);
+      const porNivel = estadoPorNivel(r, cfg);
+      r.estado = peor(porDias, porNivel);
       if (r.stock <= 0) r.estado = 'agotado';
 
-      // --- ocupación de la ubicación ---
+      // --- qué tan llena está la posición ---
       const ref = r.stockRef !== undefined ? r.stockRef : r.stock;
-      r.ocupacion = r.stockMax > 0 ? Math.min(1, ref / r.stockMax) : null;
-      if (r.stockMax > 0 && ref > r.stockMax * 1.05 && r.estado === 'ok') r.estado = 'exceso';
+      r.ocupacion = r.stockMax > 0 ? ref / r.stockMax : null;
 
       // --- sugerencia de reposición ---
       r.sugerido = calcularSugerido(r, cfg);
@@ -2513,21 +2520,36 @@ VLM.analytics = (function () {
   }
 
   /**
-   * Estado segun el minimo.
+   * Estado según qué tan llena está la posición.
    *
-   * Se compara contra p.stockRef, no contra el stock total: si el minimo sale
-   * de la configuracion de una posicion, lo que importa es lo que hay EN esa
-   * posicion. Si no, la reserva de altura tapa que el picking esta por
+   * El criterio es el porcentaje de la CAPACIDAD (máximo), no el punto de
+   * pedido: una posición de picking al 10% de lo que le entra hay que
+   * reponerla ya. Si no hay máximo cargado se cae al mínimo, que es lo único
+   * que queda.
+   *
+   * Se mide contra p.stockRef, no contra el stock total: si el máximo sale de
+   * la configuración de una posición, lo que importa es lo que hay EN esa
+   * posición. Si no, la reserva de altura tapa que el picking está por
    * vaciarse, que es justo lo que hay que ver.
    */
-  function estadoPorMinimo(p, cfg) {
-    if (!(p.stockMin > 0)) return null;
+  function estadoPorNivel(p, cfg) {
+    if (!(p.stockMax > 0) && !(p.stockMin > 0)) return null;
     const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
+
     // posición de picking vacía pero con reserva en altura: es crítico
     // (hay que bajar ya), no agotado (agotado es que no hay en ningún lado)
     if (ref <= 0) return (p.tieneConfigPos && p.stock > 0) ? 'critico' : 'agotado';
+
+    if (p.stockMax > 0) {
+      const pct = ref / p.stockMax * 100;
+      if (pct <= cfg.pctCritico) return 'critico';
+      if (pct <= cfg.pctBajo)    return 'bajo';
+      if (ref > p.stockMax * 1.05) return 'exceso';
+      return 'ok';
+    }
+    // sin máximo: se usa el mínimo como punto de pedido
     if (ref <= p.stockMin) return 'critico';
-    if (ref <= p.stockMin * cfg.factorBajo) return 'bajo';
+    if (ref <= p.stockMin * 1.25) return 'bajo';
     return 'ok';
   }
 
@@ -2538,13 +2560,15 @@ VLM.analytics = (function () {
     return ESTADOS[a].orden <= ESTADOS[b].orden ? a : b;
   }
 
-  /** Cuánto pedir: hasta capacidad, o hasta cubrir N días de consumo. */
+  /**
+   * Cuánto reponer: hasta llenar la posición.
+   * Sin máximo cargado se usa el consumo o el mínimo, que es lo que haya.
+   */
   function calcularSugerido(p, cfg) {
-    let objetivo = 0;
-    if (p.consumoDiario > 0) objetivo = p.consumoDiario * cfg.diasObjetivo;
-    if (p.stockMin > 0)      objetivo = Math.max(objetivo, p.stockMin * cfg.factorBajo);
-    if (p.stockMax > 0)      objetivo = Math.min(Math.max(objetivo, p.stockMin || 0), p.stockMax);
-    if (objetivo <= 0)       return 0;
+    let objetivo = p.stockMax > 0 ? p.stockMax : 0;
+    if (!objetivo && p.consumoDiario > 0) objetivo = p.consumoDiario * cfg.diasObjetivo;
+    if (!objetivo && p.stockMin > 0)      objetivo = p.stockMin * 1.25;
+    if (objetivo <= 0) return 0;
     const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
     return Math.max(0, Math.ceil(objetivo - ref));
   }
@@ -2553,11 +2577,10 @@ VLM.analytics = (function () {
   function calcularUrgencia(p, cfg) {
     if (p.stock <= 0) return -1;
     if (p.diasCobertura !== null && isFinite(p.diasCobertura)) return p.diasCobertura;
-    // sin consumo: usar el déficit contra el mínimo como proxy
+    // sin consumo: la urgencia es qué tan vacía está la posición
     const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
-    if (p.stockMin > 0 && ref < p.stockMin) {
-      return cfg.diasCritico * (ref / p.stockMin);
-    }
+    if (p.stockMax > 0) return cfg.diasCritico * (ref / p.stockMax) * (100 / cfg.pctBajo);
+    if (p.stockMin > 0 && ref < p.stockMin) return cfg.diasCritico * (ref / p.stockMin);
     return 9999;
   }
 
@@ -3142,10 +3165,10 @@ VLM.views = (function () {
       kpi('Productos (SKU)', U.fmt(res.skus),
           res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades en picking') +
       kpi('A reponer ya', U.fmt(res.aReponer),
-          res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
+          'por debajo del ' + cfg.pctCritico + '% · ' + res.porEstado.agotado + ' agotados',
           res.aReponer > 0 ? 'k-crit' : 'k-ok') +
       kpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo),
-          'menos de ' + cfg.diasBajo + ' días de cobertura',
+          'por debajo del ' + cfg.pctBajo + '% de su capacidad',
           res.porEstado.bajo > 0 ? 'k-warn' : 'k-ok') +
       kpi('❄ Cadena de frío en alerta', U.fmt(res.alertaZona.frio),
           'de ' + res.porZona.frio + ' SKU refrigerados',
@@ -3174,7 +3197,7 @@ VLM.views = (function () {
         cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
         '</div>';
     } else {
-      html += avisoSinConsumo();
+      html += avisoSinConsumo(cfg);
     }
 
     /* --- top urgentes --- */
@@ -3199,7 +3222,7 @@ VLM.views = (function () {
    * No hay ningún dato de consumo: ni columna en la planilla ni historial.
    * Sin eso no se puede saber cuándo se agota nada.
    */
-  function avisoSinConsumo() {
+  function avisoSinConsumo(cfg) {
     return '<div class="notice">' +
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
@@ -3207,7 +3230,8 @@ VLM.views = (function () {
       'La planilla no trae columna de consumo, y sin saber cuánto sale por día no hay ' +
       'forma de anticipar el quiebre.' +
       '<br><span class="small muted">' +
-      'Las alertas salen igual del mínimo y el máximo que cargues en <strong>Posiciones</strong>.' +
+      'Las alertas salen igual del <strong>máximo</strong> que cargues en Posiciones: ' +
+      'crítico por debajo del ' + cfg.pctCritico + '%, bajo por debajo del ' + cfg.pctBajo + '%.' +
       '</span></div></div>';
   }
 
@@ -3656,11 +3680,12 @@ VLM.views = (function () {
       kpi('Posiciones', U.fmt(filas.length),
           filas.filter(f => f.tipo === 'picking').length + ' de picking · ' +
           filas.filter(f => f.tipo === 'altura').length + ' de altura') +
-      kpi('Con mín/máx cargado', U.fmt(configuradas),
+      kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
-      kpi('Bajo el mínimo', U.fmt(filas.filter(f => !f.reasignada && f.min && f.stock < f.min).length),
-          'hay que rellenar', 'k-crit') +
+      kpi('Para rellenar', U.fmt(filas.filter(f => !f.reasignada &&
+            ['critico','bajo','agotado'].indexOf(estadoPosicion(f, cfg)) > -1).length),
+          'bajo el ' + cfg.pctBajo + '% de su capacidad', 'k-crit') +
       kpi('Cambiaron de artículo', U.fmt(filas.filter(f => f.reasignada).length),
           'el mín/máx guardado no se aplica',
           filas.some(f => f.reasignada) ? 'k-warn' : 'k-ok') +
@@ -3709,10 +3734,16 @@ VLM.views = (function () {
                 '<svg viewBox="0 0 24 24" class="ico"><path d="M20 6 9 17l-5-5"/></svg></button>';
           clase = 'row-bajo';
         }
-        else if (f.min && f.stock < f.min) { est = badge('critico'); clase = 'row-critico'; }
-        else if (f.max && f.stock > f.max) { est = badge('exceso'); }
-        else if (f.min || f.max)           { est = badge('ok'); }
-        else                                { est = '<span class="badge b-sd">Sin cargar</span>'; }
+        else {
+          const e = estadoPosicion(f, cfg);
+          if (e === 'sd') est = '<span class="badge b-sd">Sin cargar</span>';
+          else {
+            est = badge(e) + (f.max ? ' <span class="pos-pct">' +
+              Math.round(f.stock / f.max * 100) + '%</span>' : '');
+            if (e === 'critico' || e === 'agotado') clase = 'row-critico';
+            else if (e === 'bajo') clase = 'row-bajo';
+          }
+        }
         html += '<tr class="' + clase + '">' +
           '<td class="t-code"><strong>' + U.esc(f.ubicacion) + '</strong></td>' +
           '<td><span class="zchip ' + (f.tipo === 'altura' ? 'a-externo' : 'a-vlm') + '">' +
@@ -3753,6 +3784,25 @@ VLM.views = (function () {
     $('#posFile', el).addEventListener('change', e => {
       if (e.target.files[0]) importarPosiciones(e.target.files[0]);
     });
+  }
+
+  /**
+   * Estado de UNA posición, con la misma regla que usa el resto de la app:
+   * porcentaje de la capacidad. Sin máximo se cae al mínimo.
+   */
+  function estadoPosicion(f, cfg) {
+    if (!f.max && !f.min) return 'sd';
+    if (f.stock <= 0) return 'agotado';
+    if (f.max) {
+      const pct = f.stock / f.max * 100;
+      if (pct <= cfg.pctCritico) return 'critico';
+      if (pct <= cfg.pctBajo)    return 'bajo';
+      if (f.stock > f.max * 1.05) return 'exceso';
+      return 'ok';
+    }
+    if (f.stock <= f.min) return 'critico';
+    if (f.stock <= f.min * 1.25) return 'bajo';
+    return 'ok';
   }
 
   function chipTipo(val, label, activo) {
@@ -4561,7 +4611,8 @@ VLM.app = (function () {
     ['cfgDiasCritico', 'diasCritico', 'int'],
     ['cfgDiasBajo', 'diasBajo', 'int'],
     ['cfgDiasObjetivo', 'diasObjetivo', 'int'],
-    ['cfgFactorBajo', 'factorBajo', 'float'],
+    ['cfgPctCritico', 'pctCritico', 'int'],
+    ['cfgPctBajo', 'pctBajo', 'int'],
     ['cfgTvSegundos', 'tvSegundos', 'int'],
     ['cfgTvSoloCriticos', 'tvSoloCriticos', 'bool']
   ];

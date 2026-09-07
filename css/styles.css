@@ -839,3 +839,4 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 #posTable td { padding: 6px 12px; }
 .pos-ok { width: 24px; height: 24px; margin-left: 6px; vertical-align: middle; color: var(--ok); }
 .pos-ok:hover { background: var(--ok-dim); border-color: var(--ok); }
+.pos-pct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
