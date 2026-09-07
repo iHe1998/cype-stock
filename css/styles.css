@@ -552,10 +552,19 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   font-size: 11.5px; line-height: 1.35; text-align: right;
   padding: 5px 10px; border-radius: var(--r-sm);
   background: var(--surface-2); border: 1px solid var(--border-soft);
-  color: var(--muted); min-width: 120px;
+  color: var(--muted); min-width: 190px; max-width: 230px;
 }
 .repo-altura b { color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
-.repo-altura span { font-family: var(--mono); font-size: 10.5px; }
+.alt-lote {
+  margin-top: 5px; padding-top: 5px;
+  border-top: 1px solid var(--border-soft);
+  text-align: left;
+}
+.alt-lote.es-mismo { border-left: 2px solid var(--ok); padding-left: 6px; border-top-color: transparent; }
+.alt-ubics { display: block; font-family: var(--mono); font-size: 11px; color: var(--text-2); }
+.alt-meta  { display: block; font-size: 10px; color: var(--muted); }
+.alt-lote.es-mismo .alt-meta strong { color: var(--ok); }
+.alt-mas { font-size: 10px; color: var(--muted); margin-top: 4px; }
 .sin-pick { color: var(--crit); font-weight: 700; }
 
 .repo-metric.m-crit b { color: var(--crit); }

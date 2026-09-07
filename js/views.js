@@ -90,13 +90,12 @@ VLM.views = (function () {
   /* ============================================================
      VISTA 1 · RESUMEN
      ============================================================ */
-  function dashboard(el, items, cfg, hist) {
+  function dashboard(el, items, cfg) {
     const res  = A.resumen(items, cfg);
     const labs = A.porLaboratorio(items, cfg);
     const grupos = A.porGrupo(items, cfg);
     const tramos = A.quiebresPorTramo(items, cfg);
     const urgentes = A.topUrgentes(items, 6);
-    const consLabs = A.consumoPorLaboratorio(items, cfg);
 
     let html = '';
 
@@ -113,12 +112,6 @@ VLM.views = (function () {
       kpi('❄ Cadena de frío en alerta', U.fmt(res.alertaZona.frio),
           'de ' + res.porZona.frio + ' SKU refrigerados',
           res.alertaZona.frio > 0 ? 'k-crit' : 'k-ok') +
-      (hist.activo
-        ? kpi('Consumido en el período', hist.suficiente ? U.fmtCompact(hist.totalConsumido) : '—',
-              hist.suficiente
-                ? U.fmt(hist.promedioDiario, true) + ' uds/día en ' + hist.dias + ' días'
-                : 'hacen falta 2 importaciones', 'k-info')
-        : '') +
       '</div>';
 
     /* --- cuadrantes ámbito × conservación --- */
@@ -132,19 +125,6 @@ VLM.views = (function () {
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       '</div>';
 
-    /* --- historial real de consumo (sólo si está activado) --- */
-    if (hist.activo) {
-      html += '<h3 class="section-title">Historial de consumo</h3>';
-      if (!hist.suficiente) {
-        html += avisoHistorial(hist);
-      } else {
-        html += '<div class="grid grid-2">' +
-          cardChart('Consumo por día', 'unidades que salieron, calculadas por diferencia de stock', 'chHist', 300) +
-          cardChart('Consumido por laboratorio', 'período completo', 'chConsumoLab', 300) +
-          '</div>';
-      }
-    }
-
     /* --- análisis de detalle: cuándo se agota cada producto --- */
     // ojo: un producto agotado tiene cobertura 0, que es finita. Lo que define
     // si se puede analizar el agotamiento es que haya consumo conocido.
@@ -156,7 +136,7 @@ VLM.views = (function () {
         cardChart('Menor cobertura', 'los 10 más urgentes', 'chCobertura', 300) +
         '</div>';
     } else {
-      html += avisoSinConsumo(hist);
+      html += avisoSinConsumo();
     }
 
     /* --- top urgentes --- */
@@ -175,47 +155,22 @@ VLM.views = (function () {
       C.quiebres($('#chQuiebres', el), tramos);
       C.menorCobertura($('#chCobertura', el), items, cfg, false, 10);
     }
-    if (hist.activo && hist.suficiente) {
-      C.historial($('#chHist', el), hist);
-      C.consumoLab($('#chConsumoLab', el), consLabs);
-    }
   }
 
   /**
    * No hay ningún dato de consumo: ni columna en la planilla ni historial.
    * Sin eso no se puede saber cuándo se agota nada.
    */
-  function avisoSinConsumo(hist) {
+  function avisoSinConsumo() {
     return '<div class="notice">' +
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
       '<div><strong>No se puede calcular cuándo se agota cada producto.</strong><br>' +
-      'Hace falta saber cuánto se consume, y no hay de dónde sacarlo: la planilla no trae ' +
-      'columna de consumo' +
-      (hist.activo ? ' y todavía no hay suficientes importaciones en el historial.'
-                   : ' y el historial de consumo está desactivado.') +
+      'La planilla no trae columna de consumo, y sin saber cuánto sale por día no hay ' +
+      'forma de anticipar el quiebre.' +
       '<br><span class="small muted">' +
-      (hist.activo
-        ? 'Importá una vez por día: desde la segunda importación aparece la cobertura.'
-        : 'Podés activarlo en ⚙ Configuración → Historial de consumo, o agregar una ' +
-          'columna de consumo a la planilla. Mientras tanto, las alertas salen del stock mínimo.') +
+      'Las alertas salen igual del mínimo y el máximo que cargues en <strong>Posiciones</strong>.' +
       '</span></div></div>';
-  }
-
-  /** Explica por qué todavía no hay historial y cómo se construye. */
-  function avisoHistorial(hist) {
-    const n = hist.snapshots;
-    return '<div class="notice">' +
-      '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
-        '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
-      '<div><strong>Todavía no se puede calcular el consumo.</strong><br>' +
-      'La planilla es una foto del stock del momento, así que el consumo sale de ' +
-      '<strong>restar importaciones sucesivas</strong>. Llevás ' + n +
-      (n === 1 ? ' importación guardada' : ' importaciones guardadas') +
-      ' y hacen falta al menos 2.<br>' +
-      '<span class="small muted">Importá la planilla una vez por día y a partir de mañana vas a ver ' +
-      'el consumo diario, la cobertura y la fecha estimada de quiebre de cada producto.</span>' +
-      '</div></div>';
   }
 
   /* ============================================================
@@ -233,7 +188,7 @@ VLM.views = (function () {
 
     html += '<div class="grid grid-2" style="margin-bottom:18px">' +
       cardChart('Estados por laboratorio', 'cantidad de SKU', 'chLabEstados', 340) +
-      cardChart('Consumo por laboratorio', 'según el historial observado', 'chLabConsumo', 340) +
+      cardChart('Picking vs altura', 'unidades por laboratorio', 'chLabConsumo', 340) +
       '</div>';
 
     // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente
@@ -244,7 +199,7 @@ VLM.views = (function () {
 
     el.innerHTML = html;
     C.estadosPorLab($('#chLabEstados', el), labs);
-    C.consumoLab($('#chLabConsumo', el), A.consumoPorLaboratorio(items, cfg));
+    C.pickingVsAltura($('#chLabConsumo', el), labs);
 
     const buscar = $('#labSearch', el);
     buscar.addEventListener('input', U.debounce(() => {
@@ -356,6 +311,64 @@ VLM.views = (function () {
     return '<button class="chip' + (activo ? ' is-active' : '') + '" data-val="' + val + '">' + label + '</button>';
   }
 
+  /**
+   * De dónde bajar mercadería para rellenar el picking.
+   *
+   * Se cruza por artículo + lote + Atributo02: rellenar una posición de
+   * picking con otro lote mezcla partidas, así que primero se ofrecen las
+   * alturas del MISMO lote que ya está abajo. Si no hay ninguna —o la
+   * posición de picking está vacía— se listan las demás por vencimiento,
+   * que es el orden en que conviene sacarlas.
+   */
+  function fuentesAltura(p) {
+    const det = p.detalle || [];
+    const altura = det.filter(d => d.tipo === 'altura' && d.stock > 0);
+    if (!altura.length) return '';
+
+    const clave = d => (d.lote || '') + '|' + (d.lote2 || '');
+    const enPicking = {};
+    det.filter(d => d.tipo === 'picking' && d.stock > 0).forEach(d => { enPicking[clave(d)] = true; });
+
+    // agrupar las alturas por lote, sumando lo que hay en cada una
+    const porLote = {};
+    altura.forEach(d => {
+      const k = clave(d);
+      if (!porLote[k]) porLote[k] = {
+        lote: d.lote, lote2: d.lote2, stock: 0, ubics: [],
+        vto: d.vencimiento, mismo: !!enPicking[k]
+      };
+      const g = porLote[k];
+      g.stock += d.stock;
+      if (g.ubics.indexOf(d.ubicacion) === -1) g.ubics.push(d.ubicacion);
+      if (d.vencimiento && (!g.vto || d.vencimiento < g.vto)) g.vto = d.vencimiento;
+    });
+
+    const lotes = Object.keys(porLote).map(k => porLote[k]).sort((a, b) => {
+      if (a.mismo !== b.mismo) return a.mismo ? -1 : 1;       // primero el que ya está abajo
+      if (a.vto && b.vto) return a.vto - b.vto;               // después, el que vence antes
+      return b.stock - a.stock;
+    });
+
+    const total = altura.reduce((s, d) => s + d.stock, 0);
+    const muestra = lotes.slice(0, 2);
+
+    return '<div class="repo-altura">' +
+      '<b>' + U.fmt(total) + '</b> en altura' +
+      muestra.map(g =>
+        '<div class="alt-lote' + (g.mismo ? ' es-mismo' : '') + '">' +
+          '<span class="alt-ubics">' + U.esc(g.ubics.slice(0, 2).join(', ')) +
+            (g.ubics.length > 2 ? ' +' + (g.ubics.length - 2) : '') + '</span>' +
+          '<span class="alt-meta">' + U.fmt(g.stock) + ' u' +
+            (g.lote ? ' · lote ' + U.esc(g.lote) : '') +
+            (g.lote2 ? ' · ' + U.esc(g.lote2) : '') +
+            (g.mismo ? ' · <strong>mismo lote</strong>' : '') +
+            (g.vto ? ' · vto ' + U.fmtFechaCorta(g.vto) : '') +
+          '</span>' +
+        '</div>').join('') +
+      (lotes.length > 2 ? '<div class="alt-mas">+' + (lotes.length - 2) + ' lote(s) más</div>' : '') +
+      '</div>';
+  }
+
   function repoItem(p, rank, cfg) {
     const clase = p.estado === 'agotado' ? 'r-agotado' : (p.estado === 'bajo' ? 'r-bajo' : '');
     const dias = p.diasCobertura !== null && isFinite(p.diasCobertura)
@@ -374,13 +387,7 @@ VLM.views = (function () {
           '<span>' + quiebre + '</span>' +
         '</div>' +
       '</div>' +
-      (p.stockAltura > 0
-        ? '<div class="repo-altura" title="' + U.esc(p.ubicAltura.join(', ')) + '">' +
-            '<b>' + U.fmt(p.stockAltura) + '</b> en altura<br>' +
-            '<span>bajar de ' + U.esc(p.ubicAltura.slice(0, 2).join(', ')) +
-            (p.ubicAltura.length > 2 ? ' +' + (p.ubicAltura.length - 2) : '') + '</span>' +
-          '</div>'
-        : '') +
+      fuentesAltura(p) +
       '<div class="repo-metric"><b>' + U.fmt(p.stock) + '</b><span>stock actual</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + dias + '</b><span>días restantes</span></div>' +

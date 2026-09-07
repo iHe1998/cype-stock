@@ -208,38 +208,9 @@
           <input type="number" id="cfgDiasObjetivo" min="1" step="1">
         </label>
         <label class="field">
-          <span>Factor sobre stock mínimo para "bajo"</span>
+          <span>Margen sobre el mínimo para marcar BAJO (1,25 = 25%)</span>
           <input type="number" id="cfgFactorBajo" min="1" step="0.1">
         </label>
-      </div>
-
-      <h3 class="section-title">Historial de consumo</h3>
-      <label class="field field-check">
-        <input type="checkbox" id="cfgHistorialActivo">
-        <span>Guardar una foto del stock en cada importación</span>
-      </label>
-      <p class="muted small" style="margin:8px 0 0">
-        Es la única forma de saber cuánto se consume si la planilla no trae una columna de
-        consumo: la app resta importaciones sucesivas. Hacen falta <strong>al menos 2
-        importaciones</strong> para que aparezca algo, y conviene importar una vez por día.
-        Sin esto no hay días de cobertura ni fecha estimada de quiebre.
-      </p>
-      <div id="histOpciones" hidden>
-        <div class="cfg-grid" style="margin-top:12px">
-          <label class="field">
-            <span>Días a promediar para el consumo diario</span>
-            <input type="number" id="cfgVentanaConsumo" min="2" max="90" step="1">
-          </label>
-          <label class="field">
-            <span>Días que muestra el gráfico</span>
-            <input type="number" id="cfgDiasHistorial" min="7" max="90" step="1">
-          </label>
-        </div>
-        <div class="cfg-actions" style="margin-top:10px">
-          <span class="muted small" id="histInfo"></span>
-          <div class="spacer"></div>
-          <button class="btn btn-danger" id="btnClearHist">Borrar historial</button>
-        </div>
       </div>
 
       <h3 class="section-title">Modo TV</h3>

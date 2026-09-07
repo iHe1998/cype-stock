@@ -162,89 +162,37 @@ VLM.charts = (function () {
   }
 
   /* ------------------------------------------------------------
-     3. Historial de consumo real (barras) + stock total (línea)
+     3. Picking vs altura por laboratorio (barras apiladas)
      ------------------------------------------------------------ */
-  function historial(canvas, hist, tv) {
+  function pickingVsAltura(canvas, labs, tv) {
     const t = tema();
-    const p = hist.periodos;
+    const top = labs.slice(0, tv ? 8 : 12).map(l => ({
+      nombre: l.nombre,
+      picking: l.productos.reduce((s, p) => s + (p.stockPicking || 0), 0),
+      altura:  l.productos.reduce((s, p) => s + (p.stockAltura || 0), 0)
+    }));
     const o = base(t, tv);
-    o.scales.y.ticks.callback = v => U.fmtCompact(v);
-    o.scales.y.title = { display: !tv, text: 'unidades consumidas', color: t.muted, font: { size: 10 } };
-    o.scales.x.grid.display = false;
-    o.scales.x.ticks.maxTicksLimit = tv ? 10 : 14;
-    o.scales.y1 = {
-      position: 'right',
-      grid: { display: false },
-      border: { display: false },
-      ticks: { color: t.muted, font: { size: tv ? 16 : 10 }, callback: v => U.fmtCompact(v) }
-    };
-    o.plugins.tooltip.callbacks = {
-      title: c => {
-        const per = p[c[0].dataIndex];
-        return U.fmtFecha(per.fecha) + (per.dias > 1 ? ' · acumula ' + per.dias + ' días' : '');
-      },
-      label: c => c.datasetIndex === 0
-        ? U.fmt(c.parsed.y) + ' unidades consumidas'
-        : 'Stock al cierre: ' + U.fmt(c.parsed.y)
-    };
+    o.indexAxis = 'y';
+    o.scales.x.stacked = true;
+    o.scales.y.stacked = true;
+    o.scales.y.grid.display = false;
+    o.scales.x.ticks.callback = v => U.fmtCompact(v);
     o.plugins.legend = {
       display: true, position: 'top',
       labels: { color: t.muted, font: { size: tv ? 16 : 11 }, boxWidth: 9, boxHeight: 9,
                 usePointStyle: true, pointStyle: 'circle', padding: 12 }
     };
-
+    o.plugins.tooltip.callbacks = { label: c => c.dataset.label + ': ' + U.fmt(c.parsed.x) + ' u' };
     return montar(canvas, {
       type: 'bar',
       data: {
-        labels: p.map(x => U.fmtFechaCorta(x.fecha)),
+        labels: top.map(l => recortar(l.nombre, 18)),
         datasets: [
-          {
-            label: 'Consumido',
-            data: p.map(x => Math.round(x.consumido)),
-            backgroundColor: t.accent,
-            borderRadius: 4,
-            maxBarThickness: tv ? 40 : 26,
-            order: 2
-          },
-          {
-            label: 'Stock total',
-            type: 'line',
-            data: p.map(x => x.stockFinal),
-            borderColor: t.muted,
-            borderWidth: tv ? 3 : 2,
-            borderDash: [5, 4],
-            pointRadius: 0,
-            tension: .3,
-            yAxisID: 'y1',
-            order: 1
-          }
+          { label: 'Picking', data: top.map(l => l.picking), backgroundColor: t.accent,
+            borderRadius: 3, barThickness: tv ? 24 : 16 },
+          { label: 'Altura', data: top.map(l => l.altura), backgroundColor: t.agotado,
+            borderRadius: 3, barThickness: tv ? 24 : 16 }
         ]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
-     3b. Consumo del período por laboratorio
-     ------------------------------------------------------------ */
-  function consumoLab(canvas, filas, tv) {
-    const t = tema();
-    const top = filas.slice(0, tv ? 8 : 10);
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.y.grid.display = false;
-    o.scales.x.ticks.callback = v => U.fmtCompact(v);
-    o.plugins.tooltip.callbacks = { label: c => U.fmt(c.parsed.x) + ' unidades consumidas' };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(l => recortar(l.nombre, 20)),
-        datasets: [{
-          data: top.map(l => Math.round(l.consumido)),
-          backgroundColor: top.map(l => l.color),
-          borderRadius: 4,
-          barThickness: tv ? 24 : 16
-        }]
       },
       options: o
     });
@@ -348,6 +296,6 @@ VLM.charts = (function () {
 
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, estados, historial, consumoLab, quiebres, menorCobertura, estadosPorLab
+    stockPorLab, estados, pickingVsAltura, quiebres, menorCobertura, estadosPorLab
   };
 })();

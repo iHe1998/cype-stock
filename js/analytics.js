@@ -20,17 +20,12 @@ VLM.analytics = (function () {
    * Enriquece cada producto con métricas derivadas.
    * No muta el original: devuelve copias.
    */
-  function calcular(productos, cfg, consumoHist) {
+  function calcular(productos, cfg) {
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
 
     return productos.map(p => {
       const r = Object.assign({}, p);
 
-      // --- consumo diario: la planilla manda; si no trae, sale del historial ---
-      if (!(r.consumoDiario > 0) && consumoHist && consumoHist[r.codigo] > 0) {
-        r.consumoDiario = consumoHist[r.codigo];
-        r.fuenteConsumo = 'historial';
-      }
       const cd = r.consumoDiario > 0 ? r.consumoDiario : 0;
 
       // --- días de cobertura ---
@@ -49,8 +44,9 @@ VLM.analytics = (function () {
       if (r.stock <= 0) r.estado = 'agotado';
 
       // --- ocupación de la ubicación ---
-      r.ocupacion = r.stockMax > 0 ? Math.min(1, r.stock / r.stockMax) : null;
-      if (r.stockMax > 0 && r.stock > r.stockMax * 1.05 && r.estado === 'ok') r.estado = 'exceso';
+      const ref = r.stockRef !== undefined ? r.stockRef : r.stock;
+      r.ocupacion = r.stockMax > 0 ? Math.min(1, ref / r.stockMax) : null;
+      if (r.stockMax > 0 && ref > r.stockMax * 1.05 && r.estado === 'ok') r.estado = 'exceso';
 
       // --- sugerencia de reposición ---
       r.sugerido = calcularSugerido(r, cfg);
@@ -73,11 +69,22 @@ VLM.analytics = (function () {
     return 'ok';
   }
 
+  /**
+   * Estado segun el minimo.
+   *
+   * Se compara contra p.stockRef, no contra el stock total: si el minimo sale
+   * de la configuracion de una posicion, lo que importa es lo que hay EN esa
+   * posicion. Si no, la reserva de altura tapa que el picking esta por
+   * vaciarse, que es justo lo que hay que ver.
+   */
   function estadoPorMinimo(p, cfg) {
     if (!(p.stockMin > 0)) return null;
-    if (p.stock <= 0) return 'agotado';
-    if (p.stock <= p.stockMin) return 'critico';
-    if (p.stock <= p.stockMin * cfg.factorBajo) return 'bajo';
+    const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
+    // posición de picking vacía pero con reserva en altura: es crítico
+    // (hay que bajar ya), no agotado (agotado es que no hay en ningún lado)
+    if (ref <= 0) return (p.tieneConfigPos && p.stock > 0) ? 'critico' : 'agotado';
+    if (ref <= p.stockMin) return 'critico';
+    if (ref <= p.stockMin * cfg.factorBajo) return 'bajo';
     return 'ok';
   }
 
@@ -95,7 +102,8 @@ VLM.analytics = (function () {
     if (p.stockMin > 0)      objetivo = Math.max(objetivo, p.stockMin * cfg.factorBajo);
     if (p.stockMax > 0)      objetivo = Math.min(Math.max(objetivo, p.stockMin || 0), p.stockMax);
     if (objetivo <= 0)       return 0;
-    return Math.max(0, Math.ceil(objetivo - p.stock));
+    const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
+    return Math.max(0, Math.ceil(objetivo - ref));
   }
 
   /** Score de urgencia: días de cobertura, con penalización por estado. */
@@ -103,8 +111,9 @@ VLM.analytics = (function () {
     if (p.stock <= 0) return -1;
     if (p.diasCobertura !== null && isFinite(p.diasCobertura)) return p.diasCobertura;
     // sin consumo: usar el déficit contra el mínimo como proxy
-    if (p.stockMin > 0 && p.stock < p.stockMin) {
-      return cfg.diasCritico * (p.stock / p.stockMin);
+    const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
+    if (p.stockMin > 0 && ref < p.stockMin) {
+      return cfg.diasCritico * (ref / p.stockMin);
     }
     return 9999;
   }
@@ -228,129 +237,6 @@ VLM.analytics = (function () {
     });
   }
 
-  /* ------------------------------------------------------------
-     HISTORIAL · consumo real por diferencia entre snapshots
-     ------------------------------------------------------------ */
-
-  /** Días calendario entre dos snapshots (mínimo 1). */
-  function diasEntre(a, b) {
-    const d = Math.round((new Date(b.dia + 'T00:00:00') - new Date(a.dia + 'T00:00:00')) / 86400000);
-    return d > 0 ? d : 1;
-  }
-
-  /**
-   * Proporción de SKU que comparten dos snapshots.
-   * Si dos importaciones consecutivas casi no se solapan no son comparables
-   * (cambió el formato del export, se cargó otro archivo, vino incompleto):
-   * restarlas daría un consumo enorme y falso, así que ese tramo se descarta.
-   */
-  const SOLAPE_MINIMO = 0.5;
-
-  function solape(a, b) {
-    const ka = Object.keys(a.porSku), kb = Object.keys(b.porSku);
-    if (!ka.length || !kb.length) return 0;
-    let comunes = 0;
-    ka.forEach(k => { if (b.porSku[k] !== undefined) comunes++; });
-    return comunes / Math.min(ka.length, kb.length);
-  }
-
-  /**
-   * Consumo real entre importaciones consecutivas.
-   *
-   * Una baja de stock es consumo; una suba es reposición. Se calculan por
-   * separado porque un SKU puede recibir mercadería y consumirse en el mismo
-   * intervalo: en ese caso la diferencia subestima el consumo. Con snapshots
-   * diarios el error es chico, pero conviene tenerlo presente.
-   *
-   * @returns { periodos, totalConsumido, totalRepuesto, dias, promedioDiario, suficiente }
-   */
-  function historialConsumo(historial, dias) {
-    const h = (historial || []).filter(s => s && s.porSku);
-    const res = {
-      periodos: [], totalConsumido: 0, totalRepuesto: 0,
-      dias: 0, promedioDiario: 0, snapshots: (historial || []).length,
-      saltados: 0, suficiente: h.length >= 2
-    };
-    if (!res.suficiente) return res;
-
-    const desde = h.length - 1 - (dias || 30);
-    for (let i = Math.max(1, desde); i < h.length; i++) {
-      const prev = h[i - 1], cur = h[i];
-      if (solape(prev, cur) < SOLAPE_MINIMO) { res.saltados++; continue; }
-      let consumido = 0, repuesto = 0;
-      const codigos = Object.keys(cur.porSku);
-      codigos.forEach(cod => {
-        const antes = prev.porSku[cod];
-        if (antes === undefined) return;          // SKU nuevo: no es consumo
-        const delta = antes - cur.porSku[cod];
-        if (delta > 0) consumido += delta; else repuesto += -delta;
-      });
-      // SKUs que desaparecieron de la planilla: se cuentan como consumidos
-      Object.keys(prev.porSku).forEach(cod => {
-        if (cur.porSku[cod] === undefined) consumido += prev.porSku[cod];
-      });
-
-      const nd = diasEntre(prev, cur);
-      res.periodos.push({
-        dia: cur.dia,
-        fecha: new Date(cur.dia + 'T00:00:00'),
-        consumido: consumido,
-        repuesto: repuesto,
-        stockFinal: cur.total,
-        dias: nd,
-        porDia: consumido / nd
-      });
-      res.totalConsumido += consumido;
-      res.totalRepuesto += repuesto;
-      res.dias += nd;
-    }
-    res.promedioDiario = res.dias > 0 ? res.totalConsumido / res.dias : 0;
-    return res;
-  }
-
-  /**
-   * Consumo diario promedio por SKU, sacado del historial.
-   * Se usa cuando la planilla no trae columna de consumo.
-   * @returns { codigo: unidades por día }
-   */
-  function consumoPorSku(historial, ventanaDias) {
-    const h = (historial || []).filter(s => s && s.porSku);
-    const out = {};
-    if (h.length < 2) return out;
-
-    const desde = Math.max(1, h.length - 1 - (ventanaDias || 30));
-    const acum = {}, dias = {};
-    for (let i = desde; i < h.length; i++) {
-      const prev = h[i - 1], cur = h[i];
-      if (solape(prev, cur) < SOLAPE_MINIMO) continue;
-      const nd = diasEntre(prev, cur);
-      Object.keys(cur.porSku).forEach(cod => {
-        const antes = prev.porSku[cod];
-        if (antes === undefined) return;
-        const delta = antes - cur.porSku[cod];
-        if (!(cod in acum)) { acum[cod] = 0; dias[cod] = 0; }
-        if (delta > 0) acum[cod] += delta;
-        dias[cod] += nd;
-      });
-    }
-    Object.keys(acum).forEach(cod => {
-      if (dias[cod] > 0 && acum[cod] > 0) out[cod] = acum[cod] / dias[cod];
-    });
-    return out;
-  }
-
-  /** Consumo del período por laboratorio, para el gráfico comparativo. */
-  function consumoPorLaboratorio(items, cfg) {
-    return porLaboratorio(items, cfg)
-      .map(l => ({
-        nombre: l.nombre,
-        color: l.color,
-        consumido: l.productos.reduce((s, p) => s + (p.consumoDiario || 0), 0) * (cfg.ventanaConsumo || 30)
-      }))
-      .filter(l => l.consumido > 0)
-      .sort((a, b) => b.consumido - a.consumido);
-  }
-
   /** Cuántos SKU se agotan en cada tramo de días. */
   function quiebresPorTramo(items, cfg) {
     const tramos = [
@@ -380,7 +266,6 @@ VLM.analytics = (function () {
   return {
     ESTADOS, ORDEN_ESTADOS,
     calcular, resumen, porLaboratorio, porGrupo, filtrarPorZona,
-    historialConsumo, consumoPorSku, consumoPorLaboratorio,
     quiebresPorTramo, topUrgentes
   };
 })();

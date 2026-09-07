@@ -27,17 +27,15 @@ VLM.tv = (function () {
     { nombre: 'Cadena de frío',  render: slideFrio,
       saltarSi: d => d.items.filter(p => p.conservacion === 'frio').length === 0 },
     { nombre: 'Zonas de almacenamiento', render: slideZonas },
-    { nombre: 'Laboratorios',    render: slideLabs },
-    { nombre: 'Historial de consumo', render: slideHistorial,
-      saltarSi: d => !d.hist || !d.hist.suficiente }
+    { nombre: 'Laboratorios',    render: slideLabs }
   ];
 
   /* ------------------------------------------------------------
      Ciclo de vida
      ------------------------------------------------------------ */
-  function entrar(items, cfg, hist) {
+  function entrar(items, cfg) {
     if (!items.length) { U.toast('Cargá datos antes de usar el modo TV', 'err'); return; }
-    datos = { items, cfg, hist: hist || { suficiente: false, periodos: [] } };
+    datos = { items, cfg };
     activo = true;
     idx = 0;
     C.destruirTodos();
@@ -127,9 +125,9 @@ VLM.tv = (function () {
   }
 
   /** Redibuja con datos nuevos sin cortar la rotación. */
-  function refrescar(items, cfg, hist) {
+  function refrescar(items, cfg) {
     if (!activo) return;
-    datos = { items, cfg, hist: hist || datos.hist };
+    datos = { items, cfg };
     pintar();
   }
 
@@ -258,32 +256,6 @@ VLM.tv = (function () {
             (r.enAlerta ? '<strong style="color:var(--warn)">' + r.enAlerta + ' en alerta</strong>' : 'sin alertas') +
           '</div>' + V.stackbar(r) + '</div>';
       }).join('') + '</div>';
-  }
-
-  /* ------------------------------------------------------------
-     Pantalla · Historial de consumo real
-     ------------------------------------------------------------ */
-  function slideHistorial(el, items, cfg) {
-    const h = datos.hist;
-    const ult = h.periodos[h.periodos.length - 1];
-
-    el.innerHTML =
-      '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
-        tvKpi('Consumido en el período', U.fmtCompact(h.totalConsumido),
-              h.dias + ' días · ' + U.fmt(h.promedioDiario, true) + ' uds/día', 'k-warn') +
-        tvKpi('Último día', ult ? U.fmtCompact(ult.consumido) : '—',
-              ult ? U.fmtFecha(ult.fecha) : '') +
-        tvKpi('Repuesto en el período', U.fmtCompact(h.totalRepuesto), 'unidades ingresadas') +
-      '</div>' +
-      '<div class="tv-split">' +
-        '<div class="tv-panel"><h3>Consumo por día</h3>' +
-          '<div class="tv-chart"><canvas id="tvChHist"></canvas></div></div>' +
-        '<div class="tv-panel"><h3>¿Cuándo se agota cada producto?</h3>' +
-          '<div class="tv-chart"><canvas id="tvChQ"></canvas></div></div>' +
-      '</div>';
-
-    C.historial($('#tvChHist', el), h, true);
-    C.quiebres($('#tvChQ', el), A.quiebresPorTramo(items, cfg), true);
   }
 
   return { entrar, salir, refrescar, get activo() { return activo; } };

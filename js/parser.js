@@ -54,8 +54,12 @@ VLM.parser = (function () {
               'condiciones de conservacion', 'almacenamiento', 'frio'] },
 
     { id: 'lote', label: 'Lote', req: false, tipo: 'texto',
-      hint: '',
+      hint: 'Se usa para bajar el mismo lote desde altura',
       alias: ['lote', 'batch', 'partida', 'nro lote'] },
+
+    { id: 'lote2', label: 'Lote secundario / Atributo02', req: false, tipo: 'texto',
+      hint: 'Segundo identificador de partida, si la planilla lo trae',
+      alias: ['atributo02', 'atributo 02', 'atributo2', 'lote proveedor', 'lote secundario', 'partida proveedor', 'lote fabricante'] },
 
     { id: 'vencimiento', label: 'Vencimiento', req: false, tipo: 'fecha',
       hint: 'Fecha de caducidad',
@@ -224,7 +228,7 @@ VLM.parser = (function () {
         mapa[k] = Object.assign({}, p, {
           ubicaciones: [], ubicPicking: [], ubicAltura: [], lotes: [], detalle: [],
           posiciones: 0, stockPicking: 0, stockAltura: 0,
-          minPos: 0, maxPos: 0, tieneConfigPos: false,
+          minPos: 0, maxPos: 0, stockPosConfig: 0, tieneConfigPos: false,
           zonaPeso: {}, ambitoPeso: {}
         });
         orden.push(k);
@@ -240,20 +244,34 @@ VLM.parser = (function () {
         g.stockPicking += p.stock;
         if (p.ubicacion && g.ubicPicking.indexOf(p.ubicacion) === -1) g.ubicPicking.push(p.ubicacion);
       }
-      if (p.ubicacion && g.ubicaciones.indexOf(p.ubicacion) === -1) g.ubicaciones.push(p.ubicacion);
+      // se mira ANTES de registrarla: define si su mín/máx ya se sumó
+      const ubicNueva = !!p.ubicacion && g.ubicaciones.indexOf(p.ubicacion) === -1;
+      if (ubicNueva) g.ubicaciones.push(p.ubicacion);
       if (p.lote && g.lotes.indexOf(p.lote) === -1) g.lotes.push(p.lote);
 
-      // detalle por posición: lo usa la vista de Posiciones
-      const yaD = g.detalle.filter(d => d.ubicacion === p.ubicacion)[0];
+      // Detalle por posición Y lote: lo usa la vista de Posiciones y, sobre
+      // todo, la reposición, que necesita saber de qué altura bajar el MISMO
+      // lote que está en la posición de picking.
+      const yaD = g.detalle.filter(d =>
+        d.ubicacion === p.ubicacion && d.lote === p.lote && d.lote2 === p.lote2)[0];
       if (yaD) yaD.stock += p.stock;
-      else g.detalle.push({ ubicacion: p.ubicacion, stock: p.stock, tipo: p.tipoPos, zona: p.conservacion });
+      else g.detalle.push({
+        ubicacion: p.ubicacion, stock: p.stock, tipo: p.tipoPos,
+        zona: p.conservacion, lote: p.lote, lote2: p.lote2,
+        vencimiento: p.vencimiento
+      });
 
       // min/max: los de la planilla son del artículo y se repiten en cada fila
       // (se toma el mayor), pero los configurados por posición se SUMAN, porque
-      // cada posición aporta su propia capacidad.
+      // cada posición aporta su propia capacidad. Se cuenta una vez por
+      // ubicación, no por lote.
       if (p.minPos || p.maxPos) {
         g.tieneConfigPos = true;
-        if (!yaD) { g.minPos += p.minPos || 0; g.maxPos += p.maxPos || 0; }
+        if (ubicNueva) { g.minPos += p.minPos || 0; g.maxPos += p.maxPos || 0; }
+        // El mínimo de una posición se compara contra lo que hay EN ESA
+        // posición, no contra el stock total del artículo: si no, la reserva
+        // de altura tapa que la posición de picking está por vaciarse.
+        g.stockPosConfig += p.stock;
       }
 
       // La zona y el ámbito se deciden por peso, pero SÓLO votan las filas
@@ -285,6 +303,8 @@ VLM.parser = (function () {
       g.lote = g.lotes.length > 1 ? g.lotes.length + ' lotes' : (g.lotes[0] || '');
       // la configuración de posiciones gana sobre lo que traiga la planilla
       if (g.tieneConfigPos) { g.stockMin = g.minPos; g.stockMax = g.maxPos; }
+      // contra qué stock se miden el mínimo y el máximo
+      g.stockRef = g.tieneConfigPos ? g.stockPosConfig : g.stock;
       g.conservacion = mayor(g.zonaPeso) || g.conservacion;
       g.ambito       = mayor(g.ambitoPeso) || g.ambito;
       g.zonasMixtas  = Object.keys(g.zonaPeso).length > 1;
@@ -400,6 +420,7 @@ VLM.parser = (function () {
         consumoMensual: consMensual !== null ? consMensual : (consumoDiario ? consumoDiario * diasMes : 0),
         fuenteConsumo: fuenteConsumo,
         lote:          String(get(fila, 'lote') || '').trim(),
+        lote2:         String(get(fila, 'lote2') || '').trim(),
         vencimiento:   U.toDate(get(fila, 'vencimiento'), fmtFecha)
       }, catalogo));
     }

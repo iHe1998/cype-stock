@@ -4,7 +4,7 @@ Panel web para visualizar el **stock de una torre de picking vertical (VLM)** a 
 planilla Excel. Pensado para quedar proyectado en un televisor del depósito y que el equipo
 vea de un vistazo qué hay que reponer.
 
-- 📊 Gráficos de stock y del **consumo real del mes**
+- 📊 Gráficos de stock, picking vs altura y estado por laboratorio
 - 🏭 Catálogo cerrado de **laboratorios**, con los de fuera separados y contados
 - ❄️ Separa **cámara de frío** (2-8 °C) de **ambiente**, y **dentro** de **fuera del VLM**
 - 🔴 Marca los productos **próximos a vaciarse** y los ya agotados
@@ -64,11 +64,11 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 | Conservación | — | Conservacion, Cadena de Frío, Temperatura, Refrigerado |
 | Consumo mensual | — | Consumo Mensual, Salidas Mes, Demanda Mensual |
 | Lote | — | Lote, Partida, Batch |
+| Lote secundario | — | Atributo02, Lote Proveedor |
 | Vencimiento | — | Vencimiento, Vto, Caducidad |
 
-> **No hace falta que la planilla traiga el consumo.** Si no lo trae, la app lo calcula
-> sola restando importaciones sucesivas — ver la sección siguiente. Si lo trae, esa columna
-> tiene prioridad.
+> Si la planilla no trae consumo, no hay días de cobertura ni fecha de quiebre: las
+> alertas salen del **mínimo y el máximo por posición** (ver más abajo).
 
 Hay una planilla de ejemplo en [`data/plantilla_vlm.csv`](data/plantilla_vlm.csv), y desde la
 pantalla inicial podés **descargar la plantilla en `.xlsx`**.
@@ -190,6 +190,13 @@ alertas del artículo anterior. La posición aparece como `Revisar` en la lista,
 valores viejos todavía visibles como punto de partida, y se confirma con el botón ✓ o
 editando cualquiera de los dos números. El aviso de importación dice cuántas hay.
 
+### De dónde bajar para rellenar
+
+En la lista de reposición, cada producto muestra las posiciones de altura de donde sacar
+mercadería, cruzadas por **artículo + lote + Atributo02**. Primero las del **mismo lote**
+que ya está en la posición de picking —rellenar con otro lote mezcla partidas— y después
+las demás ordenadas por vencimiento, que es el orden en que conviene sacarlas.
+
 Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con todas las
 posiciones, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve con
 **Importar completada**.
@@ -200,44 +207,9 @@ posiciones, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve
 
 ---
 
-## Historial de consumo
-
-> **Desactivado por defecto.** Se prende en **⚙ Configuración → Historial de consumo**.
-> Mientras esté apagado la app no guarda nada y el panel no lo menciona.
-
-La planilla es una **foto del stock del momento**: dice cuánto hay, no cuánto salió.
-Para saber el consumo real, la app **guarda un snapshot en cada importación** y resta.
-
-```
-consumo del día   = Σ  max(0, stock_ayer − stock_hoy)     por SKU
-reposición        = Σ  max(0, stock_hoy − stock_ayer)     por SKU
-consumo diario    = consumo acumulado / días transcurridos
-```
-
-Una baja de stock es consumo; una suba es reposición. Se cuentan por separado porque un
-mismo SKU puede recibir mercadería y consumirse en el mismo intervalo — en ese caso la
-diferencia **subestima** el consumo. Importando una vez por día el error es despreciable;
-si pasás una semana entre importaciones, el número queda corto.
-
-- Se necesitan **al menos 2 importaciones** para que aparezca cualquier cálculo de consumo.
-- Dos importaciones el mismo día se pisan: vale la última.
-- La primera importación real **descarta el historial de los datos de ejemplo**: si no, los
-  SKU inventados desaparecerían de la planilla y contarían como un consumo enorme.
-- Si dos importaciones consecutivas comparten menos de la mitad de los SKU, ese tramo se
-  descarta en vez de inventar un consumo falso (pasa si cambia el formato del export).
-- Se guardan hasta **60 snapshots**. Si el navegador se queda sin espacio, la app va
-  descartando los más viejos antes que perder todo, y avisa.
-- El historial se borra desde **⚙ Configuración → Historial de consumo**.
-
-Este historial es además la **fuente del consumo diario** de cada SKU cuando la planilla
-no trae una columna de consumo, y con eso salen los días de cobertura y la fecha de quiebre.
-
----
-
 ## Cómo calcula las alertas
 
 ```
-consumo diario    = columna de la planilla  ó  promedio del historial
 días de cobertura = stock / consumo diario
 fecha de quiebre  = hoy + días de cobertura
 a reponer         = objetivo - stock       (objetivo = consumo diario × días objetivo,
@@ -248,11 +220,22 @@ El **estado** de cada producto es el peor de dos criterios:
 
 | Estado | Por cobertura | Por stock mínimo |
 |---|---|---|
-| ⬛ Agotado | stock = 0 | stock = 0 |
-| 🔴 Crítico | ≤ 7 días | stock ≤ mínimo |
-| 🟡 Bajo | ≤ 15 días | stock ≤ mínimo × 1,5 |
-| 🟢 OK | > 15 días | > mínimo × 1,5 |
-| 🟣 Exceso | — | stock > máximo |
+| ⬛ Agotado | stock = 0 | no hay en ningún lado |
+| 🔴 Crítico | ≤ 7 días | ≤ mínimo · o la posición vacía con reserva en altura |
+| 🟡 Bajo | ≤ 15 días | **≤ mínimo × 1,25** (a menos del 25% de tocar el mínimo) |
+| 🟢 OK | > 15 días | > mínimo × 1,25 |
+| 🟣 Exceso | — | > máximo |
+
+### Contra qué stock se mide el mínimo
+
+Si el mínimo sale de la **configuración de una posición**, se compara contra lo que hay
+**en esa posición**, no contra el stock total del artículo. Un artículo con 1.282 unidades
+en sus dos posiciones de picking y 7.800 en altura está **bajo** si el mínimo de picking es
+1.200: lo que importa es que la posición desde donde se sirve está por vaciarse, no que
+sobre mercadería arriba.
+
+Por eso también, una posición de picking vacía con reserva en altura es **crítica**, no
+agotada: agotado es que no hay en ningún lado.
 
 Todos los umbrales se cambian desde **⚙ Configuración**.
 
@@ -301,7 +284,6 @@ versiones y cómo actualizarlas.
 
 ## Próximos pasos
 
-- [x] ~~Calcular el consumo real por diferencia entre importaciones~~
 - [x] ~~Derivar el ámbito y la conservación de la **posición**~~
 - [x] ~~Configurar mínimo y máximo por posición~~
 - [ ] Exportar el historial de consumo a Excel
