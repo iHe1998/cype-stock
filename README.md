@@ -178,6 +178,18 @@ Un artículo puede estar en varias posiciones: en ese caso su mínimo y su máxi
 planilla, que son del artículo y se repiten en cada fila (de esos se toma el mayor, no la
 suma). La configuración por posición tiene prioridad.
 
+### Cuando una posición cambia de artículo
+
+En picking es normal que al agotarse un artículo la posición se reasigne a otro. El
+mínimo y el máximo se guardan **junto al artículo que ocupaba la posición**, porque el
+máximo depende del artículo: no entran las mismas unidades de una caja grande que de una
+chica.
+
+Si al importar el ocupante cambió, esa configuración **no se aplica** — quedaría dando
+alertas del artículo anterior. La posición aparece como `Revisar` en la lista, con los
+valores viejos todavía visibles como punto de partida, y se confirma con el botón ✓ o
+editando cualquiera de los dos números. El aviso de importación dice cuántas hay.
+
 Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con todas las
 posiciones, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve con
 **Importar completada**.

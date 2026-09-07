@@ -578,7 +578,8 @@ VLM.views = (function () {
           const c = cfgPos[k] || {};
           porUbic[k] = {
             ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
-            arts: [], stock: 0, min: c.min || 0, max: c.max || 0
+            arts: [], stock: 0, min: c.min || 0, max: c.max || 0,
+            artConfig: c.articulo || null
           };
         }
         porUbic[k].stock += d.stock;
@@ -587,6 +588,13 @@ VLM.views = (function () {
     });
     const filas = Object.keys(porUbic).map(k => porUbic[k])
       .sort((a, b) => a.ubicacion.localeCompare(b.ubicacion, 'es'));
+
+    // en picking es normal que una posición se reasigne a otro artículo:
+    // ahí el mín/máx guardado ya no vale y hay que reconfirmarlo
+    filas.forEach(f => {
+      f.reasignada = !!(f.artConfig && (f.min || f.max) &&
+        !f.arts.some(a => a.codigo === f.artConfig));
+    });
 
     const tipoFiltro = ui.filtroTipoPos || 'picking';
     const q = U.norm(ui.busquedaPos || '');
@@ -605,10 +613,11 @@ VLM.views = (function () {
       kpi('Con mín/máx cargado', U.fmt(configuradas),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
-      kpi('Bajo el mínimo', U.fmt(filas.filter(f => f.min && f.stock < f.min).length),
+      kpi('Bajo el mínimo', U.fmt(filas.filter(f => !f.reasignada && f.min && f.stock < f.min).length),
           'hay que rellenar', 'k-crit') +
-      kpi('Sobre el máximo', U.fmt(filas.filter(f => f.max && f.stock > f.max).length),
-          'no entra más', 'k-info') +
+      kpi('Cambiaron de artículo', U.fmt(filas.filter(f => f.reasignada).length),
+          'el mín/máx guardado no se aplica',
+          filas.some(f => f.reasignada) ? 'k-warn' : 'k-ok') +
       '</div>';
 
     html += '<div class="toolbar">' +
@@ -646,7 +655,15 @@ VLM.views = (function () {
     } else {
       vis.forEach(f => {
         let est = '', clase = '';
-        if (f.min && f.stock < f.min)      { est = badge('critico'); clase = 'row-critico'; }
+        if (f.reasignada) {
+          est = '<span class="badge b-bajo">Revisar</span>' +
+                '<button class="btn btn-icon pos-ok" data-ubic="' + U.esc(f.ubicacion) + '" ' +
+                'data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" ' +
+                'title="Confirmar que estos valores sirven para el artículo nuevo">' +
+                '<svg viewBox="0 0 24 24" class="ico"><path d="M20 6 9 17l-5-5"/></svg></button>';
+          clase = 'row-bajo';
+        }
+        else if (f.min && f.stock < f.min) { est = badge('critico'); clase = 'row-critico'; }
         else if (f.max && f.stock > f.max) { est = badge('exceso'); }
         else if (f.min || f.max)           { est = badge('ok'); }
         else                                { est = '<span class="badge b-sd">Sin cargar</span>'; }
@@ -659,9 +676,9 @@ VLM.views = (function () {
             (a.descripcion && a.descripcion !== a.codigo ? ' ' + U.esc(a.descripcion) : '')).join('<br>') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
           '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
+            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
           '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
+            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
           '<td>' + est + '</td>' +
           '</tr>';
       });
@@ -675,9 +692,15 @@ VLM.views = (function () {
     }, 220));
     U.$$('.chip', el).forEach(c => c.addEventListener('click', () =>
       VLM.store.setUi({ filtroTipoPos: c.dataset.val })));
+    // al editar se re-asocia al artículo que ocupa la posición ahora
     U.$$('.pos-inp', el).forEach(inp => inp.addEventListener('change', () => {
       const v = parseInt(inp.value, 10);
-      VLM.store.setPosicion(inp.dataset.ubic, { [inp.dataset.campo]: isFinite(v) && v > 0 ? v : 0 });
+      VLM.store.setPosicion(inp.dataset.ubic,
+        { [inp.dataset.campo]: isFinite(v) && v > 0 ? v : 0 }, inp.dataset.art);
+    }));
+    U.$$('.pos-ok', el).forEach(b => b.addEventListener('click', () => {
+      VLM.store.setPosicion(b.dataset.ubic, {}, b.dataset.art);
+      U.toast('Confirmado para el artículo nuevo', 'ok');
     }));
     $('#posExport', el).addEventListener('click', () => exportarPosiciones(filas));
     $('#posImport', el).addEventListener('click', () => $('#posFile', el).click());

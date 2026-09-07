@@ -828,3 +828,5 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .pos-inp:focus { border-color: var(--accent); background: var(--surface); }
 .pos-inp::placeholder { color: var(--muted); }
 #posTable td { padding: 6px 12px; }
+.pos-ok { width: 24px; height: 24px; margin-left: 6px; vertical-align: middle; color: var(--ok); }
+.pos-ok:hover { background: var(--ok-dim); border-color: var(--ok); }

@@ -317,6 +317,8 @@ VLM.parser = (function () {
     // todas las posiciones que aparecen en el archivo, incluidas las ignoradas:
     // el editor de reglas las necesita para decir cuántas cubre cada regla
     const ubicVistas = {};
+    // posiciones cuya configuración quedó vieja porque cambió el artículo
+    const posReasignadas = {};
     const fmtFecha = detectarFormatoFecha(matriz, filaHeader, mapa.vencimiento);
 
     // encabezado de la columna de conservación: cambia cómo se lee un "SI"
@@ -370,6 +372,12 @@ VLM.parser = (function () {
                        (regla && regla.zona) || null;
 
       const cod = String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1));
+
+      // La configuración de la posición sólo vale si sigue el mismo artículo.
+      // Si la posición se reasignó, el mín/máx del artículo anterior no aplica
+      // y queda para revisar: aplicarlo a ciegas daría alertas falsas.
+      const cfgVigente = cfgPos && (!cfgPos.articulo || cfgPos.articulo === cod);
+      if (cfgPos && !cfgVigente) posReasignadas[ubic] = { antes: cfgPos.articulo, ahora: cod };
       productos.push(VLM.labs.clasificar({
         codigo:        cod,
         // sin columna de descripcion se muestra el codigo, que es lo unico que hay
@@ -384,10 +392,10 @@ VLM.parser = (function () {
         ubicacion:     ubic,
         stock:         stock,
         // min/max configurados para ESTA posición (ver Posiciones)
-        minPos:        cfgPos ? (cfgPos.min || 0) : 0,
-        maxPos:        cfgPos ? (cfgPos.max || 0) : 0,
-        stockMin:      cfgPos && cfgPos.min ? cfgPos.min : (U.toNum(get(fila, 'stockMin')) || 0),
-        stockMax:      cfgPos && cfgPos.max ? cfgPos.max : (U.toNum(get(fila, 'stockMax')) || 0),
+        minPos:        cfgVigente ? (cfgPos.min || 0) : 0,
+        maxPos:        cfgVigente ? (cfgPos.max || 0) : 0,
+        stockMin:      cfgVigente && cfgPos.min ? cfgPos.min : (U.toNum(get(fila, 'stockMin')) || 0),
+        stockMax:      cfgVigente && cfgPos.max ? cfgPos.max : (U.toNum(get(fila, 'stockMax')) || 0),
         consumoDiario: consumoDiario,
         consumoMensual: consMensual !== null ? consMensual : (consumoDiario ? consumoDiario * diasMes : 0),
         fuenteConsumo: fuenteConsumo,
@@ -422,6 +430,11 @@ VLM.parser = (function () {
     if (sinRegla) {
       avisos.push(sinRegla + ' fila(s) con posiciones que ninguna regla cubre.');
     }
+    const nReasig = Object.keys(posReasignadas).length;
+    if (nReasig) {
+      avisos.push(nReasig + ' posición(es) cambiaron de artículo: su mínimo y máximo quedan ' +
+                  'para revisar en la pestaña Posiciones y no se aplican hasta confirmarlos.');
+    }
     if (agrupado) {
       avisos.push('La planilla trae varias filas por artículo: se agruparon ' + filasLeidas +
                   ' filas en ' + lista.length + ' productos, sumando las cantidades.');
@@ -449,7 +462,7 @@ VLM.parser = (function () {
     return { productos: lista, descartadas, avisos, noListados, nombresNoListados,
              repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha,
              ignoradas, sinRegla, ignoradasPorPatron,
-             ubicacionesVistas: Object.keys(ubicVistas) };
+             ubicacionesVistas: Object.keys(ubicVistas), posReasignadas };
   }
 
   /* ------------------------------------------------------------

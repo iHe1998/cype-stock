@@ -304,12 +304,21 @@ VLM.store = (function () {
     setReglasUbic(VLM.ubicaciones.reglasDefault());
   }
 
-  /** Configura min/max de una posición. min o max en 0 borra ese valor. */
-  function setPosicion(ubicacion, cfg) {
+  /**
+   * Configura min/max de una posición.
+   *
+   * Se guarda junto al artículo que la ocupaba en ese momento. En picking es
+   * normal que al agotarse un artículo la posición se reasigne a otro, y el
+   * máximo depende del artículo: no entran las mismas unidades de una caja
+   * grande que de una chica. Al cambiar el ocupante la configuración queda
+   * marcada para revisar en vez de aplicarse a ciegas.
+   */
+  function setPosicion(ubicacion, cfg, articulo) {
     const k = String(ubicacion).trim().toUpperCase();
     if (!k) return;
     const actual = state.posiciones[k] || {};
     const nueva = Object.assign({}, actual, cfg);
+    if (articulo) nueva.articulo = String(articulo);
     if (!nueva.min && !nueva.max) delete state.posiciones[k];
     else state.posiciones[k] = nueva;
     guardarPosiciones();
