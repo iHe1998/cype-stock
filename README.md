@@ -119,9 +119,21 @@ frío y Xeloda o Tamiflu en ambiente) y aparece en los dos cuadrantes.
 La posición dice más que el laboratorio: si se pickea o es stock de altura, si está en
 cámara o en ambiente, y si hay que ignorarla porque es una zona de tránsito.
 
-Las posiciones numéricas son `PPPBBBNNN`: los tres primeros dígitos son el pasillo y los
-tres últimos el nivel. El pasillo define la zona (100 en adelante es cámara, por debajo
-ambiente) y el nivel define el tipo (100 se pickea, 200 en adelante es altura).
+Las posiciones numéricas son `PPPBBBNNN`:
+
+```
+010008100      104020250
+||| ||| |||
+||| ||| _ altura del rack: 100 y 150 se pickean
+||| |||                    200 250 300 400 500 son altura
+||| _____ posición dentro del pasillo
+________ pasillo: 1xx cámara de frío, 0xx ambiente
+```
+
+Si a una posición numérica le falta el último dígito, la app se lo completa con un cero:
+`10501910` se lee como `105019100`. Sin eso el nivel se corre (`910` en vez de `100`) y una
+posición de picking termina contada como altura. Sólo se completa cuando son 8 dígitos
+exactos; el resto se deja como viene.
 
 Las reglas se evalúan **en orden** y gana la primera que coincide, así que las de ignorar
 van arriba: `PACK` tiene que resolverse antes que `P*`. El comodín `*` vale al principio,
@@ -133,8 +145,8 @@ muestra cuántas ubicaciones del archivo cargado cubre cada regla.
 | `SPP` `PACK` `STAGE` `ACONDI` `PICKTO` `FALDEP*` `ROTORI*` `C*` | ignorar | tránsito, packing, acondicionado: no es stock ubicado |
 | `BIOCAM*` | picking · cámara | picking de pasillo |
 | `P*` | picking · ambiente | |
-| `1*100` | picking · cámara | pasillo 1xx, nivel 100 |
-| `0*100` | picking · ambiente | pasillo 0xx, nivel 100 |
+| `1*100` `1*150` | picking · cámara | pasillo 1xx |
+| `0*100` `0*150` | picking · ambiente | pasillo 0xx |
 | `1*` | altura · cámara | pasillos 103, 104… |
 | `0*` | altura · ambiente | pasillos 013, 014… |
 | `*` | altura | red de seguridad: lo que no encaje en nada |
@@ -279,6 +291,7 @@ versiones y cómo actualizarlas.
 
 - [x] ~~Calcular el consumo real por diferencia entre importaciones~~
 - [x] ~~Derivar el ámbito y la conservación de la **posición**~~
+- [x] ~~Configurar mínimo y máximo por posición~~
 - [ ] Exportar el historial de consumo a Excel
 - [ ] Conectar directo al **WMS / ERP** del VLM en vez de subir la planilla a mano
 - [ ] Auto-refresco leyendo un archivo desde una carpeta de red

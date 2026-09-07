@@ -1569,15 +1569,23 @@ VLM.ubicaciones = (function () {
       nota: 'picking ambiente' },
 
     /* --- posiciones numéricas: PPPBBBNNN ---
-       Los tres primeros dígitos son el pasillo y los tres últimos el nivel.
-       El pasillo define la zona (100 en adelante es cámara, por debajo es
-       ambiente) y el nivel define el tipo (100 se pickea, 200 en adelante es
-       altura). Por eso van primero las dos reglas de nivel 100: si no, la
-       regla del pasillo se las comería. */
+       PPP  pasillo   (010, 013, 104, 003…)  -> define la zona:
+                                                1xx cámara, 0xx ambiente
+       BBB  posición dentro del pasillo       -> no se usa para clasificar
+       NNN  altura del rack                   -> define el tipo:
+                                                100 y 150 se pickean,
+                                                200/250/300/400/500 son altura
+
+       Las reglas de nivel de picking van primero: si no, la regla del
+       pasillo (1*, 0*) se las comería y todo quedaría como altura. */
     { patron: '1*100', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
       nota: 'pasillo 1xx (cámara), nivel 100' },
+    { patron: '1*150', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
+      nota: 'pasillo 1xx (cámara), nivel 150' },
     { patron: '0*100', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'ambiente',
       nota: 'pasillo 0xx (ambiente), nivel 100' },
+    { patron: '0*150', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'ambiente',
+      nota: 'pasillo 0xx (ambiente), nivel 150' },
     { patron: '1*',    accion: 'usar', tipo: 'altura', ambito: 'externo', zona: 'frio',
       nota: 'altura de cámara (pasillos 103, 104…)' },
     { patron: '0*',    accion: 'usar', tipo: 'altura', ambito: 'externo', zona: 'ambiente',
@@ -1590,6 +1598,25 @@ VLM.ubicaciones = (function () {
 
   function reglasDefault() {
     return REGLAS_DEFAULT.map(r => Object.assign({}, r));
+  }
+
+  /* ------------------------------------------------------------
+     Normalización
+     ------------------------------------------------------------ */
+
+  /**
+   * Algunas posiciones numéricas vienen con un dígito de menos porque el
+   * sistema le come el cero final: "10501910" en vez de "105019100". Sin
+   * corregirlo, el nivel se lee corrido (910 en vez de 100) y una posición
+   * de picking termina clasificada como altura.
+   *
+   * Sólo se completa cuando son 8 dígitos exactos: el formato es PPPBBBNNN,
+   * de 9. Cualquier otra cosa se deja como viene.
+   */
+  function normalizar(ubicacion) {
+    const u = String(ubicacion == null ? '' : ubicacion).trim();
+    if (/^\d{8}$/.test(u)) return u + '0';
+    return u;
   }
 
   /* ------------------------------------------------------------
@@ -1655,7 +1682,7 @@ VLM.ubicaciones = (function () {
     return { conteo, sinRegla };
   }
 
-  return { TIPOS, REGLAS_DEFAULT, reglasDefault, coincide, evaluar, cobertura };
+  return { TIPOS, REGLAS_DEFAULT, reglasDefault, normalizar, coincide, evaluar, cobertura };
 })();
 
 </script>
@@ -2361,7 +2388,9 @@ VLM.parser = (function () {
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
       // --- reglas de posición: ignorar, picking o altura ---
-      const ubic = String(get(fila, 'ubicacion') || '').trim();
+      // se normaliza antes de todo: la posición corregida es la que se usa
+      // para clasificar, para mostrar y como clave de configuración
+      const ubic = VLM.ubicaciones.normalizar(get(fila, 'ubicacion') || '');
       if (ubic) ubicVistas[ubic] = 1;
       const regla = VLM.ubicaciones.evaluar(ubic, reglas);
       const cfgPos = ubic ? cfgPosiciones[ubic.toUpperCase()] : null;

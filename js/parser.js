@@ -352,7 +352,9 @@ VLM.parser = (function () {
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
       // --- reglas de posición: ignorar, picking o altura ---
-      const ubic = String(get(fila, 'ubicacion') || '').trim();
+      // se normaliza antes de todo: la posición corregida es la que se usa
+      // para clasificar, para mostrar y como clave de configuración
+      const ubic = VLM.ubicaciones.normalizar(get(fila, 'ubicacion') || '');
       if (ubic) ubicVistas[ubic] = 1;
       const regla = VLM.ubicaciones.evaluar(ubic, reglas);
       const cfgPos = ubic ? cfgPosiciones[ubic.toUpperCase()] : null;
