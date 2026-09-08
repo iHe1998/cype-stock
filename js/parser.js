@@ -193,6 +193,53 @@ VLM.parser = (function () {
      Agrupación por código
      ------------------------------------------------------------ */
 
+  /**
+   * Aplica la configuración de posiciones (mínimo y máximo) sobre productos
+   * ya normalizados.
+   *
+   * No necesita el archivo original: cada producto guarda su `detalle` con el
+   * stock por ubicación, así que editar un máximo se refleja al toque sin
+   * volver a importar.
+   *
+   * Los mínimos y máximos se SUMAN entre las posiciones del artículo, una vez
+   * por ubicación aunque tenga varios lotes. Y sólo cuentan las posiciones que
+   * siguen con el mismo artículo con el que se configuraron.
+   */
+  function aplicarPosiciones(productos, cfgPosiciones) {
+    cfgPosiciones = cfgPosiciones || {};
+    productos.forEach(p => {
+      const dets = (p.detalle && p.detalle.length)
+        ? p.detalle
+        : [{ ubicacion: p.ubicacion, stock: p.stock }];
+
+      // Una entrada por posición configurada, con su propio stock, mínimo y
+      // máximo. El estado del artículo sale de la PEOR de ellas, no de la
+      // suma: se repone posición por posición, y una vacía hay que atenderla
+      // aunque otra del mismo artículo esté llena.
+      const porUbic = {};
+      dets.forEach(d => {
+        const k = String(d.ubicacion || '').trim().toUpperCase();
+        const c = k ? cfgPosiciones[k] : null;
+        if (!c) return;
+        if (c.articulo && c.articulo !== p.codigo) return;   // se reasignó
+        if (!porUbic[k]) porUbic[k] = { ubicacion: d.ubicacion, stock: 0, min: c.min || 0, max: c.max || 0 };
+        porUbic[k].stock += d.stock;
+      });
+
+      const lista = Object.keys(porUbic).map(k => porUbic[k]);
+      const hay = lista.length > 0;
+
+      p.posConfig      = lista;
+      p.tieneConfigPos = hay;
+      p.minPos = lista.reduce((s, x) => s + x.min, 0);
+      p.maxPos = lista.reduce((s, x) => s + x.max, 0);
+      p.stockPosConfig = lista.reduce((s, x) => s + x.stock, 0);
+      if (hay) { p.stockMin = p.minPos; p.stockMax = p.maxPos; }
+      p.stockRef = hay ? p.stockPosConfig : p.stock;
+    });
+    return productos;
+  }
+
   /** ¿Hay más de una fila por código? (export por posición o por lote) */
   function hayRepetidos(productos) {
     const vistos = {};
@@ -253,19 +300,6 @@ VLM.parser = (function () {
         vencimiento: p.vencimiento
       });
 
-      // min/max: los de la planilla son del artículo y se repiten en cada fila
-      // (se toma el mayor), pero los configurados por posición se SUMAN, porque
-      // cada posición aporta su propia capacidad. Se cuenta una vez por
-      // ubicación, no por lote.
-      if (p.minPos || p.maxPos) {
-        g.tieneConfigPos = true;
-        if (ubicNueva) { g.minPos += p.minPos || 0; g.maxPos += p.maxPos || 0; }
-        // El mínimo de una posición se compara contra lo que hay EN ESA
-        // posición, no contra el stock total del artículo: si no, la reserva
-        // de altura tapa que la posición de picking está por vaciarse.
-        g.stockPosConfig += p.stock;
-      }
-
       // La zona y el ámbito se deciden por peso, pero SÓLO votan las filas
       // donde el dato es explícito: una columna de la planilla o una regla de
       // posición. Las que caen al default del laboratorio no votan, porque es
@@ -291,10 +325,6 @@ VLM.parser = (function () {
       g.ubicacion = g.ubicPicking.length ? g.ubicPicking[0] : (g.ubicaciones[0] || '');
       if (g.ubicaciones.length > 1) g.ubicacion += ' +' + (g.ubicaciones.length - 1);
       g.lote = g.lotes.length > 1 ? g.lotes.length + ' lotes' : (g.lotes[0] || '');
-      // la configuración de posiciones gana sobre lo que traiga la planilla
-      if (g.tieneConfigPos) { g.stockMin = g.minPos; g.stockMax = g.maxPos; }
-      // contra qué stock se miden el mínimo y el máximo
-      g.stockRef = g.tieneConfigPos ? g.stockPosConfig : g.stock;
       g.conservacion = mayor(g.zonaPeso) || g.conservacion;
       g.ambito       = mayor(g.ambitoPeso) || g.ambito;
       g.zonasMixtas  = Object.keys(g.zonaPeso).length > 1;
@@ -410,6 +440,9 @@ VLM.parser = (function () {
     const agrupado = repetidos && opciones.agrupar !== false;
     const filasLeidas = productos.length;
     let lista = agrupado ? agrupar(productos) : productos;
+    // el mínimo y el máximo se resuelven al final, desde el detalle por
+    // posición: es la misma función que corre al editarlos sin reimportar
+    aplicarPosiciones(lista, cfgPosiciones);
 
     // --- laboratorios de la planilla que no están en el catálogo ---
     const noListados = {};
@@ -485,6 +518,6 @@ VLM.parser = (function () {
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
     autoMapear, normalizar, generarPlantilla,
-    detectarFormatoFecha, hayRepetidos, agrupar
+    detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones
   };
 })();

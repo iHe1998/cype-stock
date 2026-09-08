@@ -364,7 +364,8 @@ VLM.views = (function () {
           '<span>' + U.esc(p.codigo) + '</span>' +
           '<span>' + U.esc(p.labNombre || p.laboratorio) + '</span>' +
           '<span>' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</span>' +
-          (p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
+          (p.peorPosicion ? '<span>📍 <strong>' + U.esc(p.peorPosicion) + '</strong></span>'
+            : p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
         '</div>' +
       '</div>' +
       fuentesAltura(p) +
@@ -624,7 +625,7 @@ VLM.views = (function () {
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
       '<div>Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
-      '(cuánto entra) de cada posición. Se guardan solos y se aplican al volver a importar.<br>' +
+      '(cuánto entra) de cada posición. Se guardan y se aplican al instante.<br>' +
       '<span class="small muted">Si son muchas, exportá la plantilla, completá las columnas Mínimo y Máximo en Excel y volvé a importarla.</span>' +
       '</div></div>';
 
@@ -706,18 +707,7 @@ VLM.views = (function () {
    * porcentaje de la capacidad. Sin máximo se cae al mínimo.
    */
   function estadoPosicion(f, cfg) {
-    if (!f.max && !f.min) return 'sd';
-    if (f.stock <= 0) return 'agotado';
-    if (f.max) {
-      const pct = f.stock / f.max * 100;
-      if (pct <= cfg.pctCritico) return 'critico';
-      if (pct <= cfg.pctBajo)    return 'bajo';
-      if (f.stock > f.max * 1.05) return 'exceso';
-      return 'ok';
-    }
-    if (f.stock <= f.min) return 'critico';
-    if (f.stock <= f.min * 1.25) return 'bajo';
-    return 'ok';
+    return A.estadoDeNivel(f.stock, f.min, f.max, cfg);
   }
 
   function chipTipo(val, label, activo) {

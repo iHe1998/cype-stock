@@ -29,12 +29,22 @@ VLM.app = (function () {
     wireSettings();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
-      if (motivo === 'posiciones') calculados = null;
+      if (motivo === 'posiciones') reaplicarPosiciones();
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
       render();
     });
     render();
     setInterval(actualizarEstado, 60000);
+  }
+
+  /**
+   * Reaplica el mínimo y el máximo sobre los productos ya cargados.
+   * No hace falta reimportar: cada producto guarda su stock por posición.
+   */
+  function reaplicarPosiciones() {
+    P.aplicarPosiciones(S.state.productos, S.state.posiciones);
+    S.guardar();
+    calculados = null;
   }
 
   /** Reaplica el catálogo de laboratorios sobre los productos ya cargados. */

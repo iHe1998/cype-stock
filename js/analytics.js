@@ -31,15 +31,39 @@ VLM.analytics = (function () {
       // reserva de altura tapa que el picking está por vaciarse.
       const ref = r.stockRef !== undefined ? r.stockRef : r.stock;
 
-      r.ocupacion = r.stockMax > 0 ? ref / r.stockMax : null;
-      r.estado    = estadoPorNivel(r, cfg, ref);
-      r.sugerido  = calcularSugerido(r, ref);
+      if (r.posConfig && r.posConfig.length) {
+        // el artículo hereda el estado de su PEOR posición: se repone
+        // posición por posición, no el artículo entero
+        const evaluadas = r.posConfig.map(x => ({
+          ubicacion: x.ubicacion,
+          stock: x.stock, min: x.min, max: x.max,
+          llenado: x.max > 0 ? x.stock / x.max : (x.min > 0 ? x.stock / (x.min * 1.25) : null),
+          estado: estadoDeNivel(x.stock, x.min, x.max, cfg)
+        }));
+        const peorPos = evaluadas.reduce((a, b) =>
+          ESTADOS[b.estado].orden < ESTADOS[a.estado].orden ? b : a);
+        r.posEvaluadas = evaluadas;
+        r.peorPosicion = peorPos.ubicacion;
+        r.peorStock    = peorPos.stock;
+        r.peorMin      = peorPos.min;
+        r.peorMax      = peorPos.max;
+        r.ocupacion    = peorPos.llenado;
+        r.estado       = peorPos.estado;
+        r.sugerido     = r.posConfig.reduce((s, x) =>
+          s + Math.max(0, Math.ceil((x.max > 0 ? x.max : x.min * 1.25) - x.stock)), 0);
+      } else {
+        r.ocupacion = r.stockMax > 0 ? ref / r.stockMax : null;
+        r.estado    = estadoPorNivel(r, cfg, ref);
+        r.sugerido  = calcularSugerido(r, ref);
+      }
 
       r.diasAVencer = r.vencimiento
         ? Math.round((r.vencimiento - hoy) / 86400000) : null;
 
-      // urgencia: menor = más urgente (para ordenar la reposición)
-      r.urgencia = calcularUrgencia(r, ref);
+      // urgencia: menor = más urgente. Es el llenado de la peor posición,
+      // así la lista de reposición arranca por la que está más vacía.
+      r.urgencia = r.ocupacion !== null && r.ocupacion !== undefined
+        ? r.ocupacion : calcularUrgencia(r, ref);
       return r;
     });
   }
@@ -50,21 +74,30 @@ VLM.analytics = (function () {
    * sin ninguno de los dos no hay con qué opinar.
    */
   function estadoPorNivel(p, cfg, ref) {
-    if (!(p.stockMax > 0) && !(p.stockMin > 0)) return 'sd';
+    return estadoDeNivel(ref, p.stockMin, p.stockMax, cfg,
+      p.tieneConfigPos && p.stock > 0);
+  }
 
-    // posición de picking vacía pero con reserva en altura: es crítico
-    // (hay que bajar ya), no agotado (agotado es que no hay en ningún lado)
-    if (ref <= 0) return (p.tieneConfigPos && p.stock > 0) ? 'critico' : 'agotado';
+  /**
+   * La regla, aislada, para poder aplicarla igual a un artículo entero que a
+   * una posición suelta.
+   *
+   * @param conReserva si la posición está vacía pero hay stock en altura: eso
+   *   es crítico (hay que bajar ya), no agotado (agotado es que no hay nada).
+   */
+  function estadoDeNivel(stock, min, max, cfg, conReserva) {
+    if (!(max > 0) && !(min > 0)) return 'sd';
+    if (stock <= 0) return conReserva ? 'critico' : 'agotado';
 
-    if (p.stockMax > 0) {
-      const pct = ref / p.stockMax * 100;
+    if (max > 0) {
+      const pct = stock / max * 100;
       if (pct <= cfg.pctCritico) return 'critico';
       if (pct <= cfg.pctBajo)    return 'bajo';
-      if (ref > p.stockMax * 1.05) return 'exceso';
+      if (stock > max * 1.05)    return 'exceso';
       return 'ok';
     }
-    if (ref <= p.stockMin) return 'critico';
-    if (ref <= p.stockMin * 1.25) return 'bajo';
+    if (stock <= min) return 'critico';
+    if (stock <= min * 1.25) return 'bajo';
     return 'ok';
   }
 
@@ -223,7 +256,7 @@ VLM.analytics = (function () {
 
   return {
     ESTADOS, ORDEN_ESTADOS,
-    calcular, resumen, porLaboratorio, porGrupo, filtrarPorZona,
+    calcular, estadoDeNivel, resumen, porLaboratorio, porGrupo, filtrarPorZona,
     topUrgentes
   };
 })();
