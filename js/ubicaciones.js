@@ -33,7 +33,19 @@ VLM.ubicaciones = (function () {
     { patron: 'ROTORI*', accion: 'ignorar', nota: 'rotura / origen' },
     { patron: 'C*',      accion: 'ignorar', nota: 'no se usa' },
 
-    // --- picking con nombre propio ---
+    /* --- el VLM ---
+       Adentro de la torre todos los artículos comparten la misma ubicación
+       aunque físicamente estén en bandejas distintas: el sistema no las
+       distingue. Así que acá la unidad no es la posición sino el ARTÍCULO, y
+       de eso se encarga la configuración (posición + artículo). */
+    { patron: 'VLMVENTA01', accion: 'usar', tipo: 'picking', ambito: 'vlm', zona: 'frio',
+      nota: 'VLM, cámara de frío' },
+    { patron: 'VLMVENTA02', accion: 'usar', tipo: 'picking', ambito: 'vlm', zona: 'ambiente',
+      nota: 'VLM, ambiente' },
+    { patron: 'VLM*', accion: 'usar', tipo: 'picking', ambito: 'vlm',
+      nota: 'VLM, sin zona definida' },
+
+    // --- picking con nombre propio, fuera del VLM ---
     { patron: 'BIOCAM*', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
       nota: 'picking cámara, pasillo' },
     { patron: 'P*',      accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'ambiente',

@@ -44,7 +44,7 @@ VLM.store = (function () {
     cfg: Object.assign({}, CFG_DEFAULT),
     labs: [],           // catálogo de laboratorios (ver labs.js)
     reglasUbic: [],     // reglas de posición (ver ubicaciones.js)
-    posiciones: {},     // UBICACION -> { min, max } configurados a mano
+    posiciones: {},     // UBICACION|ARTICULO -> { min, max } configurados a mano
     ui: {
       tema: 'dark',
       vista: 'dashboard',
@@ -123,7 +123,7 @@ VLM.store = (function () {
     }
     try {
       const pos = JSON.parse(localStorage.getItem(KEY_POS) || 'null');
-      state.posiciones = (pos && typeof pos === 'object') ? pos : {};
+      state.posiciones = migrarPosiciones((pos && typeof pos === 'object') ? pos : {});
     } catch (e) { state.posiciones = {}; }
     try {
       const ui = JSON.parse(localStorage.getItem(KEY_UI) || 'null');
@@ -211,15 +211,47 @@ VLM.store = (function () {
    * marcada para revisar en vez de aplicarse a ciegas.
    */
   function setPosicion(ubicacion, cfg, articulo) {
-    const k = String(ubicacion).trim().toUpperCase();
+    const k = clavePos(ubicacion, articulo);
     if (!k) return;
     const actual = state.posiciones[k] || {};
     const nueva = Object.assign({}, actual, cfg);
+    nueva.ubicacion = String(ubicacion).trim().toUpperCase();
     if (articulo) nueva.articulo = String(articulo);
     if (!nueva.min && !nueva.max) delete state.posiciones[k];
     else state.posiciones[k] = nueva;
     guardarPosiciones();
     emit('posiciones');
+  }
+
+  /**
+   * La clave de configuración es POSICIÓN|ARTÍCULO, no la posición sola.
+   *
+   * Afuera del VLM cada posición de picking tiene un artículo y da lo mismo,
+   * pero adentro de la torre TODOS los artículos comparten VLMVENTA01 o
+   * VLMVENTA02: con la posición sola, cargar un máximo lo cargaría para los
+   * cientos de artículos que viven ahí.
+   */
+  function clavePos(ubicacion, articulo) {
+    const u = String(ubicacion == null ? '' : ubicacion).trim().toUpperCase();
+    if (!u) return '';
+    const a = String(articulo == null ? '' : articulo).trim().toUpperCase();
+    return a ? u + '|' + a : u;
+  }
+
+  /**
+   * Las versiones anteriores guardaban la configuración con la posición sola
+   * como clave y el artículo adentro. Se rearma con la clave nueva para no
+   * perder lo ya cargado.
+   */
+  function migrarPosiciones(mapa) {
+    const salida = {};
+    Object.keys(mapa).forEach(k => {
+      const v = mapa[k] || {};
+      if (k.indexOf('|') > -1) { salida[k] = v; return; }
+      v.ubicacion = v.ubicacion || k;
+      salida[clavePos(k, v.articulo)] = v;
+    });
+    return salida;
   }
 
   /** Reemplaza todo el mapa de golpe (importar CSV). */
@@ -244,6 +276,6 @@ VLM.store = (function () {
     on, emit, cargar, guardar,
     setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
     setReglasUbic, resetReglasUbic,
-    setPosicion, setPosiciones, limpiarPosiciones, hayDatos
+    setPosicion, setPosiciones, limpiarPosiciones, clavePos, hayDatos
   };
 })();

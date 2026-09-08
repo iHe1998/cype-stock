@@ -850,6 +850,21 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .pos-ok:hover { background: var(--ok-dim); border-color: var(--ok); }
 .pos-pct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
 
+/* ---------- detalle de artículo ---------- */
+.art-head { display: flex; flex-direction: column; gap: 6px; }
+.art-head .t-code { font-size: 15px; font-weight: 700; }
+/* barra físico vs disponible: lo lleno es lo que queda libre de verdad */
+.art-barra {
+  height: 10px; border-radius: 5px; overflow: hidden;
+  background: var(--warn); margin-top: 4px;
+}
+.art-barra > i { display: block; height: 100%; background: var(--ok); }
+.art-barra-leyenda { display: flex; justify-content: space-between; margin: 4px 0 2px; }
+.t-warn { color: var(--warn); }
+/* fila clicable: el detalle se abre desde el inventario y la reposición */
+.row-link { cursor: pointer; }
+.row-link:hover { background: var(--surface-2); }
+
 </style>
 </head>
 <body>
@@ -1038,7 +1053,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
     </header>
     <div class="modal-body">
       <h3 class="section-title">Umbrales de alerta</h3>
-      <p class="muted small" style="margin:0 0 10px">Sobre la capacidad (mÃ¡ximo) de la posiciÃ³n.</p>
+      <p class="muted small" style="margin:0 0 10px">Sobre la capacidad (máximo) de la posición.</p>
       <div class="cfg-grid">
         <label class="field">
           <span>% del máximo · CRÍTICO ≤</span>
@@ -1098,9 +1113,24 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 07/09/2026 04:15 - 153f397</span>
+      <span class="muted small" id="appVersion">compilado 08/09/2026 20:54 - 8d15e78</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ DETALLE DE ARTÍCULO ============ -->
+<div class="modal" id="modalArt" hidden>
+  <div class="modal-box modal-lg">
+    <header class="modal-head">
+      <h2 id="artTitulo">Artículo</h2>
+      <button class="btn btn-icon" data-close><svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </header>
+    <div class="modal-body" id="artBody"></div>
+    <footer class="modal-foot">
+      <div class="spacer"></div>
+      <button class="btn btn-primary" data-close>Cerrar</button>
     </footer>
   </div>
 </div>
@@ -1543,7 +1573,19 @@ VLM.ubicaciones = (function () {
     { patron: 'ROTORI*', accion: 'ignorar', nota: 'rotura / origen' },
     { patron: 'C*',      accion: 'ignorar', nota: 'no se usa' },
 
-    // --- picking con nombre propio ---
+    /* --- el VLM ---
+       Adentro de la torre todos los artículos comparten la misma ubicación
+       aunque físicamente estén en bandejas distintas: el sistema no las
+       distingue. Así que acá la unidad no es la posición sino el ARTÍCULO, y
+       de eso se encarga la configuración (posición + artículo). */
+    { patron: 'VLMVENTA01', accion: 'usar', tipo: 'picking', ambito: 'vlm', zona: 'frio',
+      nota: 'VLM, cámara de frío' },
+    { patron: 'VLMVENTA02', accion: 'usar', tipo: 'picking', ambito: 'vlm', zona: 'ambiente',
+      nota: 'VLM, ambiente' },
+    { patron: 'VLM*', accion: 'usar', tipo: 'picking', ambito: 'vlm',
+      nota: 'VLM, sin zona definida' },
+
+    // --- picking con nombre propio, fuera del VLM ---
     { patron: 'BIOCAM*', accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'frio',
       nota: 'picking cámara, pasillo' },
     { patron: 'P*',      accion: 'usar', tipo: 'picking', ambito: 'externo', zona: 'ambiente',
@@ -1714,7 +1756,7 @@ VLM.store = (function () {
     cfg: Object.assign({}, CFG_DEFAULT),
     labs: [],           // catálogo de laboratorios (ver labs.js)
     reglasUbic: [],     // reglas de posición (ver ubicaciones.js)
-    posiciones: {},     // UBICACION -> { min, max } configurados a mano
+    posiciones: {},     // UBICACION|ARTICULO -> { min, max } configurados a mano
     ui: {
       tema: 'dark',
       vista: 'dashboard',
@@ -1793,7 +1835,7 @@ VLM.store = (function () {
     }
     try {
       const pos = JSON.parse(localStorage.getItem(KEY_POS) || 'null');
-      state.posiciones = (pos && typeof pos === 'object') ? pos : {};
+      state.posiciones = migrarPosiciones((pos && typeof pos === 'object') ? pos : {});
     } catch (e) { state.posiciones = {}; }
     try {
       const ui = JSON.parse(localStorage.getItem(KEY_UI) || 'null');
@@ -1881,15 +1923,47 @@ VLM.store = (function () {
    * marcada para revisar en vez de aplicarse a ciegas.
    */
   function setPosicion(ubicacion, cfg, articulo) {
-    const k = String(ubicacion).trim().toUpperCase();
+    const k = clavePos(ubicacion, articulo);
     if (!k) return;
     const actual = state.posiciones[k] || {};
     const nueva = Object.assign({}, actual, cfg);
+    nueva.ubicacion = String(ubicacion).trim().toUpperCase();
     if (articulo) nueva.articulo = String(articulo);
     if (!nueva.min && !nueva.max) delete state.posiciones[k];
     else state.posiciones[k] = nueva;
     guardarPosiciones();
     emit('posiciones');
+  }
+
+  /**
+   * La clave de configuración es POSICIÓN|ARTÍCULO, no la posición sola.
+   *
+   * Afuera del VLM cada posición de picking tiene un artículo y da lo mismo,
+   * pero adentro de la torre TODOS los artículos comparten VLMVENTA01 o
+   * VLMVENTA02: con la posición sola, cargar un máximo lo cargaría para los
+   * cientos de artículos que viven ahí.
+   */
+  function clavePos(ubicacion, articulo) {
+    const u = String(ubicacion == null ? '' : ubicacion).trim().toUpperCase();
+    if (!u) return '';
+    const a = String(articulo == null ? '' : articulo).trim().toUpperCase();
+    return a ? u + '|' + a : u;
+  }
+
+  /**
+   * Las versiones anteriores guardaban la configuración con la posición sola
+   * como clave y el artículo adentro. Se rearma con la clave nueva para no
+   * perder lo ya cargado.
+   */
+  function migrarPosiciones(mapa) {
+    const salida = {};
+    Object.keys(mapa).forEach(k => {
+      const v = mapa[k] || {};
+      if (k.indexOf('|') > -1) { salida[k] = v; return; }
+      v.ubicacion = v.ubicacion || k;
+      salida[clavePos(k, v.articulo)] = v;
+    });
+    return salida;
   }
 
   /** Reemplaza todo el mapa de golpe (importar CSV). */
@@ -1914,7 +1988,7 @@ VLM.store = (function () {
     on, emit, cargar, guardar,
     setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
     setReglasUbic, resetReglasUbic,
-    setPosicion, setPosiciones, limpiarPosiciones, hayDatos
+    setPosicion, setPosiciones, limpiarPosiciones, clavePos, hayDatos
   };
 })();
 
@@ -1945,9 +2019,19 @@ VLM.parser = (function () {
       hint: 'Se usa para agrupar los productos',
       alias: ['laboratorio', 'lab', 'proveedor', 'propietario', 'marca', 'fabricante', 'droguería', 'drogueria', 'laboratorio proveedor', 'dueño'] },
 
-    { id: 'stock', label: 'Stock actual', req: true, tipo: 'numero',
-      hint: 'Unidades disponibles hoy',
-      alias: ['cantidad disponible', 'stock disponible', 'stock', 'stock actual', 'cantidad', 'cant', 'existencia', 'existencias', 'saldo', 'disponible', 'unidades', 'qty', 'cantidad actual', 'stock real'] },
+    { id: 'stock', label: 'Stock físico', req: true, tipo: 'numero',
+      hint: 'Unidades que hay en la posición. Es lo que se ve en los gráficos.',
+      alias: ['stock fisico', 'fisico', 'cantidad fisica', 'stock real', 'cantidad disponible',
+              'stock disponible', 'stock', 'stock actual', 'cantidad', 'cant', 'existencia',
+              'existencias', 'saldo', 'disponible', 'unidades', 'qty', 'cantidad actual'] },
+
+    { id: 'disponible', label: 'Disponible', req: false, tipo: 'numero',
+      hint: 'Físico menos lo ya comprometido por pedidos. Sólo se ve en el detalle del artículo.',
+      alias: ['disponible', 'cantidad disponible', 'stock disponible', 'libre', 'sin asignar'] },
+
+    { id: 'asignado', label: 'Asignado', req: false, tipo: 'numero',
+      hint: 'Unidades comprometidas por pedidos ya lanzados',
+      alias: ['asignado', 'cantidad asignada', 'comprometido', 'reservado'] },
 
     { id: 'ubicacion', label: 'Ubicación', req: false, tipo: 'texto',
       hint: 'Bandeja / posición / rack',
@@ -1979,7 +2063,21 @@ VLM.parser = (function () {
       hint: 'Fecha de caducidad',
       alias: ['vencimiento', 'vto', 'vence', 'caducidad', 'fecha vencimiento', 'fecha vto', 'expira', 'expiry'] },
 
+    // Estas dos no se muestran en ningún lado: sólo sirven para descartar
+    // filas al importar (mercadería bloqueada, en cuarentena, etc.).
+    { id: 'estatus', label: 'Estatus (filtro)', req: false, tipo: 'texto',
+      hint: 'Sólo se importan las filas en OK',
+      alias: ['estatus', 'estado', 'status', 'estado del stock'] },
+
+    { id: 'atributo07', label: 'Atributo 07 (filtro)', req: false, tipo: 'texto',
+      hint: 'Sólo se importan las filas con 1000',
+      alias: ['atributo07', 'atributo 07', 'atributo7'] },
+
   ];
+
+  /* Valores que tiene que tener una fila para entrar. Si la columna no está
+     mapeada no se filtra nada: una planilla que no las trae se importa igual. */
+  const FILTROS_FILA = { estatus: 'OK', atributo07: '1000' };
 
   /* ------------------------------------------------------------
      Lectura del archivo
@@ -2115,6 +2213,56 @@ VLM.parser = (function () {
      Agrupación por código
      ------------------------------------------------------------ */
 
+  /**
+   * Aplica la configuración de posiciones (mínimo y máximo) sobre productos
+   * ya normalizados.
+   *
+   * No necesita el archivo original: cada producto guarda su `detalle` con el
+   * stock por ubicación, así que editar un máximo se refleja al toque sin
+   * volver a importar.
+   *
+   * Los mínimos y máximos se SUMAN entre las posiciones del artículo, una vez
+   * por ubicación aunque tenga varios lotes. Y sólo cuentan las posiciones que
+   * siguen con el mismo artículo con el que se configuraron.
+   */
+  function aplicarPosiciones(productos, cfgPosiciones) {
+    cfgPosiciones = cfgPosiciones || {};
+    productos.forEach(p => {
+      const dets = (p.detalle && p.detalle.length)
+        ? p.detalle
+        : [{ ubicacion: p.ubicacion, stock: p.stock }];
+
+      // Una entrada por posición configurada, con su propio stock, mínimo y
+      // máximo. El estado del artículo sale de la PEOR de ellas, no de la
+      // suma: se repone posición por posición, y una vacía hay que atenderla
+      // aunque otra del mismo artículo esté llena.
+      const porUbic = {};
+      dets.forEach(d => {
+        const u = String(d.ubicacion || '').trim().toUpperCase();
+        if (!u) return;
+        // primero la configuración de ESTE artículo en esta posición; si no
+        // hay, la de la posición sola (formato viejo, una posición un artículo)
+        const c = cfgPosiciones[u + '|' + String(p.codigo).toUpperCase()] || cfgPosiciones[u];
+        if (!c) return;
+        if (c.articulo && c.articulo !== p.codigo) return;   // se reasignó
+        if (!porUbic[u]) porUbic[u] = { ubicacion: d.ubicacion, stock: 0, min: c.min || 0, max: c.max || 0 };
+        porUbic[u].stock += d.stock;
+      });
+
+      const lista = Object.keys(porUbic).map(k => porUbic[k]);
+      const hay = lista.length > 0;
+
+      p.posConfig      = lista;
+      p.tieneConfigPos = hay;
+      p.minPos = lista.reduce((s, x) => s + x.min, 0);
+      p.maxPos = lista.reduce((s, x) => s + x.max, 0);
+      p.stockPosConfig = lista.reduce((s, x) => s + x.stock, 0);
+      if (hay) { p.stockMin = p.minPos; p.stockMax = p.maxPos; }
+      p.stockRef = hay ? p.stockPosConfig : p.stock;
+    });
+    return productos;
+  }
+
   /** ¿Hay más de una fila por código? (export por posición o por lote) */
   function hayRepetidos(productos) {
     const vistos = {};
@@ -2142,6 +2290,7 @@ VLM.parser = (function () {
         mapa[k] = Object.assign({}, p, {
           ubicaciones: [], ubicPicking: [], ubicAltura: [], lotes: [], detalle: [],
           posiciones: 0, stockPicking: 0, stockAltura: 0,
+          disponible: 0, asignado: 0, hayDisponible: false,
           minPos: 0, maxPos: 0, stockPosConfig: 0, tieneConfigPos: false,
           zonaPeso: {}, ambitoPeso: {}
         });
@@ -2151,6 +2300,13 @@ VLM.parser = (function () {
       const g = mapa[k];
       g.stock += p.stock;
       g.posiciones++;
+      // el disponible se suma igual que el físico; si la planilla no trae la
+      // columna queda en null para no mostrar un cero que parece un dato real
+      if (p.disponible !== null && p.disponible !== undefined) {
+        g.hayDisponible = true;
+        g.disponible += p.disponible;
+      }
+      g.asignado += p.asignado || 0;
       if (p.tipoPos === 'altura') {
         g.stockAltura += p.stock;
         if (p.ubicacion && g.ubicAltura.indexOf(p.ubicacion) === -1) g.ubicAltura.push(p.ubicacion);
@@ -2166,27 +2322,24 @@ VLM.parser = (function () {
       // Detalle por posición Y lote: lo usa la vista de Posiciones y, sobre
       // todo, la reposición, que necesita saber de qué altura bajar el MISMO
       // lote que está en la posición de picking.
+      // El LPN NO entra en la clave: en el VLM el mismo lote aparece partido
+      // en varios LPN aunque físicamente esté todo junto, así que esas filas
+      // se suman en una sola.
       const yaD = g.detalle.filter(d =>
         d.ubicacion === p.ubicacion && d.lote === p.lote && d.lote2 === p.lote2)[0];
-      if (yaD) yaD.stock += p.stock;
-      else g.detalle.push({
+      if (yaD) {
+        yaD.stock += p.stock;
+        yaD.asignado += p.asignado || 0;
+        if (p.disponible !== null && p.disponible !== undefined) {
+          yaD.disponible = (yaD.disponible || 0) + p.disponible;
+        }
+        yaD.lineas++;
+      } else g.detalle.push({
         ubicacion: p.ubicacion, stock: p.stock, tipo: p.tipoPos,
+        disponible: p.disponible, asignado: p.asignado || 0, lineas: 1,
         zona: p.conservacion, lote: p.lote, lote2: p.lote2,
         vencimiento: p.vencimiento
       });
-
-      // min/max: los de la planilla son del artículo y se repiten en cada fila
-      // (se toma el mayor), pero los configurados por posición se SUMAN, porque
-      // cada posición aporta su propia capacidad. Se cuenta una vez por
-      // ubicación, no por lote.
-      if (p.minPos || p.maxPos) {
-        g.tieneConfigPos = true;
-        if (ubicNueva) { g.minPos += p.minPos || 0; g.maxPos += p.maxPos || 0; }
-        // El mínimo de una posición se compara contra lo que hay EN ESA
-        // posición, no contra el stock total del artículo: si no, la reserva
-        // de altura tapa que la posición de picking está por vaciarse.
-        g.stockPosConfig += p.stock;
-      }
 
       // La zona y el ámbito se deciden por peso, pero SÓLO votan las filas
       // donde el dato es explícito: una columna de la planilla o una regla de
@@ -2213,10 +2366,8 @@ VLM.parser = (function () {
       g.ubicacion = g.ubicPicking.length ? g.ubicPicking[0] : (g.ubicaciones[0] || '');
       if (g.ubicaciones.length > 1) g.ubicacion += ' +' + (g.ubicaciones.length - 1);
       g.lote = g.lotes.length > 1 ? g.lotes.length + ' lotes' : (g.lotes[0] || '');
-      // la configuración de posiciones gana sobre lo que traiga la planilla
-      if (g.tieneConfigPos) { g.stockMin = g.minPos; g.stockMax = g.maxPos; }
-      // contra qué stock se miden el mínimo y el máximo
-      g.stockRef = g.tieneConfigPos ? g.stockPosConfig : g.stock;
+      if (!g.hayDisponible) g.disponible = null;
+      delete g.hayDisponible;
       g.conservacion = mayor(g.zonaPeso) || g.conservacion;
       g.ambito       = mayor(g.ambitoPeso) || g.ambito;
       g.zonasMixtas  = Object.keys(g.zonaPeso).length > 1;
@@ -2243,8 +2394,9 @@ VLM.parser = (function () {
     opciones = opciones || {};
     const reglas = opciones.reglas || VLM.ubicaciones.reglasDefault();
     const cfgPosiciones = opciones.posiciones || {};
-    let ignoradas = 0, sinRegla = 0;
+    let ignoradas = 0, sinRegla = 0, filtradas = 0;
     const ignoradasPorPatron = {};
+    const filtradasPorValor = {};
     // todas las posiciones que aparecen en el archivo, incluidas las ignoradas:
     // el editor de reglas las necesita para decir cuántas cubre cada regla
     const ubicVistas = {};
@@ -2276,6 +2428,19 @@ VLM.parser = (function () {
       if ((codigo === null || codigo === '') && (desc === null || desc === '')) { descartadas++; continue; }
       if (stock === null) { descartadas++; continue; }
 
+      // --- filtros de estatus: mercadería que no está disponible para vender ---
+      let fueraDeFiltro = null;
+      for (const campo in FILTROS_FILA) {
+        if (mapa[campo] === undefined || mapa[campo] === null) continue;
+        const v = String(get(fila, campo) === null ? '' : get(fila, campo)).trim();
+        if (U.norm(v) !== U.norm(FILTROS_FILA[campo])) { fueraDeFiltro = campo + '=' + (v || '(vacío)'); break; }
+      }
+      if (fueraDeFiltro) {
+        filtradas++;
+        filtradasPorValor[fueraDeFiltro] = (filtradasPorValor[fueraDeFiltro] || 0) + 1;
+        continue;
+      }
+
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
 
       // --- reglas de posición: ignorar, picking o altura ---
@@ -2284,7 +2449,6 @@ VLM.parser = (function () {
       const ubic = VLM.ubicaciones.normalizar(get(fila, 'ubicacion') || '');
       if (ubic) ubicVistas[ubic] = 1;
       const regla = VLM.ubicaciones.evaluar(ubic, reglas);
-      const cfgPos = ubic ? cfgPosiciones[ubic.toUpperCase()] : null;
       if (regla && regla.accion === 'ignorar') {
         ignoradas++;
         ignoradasPorPatron[regla.patron] = (ignoradasPorPatron[regla.patron] || 0) + 1;
@@ -2301,6 +2465,8 @@ VLM.parser = (function () {
       // La configuración de la posición sólo vale si sigue el mismo artículo.
       // Si la posición se reasignó, el mín/máx del artículo anterior no aplica
       // y queda para revisar: aplicarlo a ciegas daría alertas falsas.
+      const U_ = ubic ? ubic.toUpperCase() : '';
+      const cfgPos = U_ ? (cfgPosiciones[U_ + '|' + cod.toUpperCase()] || cfgPosiciones[U_]) : null;
       const cfgVigente = cfgPos && (!cfgPos.articulo || cfgPos.articulo === cod);
       if (cfgPos && !cfgVigente) posReasignadas[ubic] = { antes: cfgPos.articulo, ahora: cod };
       productos.push(VLM.labs.clasificar({
@@ -2316,6 +2482,11 @@ VLM.parser = (function () {
         tipoPos:       (regla && regla.tipo) || 'picking',
         ubicacion:     ubic,
         stock:         stock,
+        // el físico es lo que se ve en los gráficos y define el estado; el
+        // disponible ya tiene descontado lo que los pedidos lanzados se van a
+        // llevar, y sólo aparece en el detalle del artículo
+        disponible:    U.toNum(get(fila, 'disponible')),
+        asignado:      U.toNum(get(fila, 'asignado')) || 0,
         // min/max configurados para ESTA posición (ver Posiciones)
         minPos:        cfgVigente ? (cfgPos.min || 0) : 0,
         maxPos:        cfgVigente ? (cfgPos.max || 0) : 0,
@@ -2332,6 +2503,9 @@ VLM.parser = (function () {
     const agrupado = repetidos && opciones.agrupar !== false;
     const filasLeidas = productos.length;
     let lista = agrupado ? agrupar(productos) : productos;
+    // el mínimo y el máximo se resuelven al final, desde el detalle por
+    // posición: es la misma función que corre al editarlos sin reimportar
+    aplicarPosiciones(lista, cfgPosiciones);
 
     // --- laboratorios de la planilla que no están en el catálogo ---
     const noListados = {};
@@ -2353,6 +2527,13 @@ VLM.parser = (function () {
     if (sinRegla) {
       avisos.push(sinRegla + ' fila(s) con posiciones que ninguna regla cubre.');
     }
+    if (filtradas) {
+      const porQue = Object.keys(filtradasPorValor)
+        .sort((a, b) => filtradasPorValor[b] - filtradasPorValor[a])
+        .slice(0, 3).map(k => k + ' (' + filtradasPorValor[k] + ')').join(', ');
+      avisos.push(filtradas + ' fila(s) descartadas por estatus: ' + porQue +
+                  '. Sólo entra lo que está en OK con atributo 07 = 1000.');
+    }
     const nReasig = Object.keys(posReasignadas).length;
     if (nReasig) {
       avisos.push(nReasig + ' posición(es) cambiaron de artículo: su mínimo y máximo quedan ' +
@@ -2367,9 +2548,6 @@ VLM.parser = (function () {
     if (fmtFecha === 'mdy') {
       avisos.push('Las fechas se leyeron como mes/día/año (formato de EE.UU.).');
     }
-    if (mapa.stockMin === undefined) {
-      avisos.push('Sin stock mínimo: las alertas salen sólo de los días de cobertura.');
-    }
     if (mapa.conservacion === undefined) {
       avisos.push('Sin columna de conservación: se usa el valor por defecto de cada laboratorio (editable en Configuración).');
     }
@@ -2380,7 +2558,7 @@ VLM.parser = (function () {
     }
     return { productos: lista, descartadas, avisos, noListados, nombresNoListados,
              repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha,
-             ignoradas, sinRegla, ignoradasPorPatron,
+             ignoradas, sinRegla, ignoradasPorPatron, filtradas, filtradasPorValor,
              ubicacionesVistas: Object.keys(ubicVistas), posReasignadas };
   }
 
@@ -2407,7 +2585,7 @@ VLM.parser = (function () {
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
     autoMapear, normalizar, generarPlantilla,
-    detectarFormatoFecha, hayRepetidos, agrupar
+    detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones
   };
 })();
 
@@ -2446,15 +2624,39 @@ VLM.analytics = (function () {
       // reserva de altura tapa que el picking está por vaciarse.
       const ref = r.stockRef !== undefined ? r.stockRef : r.stock;
 
-      r.ocupacion = r.stockMax > 0 ? ref / r.stockMax : null;
-      r.estado    = estadoPorNivel(r, cfg, ref);
-      r.sugerido  = calcularSugerido(r, ref);
+      if (r.posConfig && r.posConfig.length) {
+        // el artículo hereda el estado de su PEOR posición: se repone
+        // posición por posición, no el artículo entero
+        const evaluadas = r.posConfig.map(x => ({
+          ubicacion: x.ubicacion,
+          stock: x.stock, min: x.min, max: x.max,
+          llenado: x.max > 0 ? x.stock / x.max : (x.min > 0 ? x.stock / (x.min * 1.25) : null),
+          estado: estadoDeNivel(x.stock, x.min, x.max, cfg)
+        }));
+        const peorPos = evaluadas.reduce((a, b) =>
+          ESTADOS[b.estado].orden < ESTADOS[a.estado].orden ? b : a);
+        r.posEvaluadas = evaluadas;
+        r.peorPosicion = peorPos.ubicacion;
+        r.peorStock    = peorPos.stock;
+        r.peorMin      = peorPos.min;
+        r.peorMax      = peorPos.max;
+        r.ocupacion    = peorPos.llenado;
+        r.estado       = peorPos.estado;
+        r.sugerido     = r.posConfig.reduce((s, x) =>
+          s + Math.max(0, Math.ceil((x.max > 0 ? x.max : x.min * 1.25) - x.stock)), 0);
+      } else {
+        r.ocupacion = r.stockMax > 0 ? ref / r.stockMax : null;
+        r.estado    = estadoPorNivel(r, cfg, ref);
+        r.sugerido  = calcularSugerido(r, ref);
+      }
 
       r.diasAVencer = r.vencimiento
         ? Math.round((r.vencimiento - hoy) / 86400000) : null;
 
-      // urgencia: menor = más urgente (para ordenar la reposición)
-      r.urgencia = calcularUrgencia(r, ref);
+      // urgencia: menor = más urgente. Es el llenado de la peor posición,
+      // así la lista de reposición arranca por la que está más vacía.
+      r.urgencia = r.ocupacion !== null && r.ocupacion !== undefined
+        ? r.ocupacion : calcularUrgencia(r, ref);
       return r;
     });
   }
@@ -2465,21 +2667,30 @@ VLM.analytics = (function () {
    * sin ninguno de los dos no hay con qué opinar.
    */
   function estadoPorNivel(p, cfg, ref) {
-    if (!(p.stockMax > 0) && !(p.stockMin > 0)) return 'sd';
+    return estadoDeNivel(ref, p.stockMin, p.stockMax, cfg,
+      p.tieneConfigPos && p.stock > 0);
+  }
 
-    // posición de picking vacía pero con reserva en altura: es crítico
-    // (hay que bajar ya), no agotado (agotado es que no hay en ningún lado)
-    if (ref <= 0) return (p.tieneConfigPos && p.stock > 0) ? 'critico' : 'agotado';
+  /**
+   * La regla, aislada, para poder aplicarla igual a un artículo entero que a
+   * una posición suelta.
+   *
+   * @param conReserva si la posición está vacía pero hay stock en altura: eso
+   *   es crítico (hay que bajar ya), no agotado (agotado es que no hay nada).
+   */
+  function estadoDeNivel(stock, min, max, cfg, conReserva) {
+    if (!(max > 0) && !(min > 0)) return 'sd';
+    if (stock <= 0) return conReserva ? 'critico' : 'agotado';
 
-    if (p.stockMax > 0) {
-      const pct = ref / p.stockMax * 100;
+    if (max > 0) {
+      const pct = stock / max * 100;
       if (pct <= cfg.pctCritico) return 'critico';
       if (pct <= cfg.pctBajo)    return 'bajo';
-      if (ref > p.stockMax * 1.05) return 'exceso';
+      if (stock > max * 1.05)    return 'exceso';
       return 'ok';
     }
-    if (ref <= p.stockMin) return 'critico';
-    if (ref <= p.stockMin * 1.25) return 'bajo';
+    if (stock <= min) return 'critico';
+    if (stock <= min * 1.25) return 'bajo';
     return 'ok';
   }
 
@@ -2638,7 +2849,7 @@ VLM.analytics = (function () {
 
   return {
     ESTADOS, ORDEN_ESTADOS,
-    calcular, resumen, porLaboratorio, porGrupo, filtrarPorZona,
+    calcular, estadoDeNivel, resumen, porLaboratorio, porGrupo, filtrarPorZona,
     topUrgentes
   };
 })();
@@ -2751,6 +2962,44 @@ VLM.charts = (function () {
           backgroundColor: top.map(l => l.color),
           borderRadius: 4,
           barThickness: tv ? 26 : 16
+        }]
+      },
+      options: o
+    });
+  }
+
+  /* ------------------------------------------------------------
+     1b. Stock por artículo
+     Adentro del VLM la ubicación no distingue nada: todos los artículos
+     comparten VLMVENTA01 o VLMVENTA02. El corte útil es el artículo.
+     ------------------------------------------------------------ */
+  function stockPorArticulo(canvas, items, tv, n) {
+    const t = tema();
+    const top = items.slice()
+      .sort((a, b) => (b.stockPicking !== undefined ? b.stockPicking : b.stock) -
+                      (a.stockPicking !== undefined ? a.stockPicking : a.stock))
+      .slice(0, n || (tv ? 10 : 15));
+    const o = base(t, tv);
+    o.indexAxis = 'y';
+    o.scales.x.ticks.callback = v => U.fmtCompact(v);
+    o.plugins.tooltip.callbacks = {
+      title: c => {
+        const p = top[c[0].dataIndex];
+        return p.descripcion === p.codigo ? p.codigo : p.codigo + ' · ' + p.descripcion;
+      },
+      label: c => U.fmt(c.parsed.x) + ' unidades' +
+        (top[c.dataIndex].ocupacion !== null && top[c.dataIndex].ocupacion !== undefined
+          ? ' · ' + Math.round(top[c.dataIndex].ocupacion * 100) + '% de su capacidad' : '')
+    };
+    return montar(canvas, {
+      type: 'bar',
+      data: {
+        labels: top.map(p => recortar(p.descripcion || p.codigo, tv ? 28 : 34)),
+        datasets: [{
+          data: top.map(p => p.stockPicking !== undefined ? p.stockPicking : p.stock),
+          backgroundColor: top.map(p => colorEstado(p.estado, t)),
+          borderRadius: 4,
+          barThickness: tv ? 20 : 14
         }]
       },
       options: o
@@ -2885,7 +3134,7 @@ VLM.charts = (function () {
 
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, estados, pickingVsAltura, estadosPorLab
+    stockPorLab, stockPorArticulo, estados, pickingVsAltura, estadosPorLab
   };
 })();
 
@@ -3012,9 +3261,16 @@ VLM.views = (function () {
 
     /* --- gráficos --- */
     html += '<h3 class="section-title">Situación del stock</h3>';
-    html += '<div class="grid grid-2">' +
-      cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
+    // el corte principal es el artículo: adentro del VLM la ubicación no
+    // distingue nada, todos comparten VLMVENTA01 o VLMVENTA02
+    const topArt = Math.min(items.length, 15);
+    html += cardChart('Stock por artículo', topArt < items.length
+        ? 'unidades en picking · los ' + topArt + ' de mayor stock, de ' + items.length
+        : 'unidades en picking',
+        'chArtStock', Math.max(280, topArt * 24 + 50));
+    html += '<div class="grid grid-2" style="margin-top:14px">' +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
+      cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
       '</div>';
 
     /* --- posiciones sin configurar: sin máximo no hay alerta posible --- */
@@ -3031,6 +3287,7 @@ VLM.views = (function () {
     el.innerHTML = html;
 
     /* --- montaje de gráficos --- */
+    C.stockPorArticulo($('#chArtStock', el), items);
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
   }
@@ -3249,7 +3506,7 @@ VLM.views = (function () {
     const clase = p.estado === 'agotado' ? 'r-agotado' : (p.estado === 'bajo' ? 'r-bajo' : '');
     const pct = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
 
-    return '<div class="repo-item ' + clase + '">' +
+    return '<div class="repo-item row-link ' + clase + '" data-art="' + U.esc(p.codigo) + '">' +
       '<div class="repo-rank">' + rank + '</div>' +
       '<div class="repo-main">' +
         '<strong>' + U.esc(p.descripcion) + '</strong>' +
@@ -3257,7 +3514,8 @@ VLM.views = (function () {
           '<span>' + U.esc(p.codigo) + '</span>' +
           '<span>' + U.esc(p.labNombre || p.laboratorio) + '</span>' +
           '<span>' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</span>' +
-          (p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
+          (p.peorPosicion ? '<span>📍 <strong>' + U.esc(p.peorPosicion) + '</strong></span>'
+            : p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
         '</div>' +
       '</div>' +
       fuentesAltura(p) +
@@ -3267,6 +3525,88 @@ VLM.views = (function () {
         '<b>' + pct + '</b><span>de su capacidad</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
       '</div>';
+  }
+
+  /* ============================================================
+     DETALLE DE UN ARTÍCULO
+     ============================================================ */
+
+  /**
+   * Lo que no entra en los gráficos: el desglose por lote y, sobre todo, el
+   * DISPONIBLE.
+   *
+   * El físico es lo que hay en la posición; el disponible ya tiene descontado
+   * lo que los pedidos lanzados se van a llevar. Si de 200 unidades hay dos
+   * pedidos por 150, quedan 50 realmente libres. Eso importa cuando se mira un
+   * artículo puntual, pero no en los gráficos: el panel es para saber qué
+   * reponer, y lo que se repone es lo físico.
+   */
+  function detalleArticulo(p, cfg) {
+    const hayDisp = p.disponible !== null && p.disponible !== undefined;
+    const asignado = p.asignado || 0;
+
+    let html = '<div class="art-head">' +
+      '<div><span class="t-code">' + U.esc(p.codigo) + '</span> ' +
+        badge(p.estado) + ' ' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</div>' +
+      '<div class="muted small">' + U.esc(p.labNombre || p.laboratorio) +
+        (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</div>' +
+      '</div>';
+
+    html += '<div class="kpi-grid" style="margin:14px 0">' +
+      kpi('Stock físico', U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock),
+          'lo que hay en la posición') +
+      (hayDisp ? kpi('Disponible', U.fmt(p.disponible),
+          asignado ? U.fmt(asignado) + ' ya comprometidas por pedidos' : 'sin pedidos lanzados',
+          p.disponible <= 0 ? 'k-crit' : (asignado ? 'k-warn' : 'k-ok')) : '') +
+      (p.stockAltura ? kpi('En altura', U.fmt(p.stockAltura), 'reserva para rellenar') : '') +
+      kpi('Capacidad', p.stockMax > 0 ? U.fmt(p.stockMax) : '—',
+          p.ocupacion !== null && p.ocupacion !== undefined
+            ? Math.round(p.ocupacion * 100) + '% ocupado' +
+              (p.peorPosicion ? ' en ' + U.esc(p.peorPosicion) : '')
+            : 'sin máximo cargado') +
+      '</div>';
+
+    // barra física vs disponible: se ve de un vistazo cuánto está comprometido
+    if (hayDisp && p.stock > 0) {
+      const pctDisp = Math.max(0, Math.min(100, p.disponible / p.stock * 100));
+      html += '<div class="art-barra"><i style="width:' + pctDisp + '%"></i></div>' +
+        '<div class="art-barra-leyenda muted small">' +
+        '<span>' + U.fmt(p.disponible) + ' libres</span>' +
+        '<span>' + U.fmt(Math.max(0, p.stock - p.disponible)) + ' comprometidas</span>' +
+        '</div>';
+    }
+
+    // --- desglose por lote ---
+    const det = (p.detalle || []).slice().sort((a, b) =>
+      (a.tipo === b.tipo ? 0 : a.tipo === 'picking' ? -1 : 1) ||
+      (a.vencimiento && b.vencimiento ? a.vencimiento - b.vencimiento : 0));
+
+    if (det.length) {
+      html += '<h3 class="section-title">Por lote</h3>' +
+        '<div class="table-wrap"><table class="table"><thead><tr>' +
+        '<th class="no-sort">Posición</th><th class="no-sort">Lote</th>' +
+        '<th class="no-sort">Atributo 02</th><th class="no-sort">Vence</th>' +
+        '<th class="no-sort t-num">Físico</th>' +
+        (hayDisp ? '<th class="no-sort t-num">Disponible</th>' : '') +
+        '</tr></thead><tbody>';
+      det.forEach(d => {
+        const dispD = d.disponible !== null && d.disponible !== undefined ? d.disponible : null;
+        html += '<tr>' +
+          '<td class="t-code">' + U.esc(d.ubicacion || '—') +
+            (d.tipo === 'altura' ? ' <span class="badge b-sd">altura</span>' : '') +
+            (d.lineas > 1 ? ' <span class="muted small">(' + d.lineas + ' LPN)</span>' : '') + '</td>' +
+          '<td class="t-code">' + U.esc(d.lote || '—') + '</td>' +
+          '<td class="t-code">' + U.esc(d.lote2 || '—') + '</td>' +
+          '<td class="muted">' + (d.vencimiento ? U.fmtFecha(d.vencimiento) : '—') + '</td>' +
+          '<td class="t-num"><strong>' + U.fmt(d.stock) + '</strong></td>' +
+          (hayDisp ? '<td class="t-num' + (dispD !== null && dispD < d.stock ? ' t-warn' : '') + '">' +
+            (dispD !== null ? U.fmt(dispD) : '—') + '</td>' : '') +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    return html;
   }
 
   function exportarRepo(lista, cfg) {
@@ -3385,7 +3725,7 @@ VLM.views = (function () {
     } else {
       filtrados.forEach(p => {
         const pct = p.ocupacion !== null ? Math.min(100, p.ocupacion * 100) : 0;
-        html += '<tr class="row-' + p.estado + '">' +
+        html += '<tr class="row-' + p.estado + ' row-link" data-art="' + U.esc(p.codigo) + '">' +
           '<td class="t-code">' + U.esc(p.codigo) + '</td>' +
           '<td class="t-desc">' + U.esc(p.descripcion) + '</td>' +
           '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.labNombre || p.laboratorio) + '"></i> ' +
@@ -3444,34 +3784,44 @@ VLM.views = (function () {
     const cfgPos = VLM.store.state.posiciones;
     const Ub = VLM.ubicaciones;
 
-    // UNA fila por posición física. Si una posición tiene más de un artículo
-    // se listan juntos: el mínimo y el máximo son de la posición, no del
-    // artículo, así que no puede haber dos inputs para la misma ubicación.
-    const porUbic = {};
+    /* UNA fila por POSICIÓN + ARTÍCULO.
+       Afuera del VLM cada posición de picking tiene un solo artículo y la
+       fila es la posición de siempre. Adentro de la torre, en cambio, todos
+       comparten VLMVENTA01/02, así que la fila es el artículo dentro de esa
+       posición: es lo único que se puede configurar por separado. */
+    const porSlot = {}, artsPorUbic = {};
     items.forEach(p => {
       (p.detalle || []).forEach(d => {
         if (!d.ubicacion) return;
-        const k = d.ubicacion.toUpperCase();
-        if (!porUbic[k]) {
-          const c = cfgPos[k] || {};
-          porUbic[k] = {
-            ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
-            arts: [], stock: 0, min: c.min || 0, max: c.max || 0,
+        const u = d.ubicacion.toUpperCase();
+        const k = u + '|' + String(p.codigo).toUpperCase();
+        if (!artsPorUbic[u]) artsPorUbic[u] = {};
+        artsPorUbic[u][p.codigo] = 1;
+        if (!porSlot[k]) {
+          const c = cfgPos[k] || cfgPos[u] || {};
+          porSlot[k] = {
+            clave: k, ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
+            arts: [{ codigo: p.codigo, descripcion: p.descripcion }],
+            codigo: p.codigo, descripcion: p.descripcion,
+            stock: 0, min: c.min || 0, max: c.max || 0,
             artConfig: c.articulo || null
           };
         }
-        porUbic[k].stock += d.stock;
-        porUbic[k].arts.push({ codigo: p.codigo, descripcion: p.descripcion });
+        porSlot[k].stock += d.stock;
       });
     });
-    const filas = Object.keys(porUbic).map(k => porUbic[k])
-      .sort((a, b) => a.ubicacion.localeCompare(b.ubicacion, 'es'));
+    const filas = Object.keys(porSlot).map(k => porSlot[k])
+      .sort((a, b) => a.ubicacion.localeCompare(b.ubicacion, 'es') ||
+                      a.codigo.localeCompare(b.codigo, 'es'));
 
-    // en picking es normal que una posición se reasigne a otro artículo:
-    // ahí el mín/máx guardado ya no vale y hay que reconfirmarlo
+    /* En picking es normal que al agotarse un artículo la posición se le dé a
+       otro. Ahí el mín/máx guardado es del artículo anterior y no sirve: no se
+       aplica hasta confirmarlo. En una posición compartida (el VLM) esto no
+       aplica: que haya otro artículo configurado ahí es lo normal. */
     filas.forEach(f => {
-      f.reasignada = !!(f.artConfig && (f.min || f.max) &&
-        !f.arts.some(a => a.codigo === f.artConfig));
+      const compartida = Object.keys(artsPorUbic[f.ubicacion.toUpperCase()] || {}).length > 1;
+      f.compartida = compartida;
+      f.reasignada = !compartida && !!(f.artConfig && (f.min || f.max) && f.artConfig !== f.codigo);
     });
 
     const tipoFiltro = ui.filtroTipoPos || 'picking';
@@ -3485,9 +3835,9 @@ VLM.views = (function () {
     const configuradas = filas.filter(f => f.min || f.max).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-      kpi('Posiciones', U.fmt(filas.length),
-          filas.filter(f => f.tipo === 'picking').length + ' de picking · ' +
-          filas.filter(f => f.tipo === 'altura').length + ' de altura') +
+      kpi('Artículos ubicados', U.fmt(filas.length),
+          filas.filter(f => f.tipo === 'picking').length + ' en picking · ' +
+          filas.filter(f => f.tipo === 'altura').length + ' en altura') +
       kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
@@ -3510,14 +3860,14 @@ VLM.views = (function () {
       '<button class="btn" id="posExport">Exportar plantilla</button>' +
       '<button class="btn" id="posImport">Importar completada</button>' +
       '<input type="file" id="posFile" accept=".xlsx,.xls,.csv" hidden>' +
-      '<span class="muted small">' + vis.length + ' posiciones</span>' +
+      '<span class="muted small">' + vis.length + ' filas</span>' +
       '</div>';
 
     html += '<div class="notice" style="margin-bottom:12px">' +
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
       '<div>Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
-      '(cuánto entra) de cada posición. Se guardan solos y se aplican al volver a importar.<br>' +
+      '(cuánto entra) de cada artículo en su posición. Se guardan y se aplican al instante.<br>' +
       '<span class="small muted">Si son muchas, exportá la plantilla, completá las columnas Mínimo y Máximo en Excel y volvé a importarla.</span>' +
       '</div></div>';
 
@@ -3537,7 +3887,7 @@ VLM.views = (function () {
         if (f.reasignada) {
           est = '<span class="badge b-bajo">Revisar</span>' +
                 '<button class="btn btn-icon pos-ok" data-ubic="' + U.esc(f.ubicacion) + '" ' +
-                'data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" ' +
+                'data-art="' + U.esc(f.codigo) + '" ' +
                 'title="Confirmar que estos valores sirven para el artículo nuevo">' +
                 '<svg viewBox="0 0 24 24" class="ico"><path d="M20 6 9 17l-5-5"/></svg></button>';
           clase = 'row-bajo';
@@ -3557,13 +3907,13 @@ VLM.views = (function () {
           '<td><span class="zchip ' + (f.tipo === 'altura' ? 'a-externo' : 'a-vlm') + '">' +
             Ub.TIPOS[f.tipo].corto + '</span></td>' +
           '<td>' + zchip(f.zona) + '</td>' +
-          '<td class="t-desc">' + f.arts.map(a => '<span class="t-code">' + U.esc(a.codigo) + '</span>' +
-            (a.descripcion && a.descripcion !== a.codigo ? ' ' + U.esc(a.descripcion) : '')).join('<br>') + '</td>' +
+          '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
+            (f.descripcion && f.descripcion !== f.codigo ? ' ' + U.esc(f.descripcion) : '') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
           '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
+            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
           '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
+            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
           '<td>' + est + '</td>' +
           '</tr>';
       });
@@ -3599,18 +3949,7 @@ VLM.views = (function () {
    * porcentaje de la capacidad. Sin máximo se cae al mínimo.
    */
   function estadoPosicion(f, cfg) {
-    if (!f.max && !f.min) return 'sd';
-    if (f.stock <= 0) return 'agotado';
-    if (f.max) {
-      const pct = f.stock / f.max * 100;
-      if (pct <= cfg.pctCritico) return 'critico';
-      if (pct <= cfg.pctBajo)    return 'bajo';
-      if (f.stock > f.max * 1.05) return 'exceso';
-      return 'ok';
-    }
-    if (f.stock <= f.min) return 'critico';
-    if (f.stock <= f.min * 1.25) return 'bajo';
-    return 'ok';
+    return A.estadoDeNivel(f.stock, f.min, f.max, cfg);
   }
 
   function chipTipo(val, label, activo) {
@@ -3626,8 +3965,7 @@ VLM.views = (function () {
     const out = [['Posicion', 'Tipo', 'Zona', 'Articulo', 'Descripcion', 'Stock', 'Minimo', 'Maximo']];
     filas.forEach(f => out.push([
       f.ubicacion, f.tipo, f.zona || '',
-      f.arts.map(a => a.codigo).join(' '),
-      f.arts.map(a => a.descripcion === a.codigo ? '' : a.descripcion).filter(Boolean).join(' | '),
+      f.codigo, f.descripcion === f.codigo ? '' : f.descripcion,
       f.stock, f.min || '', f.max || ''
     ]));
 
@@ -3663,6 +4001,7 @@ VLM.views = (function () {
 
         const head = filas[0].map(h => U.norm(h));
         const iU = head.indexOf('posicion'), iMin = head.indexOf('minimo'), iMax = head.indexOf('maximo');
+        const iArt = head.indexOf('articulo');
         if (iU === -1) throw new Error('falta la columna Posicion');
 
         const mapa = Object.assign({}, VLM.store.state.posiciones);
@@ -3670,14 +4009,16 @@ VLM.views = (function () {
         for (let i = 1; i < filas.length; i++) {
           const f = filas[i];
           if (!f || !f[iU]) continue;
-          const k = String(f[iU]).trim().toUpperCase();
+          const ubic = String(f[iU]).trim().toUpperCase();
+          const art  = iArt > -1 ? String(f[iArt] || '').trim() : '';
+          const k = VLM.store.clavePos(ubic, art);
           const min = iMin > -1 ? (U.toNum(f[iMin]) || 0) : 0;
           const max = iMax > -1 ? (U.toNum(f[iMax]) || 0) : 0;
-          if (min || max) { mapa[k] = { min: min, max: max }; n++; }
+          if (min || max) { mapa[k] = { min: min, max: max, ubicacion: ubic, articulo: art || undefined }; n++; }
           else delete mapa[k];
         }
         VLM.store.setPosiciones(mapa);
-        U.toast(n + ' posiciones configuradas. Volvé a importar el stock para aplicarlas.', 'ok');
+        U.toast(n + ' posiciones configuradas.', 'ok');
       } catch (err) {
         U.toast('No se pudo leer el archivo: ' + err.message, 'err');
       }
@@ -3686,7 +4027,7 @@ VLM.views = (function () {
   }
 
   return {
-    dashboard, laboratorios, reposicion, inventario, posiciones,
+    dashboard, laboratorios, reposicion, inventario, posiciones, detalleArticulo,
     badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem, exportarRepo
   };
 })();
@@ -3988,12 +4329,22 @@ VLM.app = (function () {
     wireSettings();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
-      if (motivo === 'posiciones') calculados = null;
+      if (motivo === 'posiciones') reaplicarPosiciones();
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
       render();
     });
     render();
     setInterval(actualizarEstado, 60000);
+  }
+
+  /**
+   * Reaplica el mínimo y el máximo sobre los productos ya cargados.
+   * No hace falta reimportar: cada producto guarda su stock por posición.
+   */
+  function reaplicarPosiciones() {
+    P.aplicarPosiciones(S.state.productos, S.state.posiciones);
+    S.guardar();
+    calculados = null;
   }
 
   /** Reaplica el catálogo de laboratorios sobre los productos ya cargados. */
@@ -4065,7 +4416,26 @@ VLM.app = (function () {
       S.setUi({ filtroLab: c.dataset.lab, filtroEstado: null, vista: 'repo' });
     }));
 
+    // clic en un artículo -> detalle (es el único lugar donde se ve el
+    // disponible: en los gráficos y los estados manda el físico)
+    $$('[data-art]', el).forEach(n => {
+      if (n.tagName === 'INPUT' || n.tagName === 'BUTTON') return;
+      n.addEventListener('click', ev => {
+        if (ev.target.closest('input, button, a')) return;
+        abrirArticulo(n.dataset.art, items, cfg);
+      });
+    });
+
     if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+  }
+
+  function abrirArticulo(codigo, items, cfg) {
+    const p = items.filter(x => x.codigo === codigo)[0];
+    if (!p) return;
+    $('#artTitulo').textContent = p.descripcion && p.descripcion !== p.codigo
+      ? p.descripcion : p.codigo;
+    $('#artBody').innerHTML = V.detalleArticulo(p, cfg);
+    $('#modalArt').hidden = false;
   }
 
   /* ---------- barra de ámbito / conservación ---------- */
@@ -4346,54 +4716,65 @@ VLM.app = (function () {
   /* ============================================================
      DATOS DE EJEMPLO
      ============================================================ */
+  /* Datos de ejemplo. Las ubicaciones son las de verdad: adentro del VLM todo
+     comparte VLMVENTA01 (frío) o VLMVENTA02 (ambiente), y lo de afuera usa
+     posiciones de pasillo PPPBBBNNN, con algunas de altura para que se vea de
+     dónde bajar mercadería. */
   const DEMO = [
-    ['Codigo','Descripcion','Laboratorio','Conservacion','Ubicacion','Stock','Stock Minimo','Stock Maximo','Consumo Mensual','Lote','Vencimiento'],
+    ['Codigo','Descripcion','Laboratorio','Ubicacion','Stock fisico','Disponible','Asignado','Estatus','Stock Minimo','Stock Maximo','Lote','Atributo 02','Atributo 07','Vencimiento'],
 
     // --- ASTRAZENECA · VLM ---
-    ['AZ-101','Tagrisso 80mg x30 comp','ASTRAZENECA','Ambiente','B01-C01',140,60,320,95,'AZ4411','2027-08-31'],
-    ['AZ-102','Forxiga 10mg x28 comp','ASTRAZENECA','Ambiente','B01-C02',62,80,400,150,'AZ4418','2027-11-30'],
-    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','Ambiente','B01-C03',410,120,600,185,'AZ4423','2028-02-28'],
-    ['AZ-104','Symbicort 160/4.5 turbuhaler','ASTRAZENECA','Ambiente','B01-C04',228,90,450,140,'AZ4430','2027-06-30'],
-    ['AZ-105','Imfinzi 500mg vial','ASTRAZENECA','Frio','CF-A1',18,12,60,26,'AZ7702','2027-03-31'],
-    ['AZ-106','Faslodex 250mg jeringa x2','ASTRAZENECA','Frio','CF-A2',34,20,90,38,'AZ7715','2027-09-30'],
+    ['AZ-101','Tagrisso 80mg x30 comp','ASTRAZENECA','VLMVENTA02',140,110,30,'OK',60,320,'AZ4411','FMNZ','1000','2027-08-31'],
+    ['AZ-102','Forxiga 10mg x28 comp','ASTRAZENECA','VLMVENTA02',62,62,0,'OK',80,400,'AZ4418','EGKD','1000','2027-11-30'],
+    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','VLMVENTA02',410,395,15,'OK',120,600,'AZ4423','SX695','1000','2028-02-28'],
+    ['AZ-104','Symbicort 160/4.5 turbuhaler','ASTRAZENECA','VLMVENTA02',228,228,0,'OK',90,450,'AZ4430','VKRT','1000','2027-06-30'],
+    ['AZ-105','Imfinzi 500mg vial','ASTRAZENECA','VLMVENTA01',18,4,14,'OK',12,60,'AZ7702','BCDG','1000','2027-03-31'],
+    ['AZ-106','Faslodex 250mg jeringa x2','ASTRAZENECA','VLMVENTA01',34,34,0,'OK',20,90,'AZ7715','SW829','1000','2027-09-30'],
 
     // --- ROCHE · VLM ---
-    ['RO-201','Herceptin 440mg vial','ROCHE','Frio','CF-B1',4,10,40,14,'RO8801','2027-05-31'],
-    ['RO-202','MabThera 500mg vial','ROCHE','Frio','CF-B2',11,10,45,17,'RO8809','2027-07-31'],
-    ['RO-203','Avastin 400mg vial','ROCHE','Frio','CF-B3',26,14,60,22,'RO8814','2028-01-31'],
-    ['RO-204','Actemra 400mg vial','ROCHE','Frio','CF-B4',31,12,50,15,'RO8820','2027-10-31'],
-    ['RO-205','Xeloda 500mg x120 comp','ROCHE','Ambiente','B02-C01',96,45,220,68,'RO3310','2028-04-30'],
-    ['RO-206','Tamiflu 75mg x10 caps','ROCHE','Ambiente','B02-C02',315,100,500,120,'RO3318','2027-12-31'],
+    ['RO-201','Herceptin 440mg vial','ROCHE','VLMVENTA01',4,4,0,'OK',10,40,'RO8801','1004379','1000','2027-05-31'],
+    ['RO-202','MabThera 500mg vial','ROCHE','VLMVENTA01',11,11,0,'OK',10,45,'RO8809','1005985','1000','2027-07-31'],
+    ['RO-203','Avastin 400mg vial','ROCHE','VLMVENTA01',26,20,6,'OK',14,60,'RO8814','1006056','1000','2028-01-31'],
+    ['RO-204','Actemra 400mg vial','ROCHE','VLMVENTA01',31,31,0,'OK',12,50,'RO8820','423216','1000','2027-10-31'],
+    ['RO-205','Xeloda 500mg x120 comp','ROCHE','VLMVENTA02',96,96,0,'OK',45,220,'RO3310','SS630','1000','2028-04-30'],
+    ['RO-206','Tamiflu 75mg x10 caps','ROCHE','VLMVENTA02',315,280,35,'OK',100,500,'RO3318','TT2749A','1000','2027-12-31'],
 
     // --- SANOFI AVENTIS · VLM ---
-    ['SA-301','Lantus SoloStar 100UI x5','SANOFI AVENTIS','Frio','CF-C1',0,20,90,45,'SA5501','2027-02-28'],
-    ['SA-302','Toujeo SoloStar 300UI x3','SANOFI AVENTIS','Frio','CF-C2',22,18,80,36,'SA5508','2027-04-30'],
-    ['SA-303','Plavix 75mg x28 comp','SANOFI AVENTIS','Ambiente','B03-C01',520,150,700,210,'SA2210','2028-06-30'],
-    ['SA-304','Clexane 40mg jeringa x10','SANOFI AVENTIS','Ambiente','B03-C02',148,80,380,165,'SA2217','2027-09-30'],
-    ['SA-305','Aubagio 14mg x28 comp','SANOFI AVENTIS','Ambiente','B03-C03',73,40,180,55,'SA2224','2027-11-30'],
-    ['SA-306','Taxotere 80mg vial','SANOFI AVENTIS','Ambiente','B03-C04',41,25,110,32,'SA2231','2028-03-31'],
+    ['SA-301','Lantus SoloStar 100UI x5','SANOFI AVENTIS','VLMVENTA01',0,0,0,'OK',20,90,'SA5501','SY164','1000','2027-02-28'],
+    ['SA-302','Toujeo SoloStar 300UI x3','SANOFI AVENTIS','VLMVENTA01',22,22,0,'OK',18,80,'SA5508','SY689','1000','2027-04-30'],
+    ['SA-303','Plavix 75mg x28 comp','SANOFI AVENTIS','VLMVENTA02',520,520,0,'OK',150,700,'SA2210','SX524','1000','2028-06-30'],
+    ['SA-304','Clexane 40mg jeringa x10','SANOFI AVENTIS','VLMVENTA02',148,100,48,'OK',80,380,'SA2217','SX026','1000','2027-09-30'],
+    ['SA-305','Aubagio 14mg x28 comp','SANOFI AVENTIS','VLMVENTA02',73,73,0,'OK',40,180,'SA2224','TA436','1000','2027-11-30'],
+    ['SA-306','Taxotere 80mg vial','SANOFI AVENTIS','VLMVENTA02',41,41,0,'OK',25,110,'SA2231','AACL','1000','2028-03-31'],
 
     // --- AMGEN · VLM (biológicos, todo cadena de frío) ---
-    ['AM-401','Neulasta 6mg jeringa','AMGEN','Frio','CF-D1',8,15,60,22,'AM9901','2027-06-30'],
-    ['AM-402','Prolia 60mg jeringa','AMGEN','Frio','CF-D2',37,20,85,29,'AM9908','2027-08-31'],
-    ['AM-403','Xgeva 120mg vial','AMGEN','Frio','CF-D3',24,16,70,25,'AM9914','2028-01-31'],
-    ['AM-404','Aranesp 40mcg jeringa x4','AMGEN','Frio','CF-D4',52,25,120,34,'AM9920','2027-10-31'],
-    ['AM-405','Repatha 140mg lapicera x2','AMGEN','Frio','CF-D5',19,22,95,41,'AM9927','2027-05-31'],
+    ['AM-401','Neulasta 6mg jeringa','AMGEN','VLMVENTA01',8,8,0,'OK',15,60,'AM9901','430074','1000','2027-06-30'],
+    ['AM-402','Prolia 60mg jeringa','AMGEN','VLMVENTA01',37,37,0,'OK',20,85,'AM9908','415133','1000','2027-08-31'],
+    ['AM-403','Xgeva 120mg vial','AMGEN','VLMVENTA01',24,24,0,'OK',16,70,'AM9914','1189717','1000','2028-01-31'],
+    ['AM-404','Aranesp 40mcg jeringa x4','AMGEN','VLMVENTA01',52,52,0,'OK',25,120,'AM9920','FABR','1000','2027-10-31'],
+    ['AM-405','Repatha 140mg lapicera x2','AMGEN','VLMVENTA01',19,19,0,'OK',22,95,'AM9927','GADC','1000','2027-05-31'],
 
-    // --- ABBVIE · fuera del VLM ---
-    ['AB-501','Humira 40mg jeringa x2','ABBVIE','Frio','DEP-F1',13,18,75,31,'AB6601','2027-07-31'],
-    ['AB-502','Venclexta 100mg x28 comp','ABBVIE','Ambiente','DEP-A3',44,25,120,38,'AB6608','2028-02-29'],
-    ['AB-503','Creon 25000 x50 caps','ABBVIE','Ambiente','DEP-A4',186,70,340,112,'AB6615','2028-05-31'],
-    ['AB-504','Rinvoq 15mg x28 comp','ABBVIE','Ambiente','DEP-A5',58,30,140,46,'AB6622','2027-12-31'],
+    // --- ABBVIE · fuera del VLM, picking de pasillo + altura ---
+    ['AB-501','Humira 40mg jeringa x2','ABBVIE','104006100',13,13,0,'OK',18,75,'AB6601','ABLH','1000','2027-07-31'],
+    ['AB-501','Humira 40mg jeringa x2','ABBVIE','104006300',180,180,0,'OK',18,75,'AB6601','ABLH','1000','2027-07-31'],
+    ['AB-502','Venclexta 100mg x28 comp','ABBVIE','013012100',44,44,0,'OK',25,120,'AB6608','BBDX','1000','2028-02-29'],
+    ['AB-503','Creon 25000 x50 caps','ABBVIE','013012150',186,150,36,'OK',70,340,'AB6615','FFYZ','1000','2028-05-31'],
+    ['AB-504','Rinvoq 15mg x28 comp','ABBVIE','013013100',58,58,0,'OK',30,140,'AB6622','EARX','1000','2027-12-31'],
+    ['AB-504','Rinvoq 15mg x28 comp','ABBVIE','013013400',240,240,0,'OK',30,140,'AB6622','EARX','1000','2027-12-31'],
 
-    // --- BIOSIDUS ARGENTINA · fuera del VLM ---
-    ['BS-601','Bioyetin 4000 UI x6 amp','BIOSIDUS ARGENTINA','Frio','DEP-F2',96,40,200,72,'BS1101','2027-04-30'],
-    ['BS-602','Neutromax 300mcg x5 jeringa','BIOSIDUS ARGENTINA','Frio','DEP-F3',28,30,130,58,'BS1108','2027-06-30'],
-    ['BS-603','Bioferon 3MUI x5 amp','BIOSIDUS ARGENTINA','Frio','DEP-F4',61,25,110,34,'BS1115','2028-01-31'],
+    // --- BIOSIDUS ARGENTINA · fuera del VLM, cámara de pasillo ---
+    ['BS-601','Bioyetin 4000 UI x6 amp','BIOSIDUS ARGENTINA','BIOCAM0101',96,96,0,'OK',40,200,'BS1101','133962','1000','2027-04-30'],
+    ['BS-602','Neutromax 300mcg x5 jeringa','BIOSIDUS ARGENTINA','BIOCAM0102',28,28,0,'OK',30,130,'BS1108','133970','1000','2027-06-30'],
+    ['BS-602','Neutromax 300mcg x5 jeringa','BIOSIDUS ARGENTINA','104013200',310,310,0,'OK',30,130,'BS1108','133970','1000','2027-06-30'],
+    ['BS-603','Bioferon 3MUI x5 amp','BIOSIDUS ARGENTINA','BIOCAM0103',61,61,0,'OK',25,110,'BS1115','133988','1000','2028-01-31'],
+
+    // --- descartados por estatus: no entran, pero la app dice cuántos son ---
+    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','VLMVENTA02',75,0,0,'HOLD',120,600,'AZ4401','SX695','1000','2026-11-30'],
+    ['RO-206','Tamiflu 75mg x10 caps','ROCHE','VLMVENTA02',40,0,0,'OK',100,500,'RO3301','TT2749A','2000','2026-12-31'],
 
     // --- fuera del catálogo: se excluyen, pero la app avisa cuántos son ---
-    ['GA-701','Ibuprofeno 600mg x20 comp','GADOR','Ambiente','B09-C01',480,150,700,260,'GA0110','2028-03-31'],
-    ['EL-702','Losartan 50mg x30 comp','ELEA','Ambiente','B09-C02',312,120,600,195,'EL0220','2027-10-31']
+    ['GA-701','Ibuprofeno 600mg x20 comp','GADOR','013020100',480,480,0,'OK',150,700,'GA0110','GDR01','1000','2028-03-31'],
+    ['EL-702','Losartan 50mg x30 comp','ELEA','013020150',312,312,0,'OK',120,600,'EL0220','ELE02','1000','2027-10-31']
   ];
 
   function cargarDemo() {

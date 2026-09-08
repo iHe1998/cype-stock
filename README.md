@@ -55,8 +55,10 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 |---|---|---|
 | Código / SKU | ✅ | Codigo, SKU, Artículo, Referencia |
 | Descripción | — | Descripcion, Producto, Denominación |
-| Laboratorio | ✅ | Laboratorio, Lab, Proveedor, Marca |
-| Stock actual | ✅ | Stock, Cantidad, Existencia, Saldo |
+| Laboratorio | ✅ | Laboratorio, Lab, Propietario, Marca |
+| Stock físico | ✅ | Stock físico, Stock, Cantidad, Existencia |
+| Disponible | — | Disponible, Cantidad disponible |
+| Asignado | — | Asignado, Comprometido, Reservado |
 | Ubicación | — | Ubicacion, Bandeja, Charola, Posición |
 | Stock mínimo | — | Minimo, Punto de Pedido, Stock Min |
 | Stock máximo | — | Maximo, Capacidad |
@@ -64,9 +66,36 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 | Lote | — | Lote, Partida, Batch |
 | Lote secundario | — | Atributo02, Lote Proveedor |
 | Vencimiento | — | Vencimiento, Vto, Caducidad |
+| Estatus *(filtro)* | — | Estatus, Estado, Status |
+| Atributo 07 *(filtro)* | — | Atributo 07 |
 
 > El panel mira el día a día, no el stock a futuro: no hay proyección ni días de
 > cobertura. Las alertas salen del **máximo por posición** (ver más abajo).
+
+### Físico, disponible y asignado
+
+El **físico** es lo que hay en la posición. El **disponible** ya tiene descontado lo que
+los pedidos lanzados se van a llevar: de 200 unidades físicas con dos pedidos por 150, el
+disponible es 50.
+
+Los gráficos, los KPIs y los estados usan **siempre el físico** — el panel es para saber
+qué reponer, y lo que se repone es lo que está en el estante. El disponible aparece sólo
+al abrir un artículo (clic en cualquier fila del inventario o de la reposición), junto con
+el desglose por lote.
+
+### Filas que no entran
+
+Las columnas **Estatus** y **Atributo 07** no se muestran en ningún lado: sólo filtran.
+Entra la mercadería en `OK` con atributo 07 `1000`; el resto (bloqueada, en cuarentena,
+en tránsito) se descarta y el aviso de importación dice cuántas filas fueron y por qué.
+Si la planilla no trae esas columnas no se filtra nada.
+
+### Filas repetidas del mismo lote
+
+El mismo artículo y lote aparece en varias filas cuando el sistema lo tiene partido en
+distintos **LPN**, aunque físicamente esté todo junto. El LPN no forma parte de la clave
+de agrupación, así que esas filas se suman en una sola: se agrupa por **posición + lote +
+Atributo 02**.
 
 Hay una planilla de ejemplo en [`data/plantilla_vlm.csv`](data/plantilla_vlm.csv), y desde la
 pantalla inicial podés **descargar la plantilla en `.xlsx`**.
@@ -141,6 +170,9 @@ muestra cuántas ubicaciones del archivo cargado cubre cada regla.
 | Patrón | Acción | |
 |---|---|---|
 | `SPP` `PACK` `STAGE` `ACONDI` `PICKTO` `FALDEP*` `ROTORI*` `C*` | ignorar | tránsito, packing, acondicionado: no es stock ubicado |
+| `VLMVENTA01` | picking · cámara · **VLM** | adentro de la torre |
+| `VLMVENTA02` | picking · ambiente · **VLM** | adentro de la torre |
+| `VLM*` | picking · VLM | red de seguridad de la torre |
 | `BIOCAM*` | picking · cámara | picking de pasillo |
 | `P*` | picking · ambiente | |
 | `1*100` `1*150` | picking · cámara | pasillo 1xx |
@@ -149,14 +181,19 @@ muestra cuántas ubicaciones del archivo cargado cubre cada regla.
 | `0*` | altura · ambiente | pasillos 013, 014… |
 | `*` | altura | red de seguridad: lo que no encaje en nada |
 
-> Provisionales, sacadas de un export de Biosidus. Las posiciones del VLM todavía no
-> aparecieron en ningún archivo.
+### Adentro del VLM la ubicación no distingue nada
+
+Todo lo que está en la torre comparte `VLMVENTA01` o `VLMVENTA02` aunque físicamente esté
+en bandejas separadas: el sistema no las distingue. Por eso, adentro del VLM el corte útil
+es el **artículo**, no la posición — y de ahí sale el gráfico principal del resumen, que
+es stock por artículo.
 
 **Picking y altura** se separan por producto. Todos los KPIs y gráficos muestran
 **sólo el stock en posiciones de picking**: es lo que se sirve y lo que hay que vigilar.
 Si se sumara la reserva de altura, un artículo con la posición casi vacía y un pallet
-arriba se vería sano. En el archivo de prueba son 64.917 unidades en picking contra
-238.321 en altura — el 79% del total es reserva que no se pickea.
+arriba se vería sano. En el export de pasillo que se usó de prueba son 64.917 unidades en
+picking contra 238.321 en altura — el 79% del total es reserva que no se pickea. Adentro
+del VLM no hay altura: todo lo que está en la torre se pickea.
 
 La altura sigue estando donde sirve: la tabla de inventario tiene las dos columnas, el
 gráfico "Picking vs altura" muestra el reparto por laboratorio, y la lista de reposición
@@ -172,16 +209,20 @@ tener regla de zona) tapaba a las posiciones de picking.
 
 ## Posiciones: mínimo y máximo
 
-La pestaña **Posiciones** lista una fila por posición física —las ignoradas por reglas no
-aparecen— con el artículo que la ocupa, su stock, y el **mínimo** y el **máximo** editables ahí
-mismo. El **máximo** es el que manda: de él salen los umbrales de crítico y bajo, y el
-porcentaje de llenado que muestra cada fila. Se guardan solos y se aplican al volver a
-importar el stock.
+La pestaña **Posiciones** lista una fila por **posición + artículo** —las ignoradas por
+reglas no aparecen— con su stock y el **mínimo** y el **máximo** editables ahí mismo. El
+**máximo** es el que manda: de él salen los umbrales de crítico y bajo, y el porcentaje de
+llenado que muestra cada fila. Se guardan solos y se aplican al instante, sin reimportar.
 
-Un artículo puede estar en varias posiciones: en ese caso su mínimo y su máximo son la
-**suma** de los de sus posiciones. Eso se distingue de los mínimos que venga trayendo la
-planilla, que son del artículo y se repiten en cada fila (de esos se toma el mayor, no la
-suma). La configuración por posición tiene prioridad.
+La clave es posición **más** artículo, no la posición sola. Afuera del VLM cada posición
+de picking tiene un artículo y da lo mismo, pero adentro de la torre todos comparten
+`VLMVENTA01` o `VLMVENTA02`: con la posición sola, cargar un máximo lo cargaría para los
+cientos de artículos que viven ahí.
+
+Un artículo puede estar en varias posiciones. En ese caso **hereda el estado de su peor
+posición**, no del promedio: se repone posición por posición, y una que está por vaciarse
+hay que atenderla aunque otra del mismo artículo esté llena. Las unidades a reponer sí se
+suman entre todas.
 
 ### Cuando una posición cambia de artículo
 
@@ -195,6 +236,9 @@ alertas del artículo anterior. La posición aparece como `Revisar` en la lista,
 valores viejos todavía visibles como punto de partida, y se confirma con el botón ✓ o
 editando cualquiera de los dos números. El aviso de importación dice cuántas hay.
 
+Esto vale sólo para las posiciones de un solo artículo. En una posición compartida (el
+VLM) que haya otro artículo configurado es lo normal, no un cambio de ocupante.
+
 ### De dónde bajar para rellenar
 
 En la lista de reposición, cada producto muestra las posiciones de altura de donde sacar
@@ -202,9 +246,10 @@ mercadería, cruzadas por **artículo + lote + Atributo02**. Primero las del **m
 que ya está en la posición de picking —rellenar con otro lote mezcla partidas— y después
 las demás ordenadas por vencimiento, que es el orden en que conviene sacarlas.
 
-Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con todas las
-posiciones, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve con
-**Importar completada**.
+Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con una fila por
+posición y artículo, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve
+con **Importar completada**. Las columnas `Posicion` y `Articulo` son las que arman la
+clave: no hay que tocarlas.
 
 > Es `.xlsx` y no CSV a propósito. En CSV, Excel lee `010004100` como número y le come el
 > cero de adelante; al reimportarlo la configuración no matchearía ninguna posición. En el

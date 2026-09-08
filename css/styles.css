@@ -840,3 +840,18 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .pos-ok { width: 24px; height: 24px; margin-left: 6px; vertical-align: middle; color: var(--ok); }
 .pos-ok:hover { background: var(--ok-dim); border-color: var(--ok); }
 .pos-pct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
+
+/* ---------- detalle de artículo ---------- */
+.art-head { display: flex; flex-direction: column; gap: 6px; }
+.art-head .t-code { font-size: 15px; font-weight: 700; }
+/* barra físico vs disponible: lo lleno es lo que queda libre de verdad */
+.art-barra {
+  height: 10px; border-radius: 5px; overflow: hidden;
+  background: var(--warn); margin-top: 4px;
+}
+.art-barra > i { display: block; height: 100%; background: var(--ok); }
+.art-barra-leyenda { display: flex; justify-content: space-between; margin: 4px 0 2px; }
+.t-warn { color: var(--warn); }
+/* fila clicable: el detalle se abre desde el inventario y la reposición */
+.row-link { cursor: pointer; }
+.row-link:hover { background: var(--surface-2); }

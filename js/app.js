@@ -116,7 +116,26 @@ VLM.app = (function () {
       S.setUi({ filtroLab: c.dataset.lab, filtroEstado: null, vista: 'repo' });
     }));
 
+    // clic en un artículo -> detalle (es el único lugar donde se ve el
+    // disponible: en los gráficos y los estados manda el físico)
+    $$('[data-art]', el).forEach(n => {
+      if (n.tagName === 'INPUT' || n.tagName === 'BUTTON') return;
+      n.addEventListener('click', ev => {
+        if (ev.target.closest('input, button, a')) return;
+        abrirArticulo(n.dataset.art, items, cfg);
+      });
+    });
+
     if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+  }
+
+  function abrirArticulo(codigo, items, cfg) {
+    const p = items.filter(x => x.codigo === codigo)[0];
+    if (!p) return;
+    $('#artTitulo').textContent = p.descripcion && p.descripcion !== p.codigo
+      ? p.descripcion : p.codigo;
+    $('#artBody').innerHTML = V.detalleArticulo(p, cfg);
+    $('#modalArt').hidden = false;
   }
 
   /* ---------- barra de ámbito / conservación ---------- */
@@ -397,54 +416,65 @@ VLM.app = (function () {
   /* ============================================================
      DATOS DE EJEMPLO
      ============================================================ */
+  /* Datos de ejemplo. Las ubicaciones son las de verdad: adentro del VLM todo
+     comparte VLMVENTA01 (frío) o VLMVENTA02 (ambiente), y lo de afuera usa
+     posiciones de pasillo PPPBBBNNN, con algunas de altura para que se vea de
+     dónde bajar mercadería. */
   const DEMO = [
-    ['Codigo','Descripcion','Laboratorio','Conservacion','Ubicacion','Stock','Stock Minimo','Stock Maximo','Consumo Mensual','Lote','Vencimiento'],
+    ['Codigo','Descripcion','Laboratorio','Ubicacion','Stock fisico','Disponible','Asignado','Estatus','Stock Minimo','Stock Maximo','Lote','Atributo 02','Atributo 07','Vencimiento'],
 
     // --- ASTRAZENECA · VLM ---
-    ['AZ-101','Tagrisso 80mg x30 comp','ASTRAZENECA','Ambiente','B01-C01',140,60,320,95,'AZ4411','2027-08-31'],
-    ['AZ-102','Forxiga 10mg x28 comp','ASTRAZENECA','Ambiente','B01-C02',62,80,400,150,'AZ4418','2027-11-30'],
-    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','Ambiente','B01-C03',410,120,600,185,'AZ4423','2028-02-28'],
-    ['AZ-104','Symbicort 160/4.5 turbuhaler','ASTRAZENECA','Ambiente','B01-C04',228,90,450,140,'AZ4430','2027-06-30'],
-    ['AZ-105','Imfinzi 500mg vial','ASTRAZENECA','Frio','CF-A1',18,12,60,26,'AZ7702','2027-03-31'],
-    ['AZ-106','Faslodex 250mg jeringa x2','ASTRAZENECA','Frio','CF-A2',34,20,90,38,'AZ7715','2027-09-30'],
+    ['AZ-101','Tagrisso 80mg x30 comp','ASTRAZENECA','VLMVENTA02',140,110,30,'OK',60,320,'AZ4411','FMNZ','1000','2027-08-31'],
+    ['AZ-102','Forxiga 10mg x28 comp','ASTRAZENECA','VLMVENTA02',62,62,0,'OK',80,400,'AZ4418','EGKD','1000','2027-11-30'],
+    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','VLMVENTA02',410,395,15,'OK',120,600,'AZ4423','SX695','1000','2028-02-28'],
+    ['AZ-104','Symbicort 160/4.5 turbuhaler','ASTRAZENECA','VLMVENTA02',228,228,0,'OK',90,450,'AZ4430','VKRT','1000','2027-06-30'],
+    ['AZ-105','Imfinzi 500mg vial','ASTRAZENECA','VLMVENTA01',18,4,14,'OK',12,60,'AZ7702','BCDG','1000','2027-03-31'],
+    ['AZ-106','Faslodex 250mg jeringa x2','ASTRAZENECA','VLMVENTA01',34,34,0,'OK',20,90,'AZ7715','SW829','1000','2027-09-30'],
 
     // --- ROCHE · VLM ---
-    ['RO-201','Herceptin 440mg vial','ROCHE','Frio','CF-B1',4,10,40,14,'RO8801','2027-05-31'],
-    ['RO-202','MabThera 500mg vial','ROCHE','Frio','CF-B2',11,10,45,17,'RO8809','2027-07-31'],
-    ['RO-203','Avastin 400mg vial','ROCHE','Frio','CF-B3',26,14,60,22,'RO8814','2028-01-31'],
-    ['RO-204','Actemra 400mg vial','ROCHE','Frio','CF-B4',31,12,50,15,'RO8820','2027-10-31'],
-    ['RO-205','Xeloda 500mg x120 comp','ROCHE','Ambiente','B02-C01',96,45,220,68,'RO3310','2028-04-30'],
-    ['RO-206','Tamiflu 75mg x10 caps','ROCHE','Ambiente','B02-C02',315,100,500,120,'RO3318','2027-12-31'],
+    ['RO-201','Herceptin 440mg vial','ROCHE','VLMVENTA01',4,4,0,'OK',10,40,'RO8801','1004379','1000','2027-05-31'],
+    ['RO-202','MabThera 500mg vial','ROCHE','VLMVENTA01',11,11,0,'OK',10,45,'RO8809','1005985','1000','2027-07-31'],
+    ['RO-203','Avastin 400mg vial','ROCHE','VLMVENTA01',26,20,6,'OK',14,60,'RO8814','1006056','1000','2028-01-31'],
+    ['RO-204','Actemra 400mg vial','ROCHE','VLMVENTA01',31,31,0,'OK',12,50,'RO8820','423216','1000','2027-10-31'],
+    ['RO-205','Xeloda 500mg x120 comp','ROCHE','VLMVENTA02',96,96,0,'OK',45,220,'RO3310','SS630','1000','2028-04-30'],
+    ['RO-206','Tamiflu 75mg x10 caps','ROCHE','VLMVENTA02',315,280,35,'OK',100,500,'RO3318','TT2749A','1000','2027-12-31'],
 
     // --- SANOFI AVENTIS · VLM ---
-    ['SA-301','Lantus SoloStar 100UI x5','SANOFI AVENTIS','Frio','CF-C1',0,20,90,45,'SA5501','2027-02-28'],
-    ['SA-302','Toujeo SoloStar 300UI x3','SANOFI AVENTIS','Frio','CF-C2',22,18,80,36,'SA5508','2027-04-30'],
-    ['SA-303','Plavix 75mg x28 comp','SANOFI AVENTIS','Ambiente','B03-C01',520,150,700,210,'SA2210','2028-06-30'],
-    ['SA-304','Clexane 40mg jeringa x10','SANOFI AVENTIS','Ambiente','B03-C02',148,80,380,165,'SA2217','2027-09-30'],
-    ['SA-305','Aubagio 14mg x28 comp','SANOFI AVENTIS','Ambiente','B03-C03',73,40,180,55,'SA2224','2027-11-30'],
-    ['SA-306','Taxotere 80mg vial','SANOFI AVENTIS','Ambiente','B03-C04',41,25,110,32,'SA2231','2028-03-31'],
+    ['SA-301','Lantus SoloStar 100UI x5','SANOFI AVENTIS','VLMVENTA01',0,0,0,'OK',20,90,'SA5501','SY164','1000','2027-02-28'],
+    ['SA-302','Toujeo SoloStar 300UI x3','SANOFI AVENTIS','VLMVENTA01',22,22,0,'OK',18,80,'SA5508','SY689','1000','2027-04-30'],
+    ['SA-303','Plavix 75mg x28 comp','SANOFI AVENTIS','VLMVENTA02',520,520,0,'OK',150,700,'SA2210','SX524','1000','2028-06-30'],
+    ['SA-304','Clexane 40mg jeringa x10','SANOFI AVENTIS','VLMVENTA02',148,100,48,'OK',80,380,'SA2217','SX026','1000','2027-09-30'],
+    ['SA-305','Aubagio 14mg x28 comp','SANOFI AVENTIS','VLMVENTA02',73,73,0,'OK',40,180,'SA2224','TA436','1000','2027-11-30'],
+    ['SA-306','Taxotere 80mg vial','SANOFI AVENTIS','VLMVENTA02',41,41,0,'OK',25,110,'SA2231','AACL','1000','2028-03-31'],
 
     // --- AMGEN · VLM (biológicos, todo cadena de frío) ---
-    ['AM-401','Neulasta 6mg jeringa','AMGEN','Frio','CF-D1',8,15,60,22,'AM9901','2027-06-30'],
-    ['AM-402','Prolia 60mg jeringa','AMGEN','Frio','CF-D2',37,20,85,29,'AM9908','2027-08-31'],
-    ['AM-403','Xgeva 120mg vial','AMGEN','Frio','CF-D3',24,16,70,25,'AM9914','2028-01-31'],
-    ['AM-404','Aranesp 40mcg jeringa x4','AMGEN','Frio','CF-D4',52,25,120,34,'AM9920','2027-10-31'],
-    ['AM-405','Repatha 140mg lapicera x2','AMGEN','Frio','CF-D5',19,22,95,41,'AM9927','2027-05-31'],
+    ['AM-401','Neulasta 6mg jeringa','AMGEN','VLMVENTA01',8,8,0,'OK',15,60,'AM9901','430074','1000','2027-06-30'],
+    ['AM-402','Prolia 60mg jeringa','AMGEN','VLMVENTA01',37,37,0,'OK',20,85,'AM9908','415133','1000','2027-08-31'],
+    ['AM-403','Xgeva 120mg vial','AMGEN','VLMVENTA01',24,24,0,'OK',16,70,'AM9914','1189717','1000','2028-01-31'],
+    ['AM-404','Aranesp 40mcg jeringa x4','AMGEN','VLMVENTA01',52,52,0,'OK',25,120,'AM9920','FABR','1000','2027-10-31'],
+    ['AM-405','Repatha 140mg lapicera x2','AMGEN','VLMVENTA01',19,19,0,'OK',22,95,'AM9927','GADC','1000','2027-05-31'],
 
-    // --- ABBVIE · fuera del VLM ---
-    ['AB-501','Humira 40mg jeringa x2','ABBVIE','Frio','DEP-F1',13,18,75,31,'AB6601','2027-07-31'],
-    ['AB-502','Venclexta 100mg x28 comp','ABBVIE','Ambiente','DEP-A3',44,25,120,38,'AB6608','2028-02-29'],
-    ['AB-503','Creon 25000 x50 caps','ABBVIE','Ambiente','DEP-A4',186,70,340,112,'AB6615','2028-05-31'],
-    ['AB-504','Rinvoq 15mg x28 comp','ABBVIE','Ambiente','DEP-A5',58,30,140,46,'AB6622','2027-12-31'],
+    // --- ABBVIE · fuera del VLM, picking de pasillo + altura ---
+    ['AB-501','Humira 40mg jeringa x2','ABBVIE','104006100',13,13,0,'OK',18,75,'AB6601','ABLH','1000','2027-07-31'],
+    ['AB-501','Humira 40mg jeringa x2','ABBVIE','104006300',180,180,0,'OK',18,75,'AB6601','ABLH','1000','2027-07-31'],
+    ['AB-502','Venclexta 100mg x28 comp','ABBVIE','013012100',44,44,0,'OK',25,120,'AB6608','BBDX','1000','2028-02-29'],
+    ['AB-503','Creon 25000 x50 caps','ABBVIE','013012150',186,150,36,'OK',70,340,'AB6615','FFYZ','1000','2028-05-31'],
+    ['AB-504','Rinvoq 15mg x28 comp','ABBVIE','013013100',58,58,0,'OK',30,140,'AB6622','EARX','1000','2027-12-31'],
+    ['AB-504','Rinvoq 15mg x28 comp','ABBVIE','013013400',240,240,0,'OK',30,140,'AB6622','EARX','1000','2027-12-31'],
 
-    // --- BIOSIDUS ARGENTINA · fuera del VLM ---
-    ['BS-601','Bioyetin 4000 UI x6 amp','BIOSIDUS ARGENTINA','Frio','DEP-F2',96,40,200,72,'BS1101','2027-04-30'],
-    ['BS-602','Neutromax 300mcg x5 jeringa','BIOSIDUS ARGENTINA','Frio','DEP-F3',28,30,130,58,'BS1108','2027-06-30'],
-    ['BS-603','Bioferon 3MUI x5 amp','BIOSIDUS ARGENTINA','Frio','DEP-F4',61,25,110,34,'BS1115','2028-01-31'],
+    // --- BIOSIDUS ARGENTINA · fuera del VLM, cámara de pasillo ---
+    ['BS-601','Bioyetin 4000 UI x6 amp','BIOSIDUS ARGENTINA','BIOCAM0101',96,96,0,'OK',40,200,'BS1101','133962','1000','2027-04-30'],
+    ['BS-602','Neutromax 300mcg x5 jeringa','BIOSIDUS ARGENTINA','BIOCAM0102',28,28,0,'OK',30,130,'BS1108','133970','1000','2027-06-30'],
+    ['BS-602','Neutromax 300mcg x5 jeringa','BIOSIDUS ARGENTINA','104013200',310,310,0,'OK',30,130,'BS1108','133970','1000','2027-06-30'],
+    ['BS-603','Bioferon 3MUI x5 amp','BIOSIDUS ARGENTINA','BIOCAM0103',61,61,0,'OK',25,110,'BS1115','133988','1000','2028-01-31'],
+
+    // --- descartados por estatus: no entran, pero la app dice cuántos son ---
+    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','VLMVENTA02',75,0,0,'HOLD',120,600,'AZ4401','SX695','1000','2026-11-30'],
+    ['RO-206','Tamiflu 75mg x10 caps','ROCHE','VLMVENTA02',40,0,0,'OK',100,500,'RO3301','TT2749A','2000','2026-12-31'],
 
     // --- fuera del catálogo: se excluyen, pero la app avisa cuántos son ---
-    ['GA-701','Ibuprofeno 600mg x20 comp','GADOR','Ambiente','B09-C01',480,150,700,260,'GA0110','2028-03-31'],
-    ['EL-702','Losartan 50mg x30 comp','ELEA','Ambiente','B09-C02',312,120,600,195,'EL0220','2027-10-31']
+    ['GA-701','Ibuprofeno 600mg x20 comp','GADOR','013020100',480,480,0,'OK',150,700,'GA0110','GDR01','1000','2028-03-31'],
+    ['EL-702','Losartan 50mg x30 comp','ELEA','013020150',312,312,0,'OK',120,600,'EL0220','ELE02','1000','2027-10-31']
   ];
 
   function cargarDemo() {

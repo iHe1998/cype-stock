@@ -119,9 +119,16 @@ VLM.views = (function () {
 
     /* --- gráficos --- */
     html += '<h3 class="section-title">Situación del stock</h3>';
-    html += '<div class="grid grid-2">' +
-      cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
+    // el corte principal es el artículo: adentro del VLM la ubicación no
+    // distingue nada, todos comparten VLMVENTA01 o VLMVENTA02
+    const topArt = Math.min(items.length, 15);
+    html += cardChart('Stock por artículo', topArt < items.length
+        ? 'unidades en picking · los ' + topArt + ' de mayor stock, de ' + items.length
+        : 'unidades en picking',
+        'chArtStock', Math.max(280, topArt * 24 + 50));
+    html += '<div class="grid grid-2" style="margin-top:14px">' +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
+      cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
       '</div>';
 
     /* --- posiciones sin configurar: sin máximo no hay alerta posible --- */
@@ -138,6 +145,7 @@ VLM.views = (function () {
     el.innerHTML = html;
 
     /* --- montaje de gráficos --- */
+    C.stockPorArticulo($('#chArtStock', el), items);
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
   }
@@ -356,7 +364,7 @@ VLM.views = (function () {
     const clase = p.estado === 'agotado' ? 'r-agotado' : (p.estado === 'bajo' ? 'r-bajo' : '');
     const pct = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
 
-    return '<div class="repo-item ' + clase + '">' +
+    return '<div class="repo-item row-link ' + clase + '" data-art="' + U.esc(p.codigo) + '">' +
       '<div class="repo-rank">' + rank + '</div>' +
       '<div class="repo-main">' +
         '<strong>' + U.esc(p.descripcion) + '</strong>' +
@@ -375,6 +383,88 @@ VLM.views = (function () {
         '<b>' + pct + '</b><span>de su capacidad</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
       '</div>';
+  }
+
+  /* ============================================================
+     DETALLE DE UN ARTÍCULO
+     ============================================================ */
+
+  /**
+   * Lo que no entra en los gráficos: el desglose por lote y, sobre todo, el
+   * DISPONIBLE.
+   *
+   * El físico es lo que hay en la posición; el disponible ya tiene descontado
+   * lo que los pedidos lanzados se van a llevar. Si de 200 unidades hay dos
+   * pedidos por 150, quedan 50 realmente libres. Eso importa cuando se mira un
+   * artículo puntual, pero no en los gráficos: el panel es para saber qué
+   * reponer, y lo que se repone es lo físico.
+   */
+  function detalleArticulo(p, cfg) {
+    const hayDisp = p.disponible !== null && p.disponible !== undefined;
+    const asignado = p.asignado || 0;
+
+    let html = '<div class="art-head">' +
+      '<div><span class="t-code">' + U.esc(p.codigo) + '</span> ' +
+        badge(p.estado) + ' ' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</div>' +
+      '<div class="muted small">' + U.esc(p.labNombre || p.laboratorio) +
+        (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</div>' +
+      '</div>';
+
+    html += '<div class="kpi-grid" style="margin:14px 0">' +
+      kpi('Stock físico', U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock),
+          'lo que hay en la posición') +
+      (hayDisp ? kpi('Disponible', U.fmt(p.disponible),
+          asignado ? U.fmt(asignado) + ' ya comprometidas por pedidos' : 'sin pedidos lanzados',
+          p.disponible <= 0 ? 'k-crit' : (asignado ? 'k-warn' : 'k-ok')) : '') +
+      (p.stockAltura ? kpi('En altura', U.fmt(p.stockAltura), 'reserva para rellenar') : '') +
+      kpi('Capacidad', p.stockMax > 0 ? U.fmt(p.stockMax) : '—',
+          p.ocupacion !== null && p.ocupacion !== undefined
+            ? Math.round(p.ocupacion * 100) + '% ocupado' +
+              (p.peorPosicion ? ' en ' + U.esc(p.peorPosicion) : '')
+            : 'sin máximo cargado') +
+      '</div>';
+
+    // barra física vs disponible: se ve de un vistazo cuánto está comprometido
+    if (hayDisp && p.stock > 0) {
+      const pctDisp = Math.max(0, Math.min(100, p.disponible / p.stock * 100));
+      html += '<div class="art-barra"><i style="width:' + pctDisp + '%"></i></div>' +
+        '<div class="art-barra-leyenda muted small">' +
+        '<span>' + U.fmt(p.disponible) + ' libres</span>' +
+        '<span>' + U.fmt(Math.max(0, p.stock - p.disponible)) + ' comprometidas</span>' +
+        '</div>';
+    }
+
+    // --- desglose por lote ---
+    const det = (p.detalle || []).slice().sort((a, b) =>
+      (a.tipo === b.tipo ? 0 : a.tipo === 'picking' ? -1 : 1) ||
+      (a.vencimiento && b.vencimiento ? a.vencimiento - b.vencimiento : 0));
+
+    if (det.length) {
+      html += '<h3 class="section-title">Por lote</h3>' +
+        '<div class="table-wrap"><table class="table"><thead><tr>' +
+        '<th class="no-sort">Posición</th><th class="no-sort">Lote</th>' +
+        '<th class="no-sort">Atributo 02</th><th class="no-sort">Vence</th>' +
+        '<th class="no-sort t-num">Físico</th>' +
+        (hayDisp ? '<th class="no-sort t-num">Disponible</th>' : '') +
+        '</tr></thead><tbody>';
+      det.forEach(d => {
+        const dispD = d.disponible !== null && d.disponible !== undefined ? d.disponible : null;
+        html += '<tr>' +
+          '<td class="t-code">' + U.esc(d.ubicacion || '—') +
+            (d.tipo === 'altura' ? ' <span class="badge b-sd">altura</span>' : '') +
+            (d.lineas > 1 ? ' <span class="muted small">(' + d.lineas + ' LPN)</span>' : '') + '</td>' +
+          '<td class="t-code">' + U.esc(d.lote || '—') + '</td>' +
+          '<td class="t-code">' + U.esc(d.lote2 || '—') + '</td>' +
+          '<td class="muted">' + (d.vencimiento ? U.fmtFecha(d.vencimiento) : '—') + '</td>' +
+          '<td class="t-num"><strong>' + U.fmt(d.stock) + '</strong></td>' +
+          (hayDisp ? '<td class="t-num' + (dispD !== null && dispD < d.stock ? ' t-warn' : '') + '">' +
+            (dispD !== null ? U.fmt(dispD) : '—') + '</td>' : '') +
+          '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    return html;
   }
 
   function exportarRepo(lista, cfg) {
@@ -493,7 +583,7 @@ VLM.views = (function () {
     } else {
       filtrados.forEach(p => {
         const pct = p.ocupacion !== null ? Math.min(100, p.ocupacion * 100) : 0;
-        html += '<tr class="row-' + p.estado + '">' +
+        html += '<tr class="row-' + p.estado + ' row-link" data-art="' + U.esc(p.codigo) + '">' +
           '<td class="t-code">' + U.esc(p.codigo) + '</td>' +
           '<td class="t-desc">' + U.esc(p.descripcion) + '</td>' +
           '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.labNombre || p.laboratorio) + '"></i> ' +
@@ -552,34 +642,44 @@ VLM.views = (function () {
     const cfgPos = VLM.store.state.posiciones;
     const Ub = VLM.ubicaciones;
 
-    // UNA fila por posición física. Si una posición tiene más de un artículo
-    // se listan juntos: el mínimo y el máximo son de la posición, no del
-    // artículo, así que no puede haber dos inputs para la misma ubicación.
-    const porUbic = {};
+    /* UNA fila por POSICIÓN + ARTÍCULO.
+       Afuera del VLM cada posición de picking tiene un solo artículo y la
+       fila es la posición de siempre. Adentro de la torre, en cambio, todos
+       comparten VLMVENTA01/02, así que la fila es el artículo dentro de esa
+       posición: es lo único que se puede configurar por separado. */
+    const porSlot = {}, artsPorUbic = {};
     items.forEach(p => {
       (p.detalle || []).forEach(d => {
         if (!d.ubicacion) return;
-        const k = d.ubicacion.toUpperCase();
-        if (!porUbic[k]) {
-          const c = cfgPos[k] || {};
-          porUbic[k] = {
-            ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
-            arts: [], stock: 0, min: c.min || 0, max: c.max || 0,
+        const u = d.ubicacion.toUpperCase();
+        const k = u + '|' + String(p.codigo).toUpperCase();
+        if (!artsPorUbic[u]) artsPorUbic[u] = {};
+        artsPorUbic[u][p.codigo] = 1;
+        if (!porSlot[k]) {
+          const c = cfgPos[k] || cfgPos[u] || {};
+          porSlot[k] = {
+            clave: k, ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
+            arts: [{ codigo: p.codigo, descripcion: p.descripcion }],
+            codigo: p.codigo, descripcion: p.descripcion,
+            stock: 0, min: c.min || 0, max: c.max || 0,
             artConfig: c.articulo || null
           };
         }
-        porUbic[k].stock += d.stock;
-        porUbic[k].arts.push({ codigo: p.codigo, descripcion: p.descripcion });
+        porSlot[k].stock += d.stock;
       });
     });
-    const filas = Object.keys(porUbic).map(k => porUbic[k])
-      .sort((a, b) => a.ubicacion.localeCompare(b.ubicacion, 'es'));
+    const filas = Object.keys(porSlot).map(k => porSlot[k])
+      .sort((a, b) => a.ubicacion.localeCompare(b.ubicacion, 'es') ||
+                      a.codigo.localeCompare(b.codigo, 'es'));
 
-    // en picking es normal que una posición se reasigne a otro artículo:
-    // ahí el mín/máx guardado ya no vale y hay que reconfirmarlo
+    /* En picking es normal que al agotarse un artículo la posición se le dé a
+       otro. Ahí el mín/máx guardado es del artículo anterior y no sirve: no se
+       aplica hasta confirmarlo. En una posición compartida (el VLM) esto no
+       aplica: que haya otro artículo configurado ahí es lo normal. */
     filas.forEach(f => {
-      f.reasignada = !!(f.artConfig && (f.min || f.max) &&
-        !f.arts.some(a => a.codigo === f.artConfig));
+      const compartida = Object.keys(artsPorUbic[f.ubicacion.toUpperCase()] || {}).length > 1;
+      f.compartida = compartida;
+      f.reasignada = !compartida && !!(f.artConfig && (f.min || f.max) && f.artConfig !== f.codigo);
     });
 
     const tipoFiltro = ui.filtroTipoPos || 'picking';
@@ -593,9 +693,9 @@ VLM.views = (function () {
     const configuradas = filas.filter(f => f.min || f.max).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-      kpi('Posiciones', U.fmt(filas.length),
-          filas.filter(f => f.tipo === 'picking').length + ' de picking · ' +
-          filas.filter(f => f.tipo === 'altura').length + ' de altura') +
+      kpi('Artículos ubicados', U.fmt(filas.length),
+          filas.filter(f => f.tipo === 'picking').length + ' en picking · ' +
+          filas.filter(f => f.tipo === 'altura').length + ' en altura') +
       kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
@@ -618,14 +718,14 @@ VLM.views = (function () {
       '<button class="btn" id="posExport">Exportar plantilla</button>' +
       '<button class="btn" id="posImport">Importar completada</button>' +
       '<input type="file" id="posFile" accept=".xlsx,.xls,.csv" hidden>' +
-      '<span class="muted small">' + vis.length + ' posiciones</span>' +
+      '<span class="muted small">' + vis.length + ' filas</span>' +
       '</div>';
 
     html += '<div class="notice" style="margin-bottom:12px">' +
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
       '<div>Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
-      '(cuánto entra) de cada posición. Se guardan y se aplican al instante.<br>' +
+      '(cuánto entra) de cada artículo en su posición. Se guardan y se aplican al instante.<br>' +
       '<span class="small muted">Si son muchas, exportá la plantilla, completá las columnas Mínimo y Máximo en Excel y volvé a importarla.</span>' +
       '</div></div>';
 
@@ -645,7 +745,7 @@ VLM.views = (function () {
         if (f.reasignada) {
           est = '<span class="badge b-bajo">Revisar</span>' +
                 '<button class="btn btn-icon pos-ok" data-ubic="' + U.esc(f.ubicacion) + '" ' +
-                'data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" ' +
+                'data-art="' + U.esc(f.codigo) + '" ' +
                 'title="Confirmar que estos valores sirven para el artículo nuevo">' +
                 '<svg viewBox="0 0 24 24" class="ico"><path d="M20 6 9 17l-5-5"/></svg></button>';
           clase = 'row-bajo';
@@ -665,13 +765,13 @@ VLM.views = (function () {
           '<td><span class="zchip ' + (f.tipo === 'altura' ? 'a-externo' : 'a-vlm') + '">' +
             Ub.TIPOS[f.tipo].corto + '</span></td>' +
           '<td>' + zchip(f.zona) + '</td>' +
-          '<td class="t-desc">' + f.arts.map(a => '<span class="t-code">' + U.esc(a.codigo) + '</span>' +
-            (a.descripcion && a.descripcion !== a.codigo ? ' ' + U.esc(a.descripcion) : '')).join('<br>') + '</td>' +
+          '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
+            (f.descripcion && f.descripcion !== f.codigo ? ' ' + U.esc(f.descripcion) : '') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
           '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
+            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
           '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.arts[0] ? f.arts[0].codigo : '') + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
+            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
           '<td>' + est + '</td>' +
           '</tr>';
       });
@@ -723,8 +823,7 @@ VLM.views = (function () {
     const out = [['Posicion', 'Tipo', 'Zona', 'Articulo', 'Descripcion', 'Stock', 'Minimo', 'Maximo']];
     filas.forEach(f => out.push([
       f.ubicacion, f.tipo, f.zona || '',
-      f.arts.map(a => a.codigo).join(' '),
-      f.arts.map(a => a.descripcion === a.codigo ? '' : a.descripcion).filter(Boolean).join(' | '),
+      f.codigo, f.descripcion === f.codigo ? '' : f.descripcion,
       f.stock, f.min || '', f.max || ''
     ]));
 
@@ -760,6 +859,7 @@ VLM.views = (function () {
 
         const head = filas[0].map(h => U.norm(h));
         const iU = head.indexOf('posicion'), iMin = head.indexOf('minimo'), iMax = head.indexOf('maximo');
+        const iArt = head.indexOf('articulo');
         if (iU === -1) throw new Error('falta la columna Posicion');
 
         const mapa = Object.assign({}, VLM.store.state.posiciones);
@@ -767,14 +867,16 @@ VLM.views = (function () {
         for (let i = 1; i < filas.length; i++) {
           const f = filas[i];
           if (!f || !f[iU]) continue;
-          const k = String(f[iU]).trim().toUpperCase();
+          const ubic = String(f[iU]).trim().toUpperCase();
+          const art  = iArt > -1 ? String(f[iArt] || '').trim() : '';
+          const k = VLM.store.clavePos(ubic, art);
           const min = iMin > -1 ? (U.toNum(f[iMin]) || 0) : 0;
           const max = iMax > -1 ? (U.toNum(f[iMax]) || 0) : 0;
-          if (min || max) { mapa[k] = { min: min, max: max }; n++; }
+          if (min || max) { mapa[k] = { min: min, max: max, ubicacion: ubic, articulo: art || undefined }; n++; }
           else delete mapa[k];
         }
         VLM.store.setPosiciones(mapa);
-        U.toast(n + ' posiciones configuradas. Volvé a importar el stock para aplicarlas.', 'ok');
+        U.toast(n + ' posiciones configuradas.', 'ok');
       } catch (err) {
         U.toast('No se pudo leer el archivo: ' + err.message, 'err');
       }
@@ -783,7 +885,7 @@ VLM.views = (function () {
   }
 
   return {
-    dashboard, laboratorios, reposicion, inventario, posiciones,
+    dashboard, laboratorios, reposicion, inventario, posiciones, detalleArticulo,
     badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem, exportarRepo
   };
 })();
