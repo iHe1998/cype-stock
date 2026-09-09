@@ -491,6 +491,15 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   margin-bottom: 12px;
 }
+/* Sin flechitas en los campos numéricos.
+   Comen la mitad de un input angosto —el mínimo y el máximo de cada
+   posición— y tapan el número; peor todavía, el primer clic cae sobre la
+   flecha en vez de sobre el texto, así que había que hacer clic dos veces
+   para poder escribir. Los valores se escriben, no se suben de a uno. */
+input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
 .input, .select {
   height: 34px; padding: 0 11px;
   font: inherit; font-size: 13px; color: var(--text);
@@ -1115,7 +1124,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 08/09/2026 21:20 - ecbd1aa</span>
+      <span class="muted small" id="appVersion">compilado 08/09/2026 21:29 - dd183a7</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -4046,10 +4055,7 @@ VLM.views = (function () {
           '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
             (f.descripcion && f.descripcion !== f.codigo ? ' ' + U.esc(f.descripcion) : '') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
-          '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
-          '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
+          celdaInp(f, 'min') + celdaInp(f, 'max') +
           '<td>' + est + '</td>' +
           '</tr>';
       });
@@ -4064,11 +4070,16 @@ VLM.views = (function () {
     U.$$('.chip', el).forEach(c => c.addEventListener('click', () =>
       VLM.store.setUi({ filtroTipoPos: c.dataset.val })));
     // al editar se re-asocia al artículo que ocupa la posición ahora
-    U.$$('.pos-inp', el).forEach(inp => inp.addEventListener('change', () => {
-      const v = parseInt(inp.value, 10);
-      VLM.store.setPosicion(inp.dataset.ubic,
-        { [inp.dataset.campo]: isFinite(v) && v > 0 ? v : 0 }, inp.dataset.art);
-    }));
+    U.$$('.pos-inp', el).forEach(inp => {
+      // un clic selecciona lo que ya está: se carga escribiendo el número
+      // nuevo encima, sin tener que borrar antes
+      inp.addEventListener('focus', () => inp.select());
+      inp.addEventListener('change', () => {
+        const v = parseInt(inp.value, 10);
+        VLM.store.setPosicion(inp.dataset.ubic,
+          { [inp.dataset.campo]: isFinite(v) && v > 0 ? v : 0 }, inp.dataset.art);
+      });
+    });
     U.$$('.pos-ok', el).forEach(b => b.addEventListener('click', () => {
       VLM.store.setPosicion(b.dataset.ubic, {}, b.dataset.art);
       U.toast('Confirmado para el artículo nuevo', 'ok');
@@ -4078,6 +4089,20 @@ VLM.views = (function () {
     $('#posFile', el).addEventListener('change', e => {
       if (e.target.files[0]) importarPosiciones(e.target.files[0]);
     });
+  }
+
+  /**
+   * Celda editable de mínimo o máximo.
+   * `data-k` identifica la celda entre redibujos: al guardar un valor se
+   * vuelve a dibujar toda la tabla, y sin esa clave el cursor se perdía en
+   * cada número cargado (ver restaurarFoco en app.js).
+   */
+  function celdaInp(f, campo) {
+    return '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
+      'inputmode="numeric" ' +
+      'data-k="' + U.esc(f.ubicacion + '|' + f.codigo + '|' + campo) + '" ' +
+      'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" ' +
+      'data-campo="' + campo + '" value="' + (f[campo] || '') + '"></td>';
   }
 
   /**
@@ -4528,6 +4553,10 @@ VLM.app = (function () {
      RENDER
      ============================================================ */
   function render() {
+    // guardar un valor redibuja la vista entera: sin esto, cargar de corrido
+    // los máximos de la tabla de posiciones perdía el cursor en cada número
+    const focoPrev = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.k : null;
     const hay = S.hayDatos();
     $('#empty').hidden = hay;
     $('#tabs').hidden = !hay;
@@ -4581,7 +4610,17 @@ VLM.app = (function () {
       });
     });
 
+    if (focoPrev) restaurarFoco(el, focoPrev);
+
     if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+  }
+
+  /** Devuelve el cursor al mismo campo después de redibujar. */
+  function restaurarFoco(el, clave) {
+    const n = el.querySelector('[data-k="' + clave.replace(/"/g, '\\"') + '"]');
+    if (!n) return;
+    n.focus();
+    if (n.select) n.select();
   }
 
   function abrirArticulo(codigo, items, cfg) {
