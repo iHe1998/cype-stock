@@ -267,6 +267,74 @@ VLM.parser = (function () {
     return productos;
   }
 
+  /**
+   * Reaplica las reglas de posición sobre productos ya cargados.
+   *
+   * Sin esto, cambiar una regla —o abrir una versión nueva de la app que trae
+   * reglas nuevas— dejaba la clasificación vieja pegada hasta reimportar la
+   * planilla: el artículo seguía en la zona y el ámbito que le tocaron el día
+   * que se importó. Cada producto guarda su `detalle` con la ubicación de cada
+   * línea, así que se puede recalcular sin el archivo original.
+   *
+   * Lo único que NO se puede recuperar son las filas que una regla de ignorar
+   * descartó al importar: esas nunca se guardaron.
+   */
+  function reaplicarReglas(productos, reglas, catalogo) {
+    reglas = reglas || VLM.ubicaciones.reglasDefault();
+    catalogo = catalogo || VLM.labs.catalogoDefault();
+
+    productos.forEach(p => {
+      const dets = p.detalle || [];
+      if (!dets.length) return;
+
+      let pick = 0, alt = 0;
+      const zonaPeso = {}, ambitoPeso = {};
+      const ubicPicking = [], ubicAltura = [], ubicaciones = [];
+
+      dets.forEach(d => {
+        const regla = VLM.ubicaciones.evaluar(d.ubicacion, reglas);
+        d.tipo = (regla && regla.tipo) || 'picking';
+        const zona = regla && regla.zona ? regla.zona : null;
+        if (zona && !p.zonaDeColumna) d.zona = zona;
+
+        if (d.tipo === 'altura') {
+          alt += d.stock;
+          if (d.ubicacion && ubicAltura.indexOf(d.ubicacion) === -1) ubicAltura.push(d.ubicacion);
+        } else {
+          pick += d.stock;
+          if (d.ubicacion && ubicPicking.indexOf(d.ubicacion) === -1) ubicPicking.push(d.ubicacion);
+        }
+        if (d.ubicacion && ubicaciones.indexOf(d.ubicacion) === -1) ubicaciones.push(d.ubicacion);
+
+        // el picking pesa doble: es desde donde se sirve
+        const peso = (d.stock || 0) * (d.tipo === 'picking' ? 2 : 1) + 1;
+        if (zona) zonaPeso[zona] = (zonaPeso[zona] || 0) + peso;
+        if (regla && regla.ambito) ambitoPeso[regla.ambito] = (ambitoPeso[regla.ambito] || 0) + peso;
+      });
+
+      const mayor = o => Object.keys(o).sort((a, b) => o[b] - o[a])[0];
+      const zonaGana   = mayor(zonaPeso);
+      const ambitoGana = mayor(ambitoPeso);
+
+      p.stockPicking = pick;
+      p.stockAltura  = alt;
+      p.ubicaciones  = ubicaciones;
+      p.ubicPicking  = ubicPicking;
+      p.ubicAltura   = ubicAltura;
+      p.sinPicking   = ubicPicking.length === 0;
+      p.zonasMixtas  = Object.keys(zonaPeso).length > 1;
+      p.ubicacion    = ubicPicking.length ? ubicPicking[0] : (ubicaciones[0] || '');
+      if (ubicaciones.length > 1) p.ubicacion += ' +' + (ubicaciones.length - 1);
+
+      // la columna de la planilla, si existe, le gana a la regla
+      if (zonaGana && !p.zonaDeColumna) { p.zonaPlanilla = zonaGana; p.zonaExplicita = true; }
+      if (ambitoGana) p.ambitoPos = ambitoGana;
+
+      VLM.labs.clasificar(p, catalogo);
+    });
+    return productos;
+  }
+
   /** ¿Hay más de una fila por código? (export por posición o por lote) */
   function hayRepetidos(productos) {
     const vistos = {};
@@ -357,6 +425,7 @@ VLM.parser = (function () {
       }
       if (p.ambitoPos) g.ambitoPeso[p.ambitoPos] = (g.ambitoPeso[p.ambitoPos] || 0) + peso;
 
+      if (p.zonaDeColumna) g.zonaDeColumna = true;
       g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
       g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
       if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
@@ -461,7 +530,8 @@ VLM.parser = (function () {
       if (ubic && !regla) sinRegla++;
 
       // la columna de la planilla manda sobre la regla de posición
-      const zonaFila = VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons) ||
+      const zonaCol = VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons);
+      const zonaFila = zonaCol ||
                        (regla && regla.zona) || null;
 
       const cod = String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1));
@@ -482,6 +552,9 @@ VLM.parser = (function () {
         // una columna de conservación explícita en la planilla
         zonaPlanilla:  zonaFila,
         zonaExplicita: !!zonaFila,
+        // si la zona vino de una columna de la planilla, ninguna regla de
+        // posición la pisa después (ver reaplicarReglas)
+        zonaDeColumna: !!zonaCol,
         ambitoPos:     regla && regla.ambito ? regla.ambito : null,
         tipoPos:       (regla && regla.tipo) || 'picking',
         ubicacion:     ubic,
@@ -589,6 +662,6 @@ VLM.parser = (function () {
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
     autoMapear, normalizar, generarPlantilla,
-    detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones
+    detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, reaplicarReglas
   };
 })();

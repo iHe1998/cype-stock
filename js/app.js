@@ -30,9 +30,14 @@ VLM.app = (function () {
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       if (motivo === 'posiciones') reaplicarPosiciones();
+      if (motivo === 'ubicaciones') reaplicarReglas();
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
       render();
     });
+    // Al abrir: las reglas de posición pueden haber cambiado desde la última
+    // importación (por editarlas o por abrir una versión nueva de la app), y
+    // los productos guardados traen la clasificación de ese momento.
+    if (S.hayDatos()) reaplicarReglas(true);
     render();
     setInterval(actualizarEstado, 60000);
   }
@@ -45,6 +50,20 @@ VLM.app = (function () {
     P.aplicarPosiciones(S.state.productos, S.state.posiciones);
     S.guardar();
     calculados = null;
+  }
+
+  /**
+   * Reaplica las reglas de posición: tipo (picking/altura), zona y ámbito.
+   * No hace falta reimportar; cada producto guarda sus ubicaciones.
+   *
+   * @param silencioso al arrancar, sin avisar ni redibujar de más
+   */
+  function reaplicarReglas(silencioso) {
+    P.reaplicarReglas(S.state.productos, S.state.reglasUbic, S.state.labs);
+    P.aplicarPosiciones(S.state.productos, S.state.posiciones);
+    S.guardar();
+    calculados = null;
+    if (!silencioso) U.toast('Reglas aplicadas sobre el stock cargado', 'ok');
   }
 
   /** Reaplica el catálogo de laboratorios sobre los productos ya cargados. */

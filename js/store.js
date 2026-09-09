@@ -190,7 +190,7 @@ VLM.store = (function () {
     setLabs(VLM.labs.catalogoDefault());
   }
 
-  /** Reemplaza las reglas de posición. Obliga a reimportar para que apliquen. */
+  /** Reemplaza las reglas de posición. Se reaplican sobre el stock cargado. */
   function setReglasUbic(reglas) {
     state.reglasUbic = reglas;
     guardarReglasUbic();

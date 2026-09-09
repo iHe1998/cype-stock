@@ -226,7 +226,8 @@
       <p class="muted small">Se evalúan <strong>en orden</strong> y gana la primera que coincide, así
         que las de ignorar van arriba: <code>PACK</code> tiene que resolverse antes que <code>P*</code>.
         Comodín <code>*</code> al principio, al final o solo (<code>*</code> = todas).
-        Los cambios se aplican al volver a importar.</p>
+        Los cambios se aplican al instante sobre el stock cargado, salvo las filas
+        que una regla de ignorar ya descartó: esas vuelven al reimportar.</p>
       <div class="reglas-editor" id="reglasEditor"></div>
       <div class="cfg-actions" style="margin-top:10px">
         <button class="btn" id="btnAddRegla">+ Agregar regla</button>

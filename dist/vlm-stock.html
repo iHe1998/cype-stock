@@ -1085,7 +1085,8 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       <p class="muted small">Se evalúan <strong>en orden</strong> y gana la primera que coincide, así
         que las de ignorar van arriba: <code>PACK</code> tiene que resolverse antes que <code>P*</code>.
         Comodín <code>*</code> al principio, al final o solo (<code>*</code> = todas).
-        Los cambios se aplican al volver a importar.</p>
+        Los cambios se aplican al instante sobre el stock cargado, salvo las filas
+        que una regla de ignorar ya descartó: esas vuelven al reimportar.</p>
       <div class="reglas-editor" id="reglasEditor"></div>
       <div class="cfg-actions" style="margin-top:10px">
         <button class="btn" id="btnAddRegla">+ Agregar regla</button>
@@ -1113,7 +1114,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 08/09/2026 21:02 - 95948b4</span>
+      <span class="muted small" id="appVersion">compilado 08/09/2026 21:09 - dc041b7</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1902,7 +1903,7 @@ VLM.store = (function () {
     setLabs(VLM.labs.catalogoDefault());
   }
 
-  /** Reemplaza las reglas de posición. Obliga a reimportar para que apliquen. */
+  /** Reemplaza las reglas de posición. Se reaplican sobre el stock cargado. */
   function setReglasUbic(reglas) {
     state.reglasUbic = reglas;
     guardarReglasUbic();
@@ -2263,6 +2264,74 @@ VLM.parser = (function () {
     return productos;
   }
 
+  /**
+   * Reaplica las reglas de posición sobre productos ya cargados.
+   *
+   * Sin esto, cambiar una regla —o abrir una versión nueva de la app que trae
+   * reglas nuevas— dejaba la clasificación vieja pegada hasta reimportar la
+   * planilla: el artículo seguía en la zona y el ámbito que le tocaron el día
+   * que se importó. Cada producto guarda su `detalle` con la ubicación de cada
+   * línea, así que se puede recalcular sin el archivo original.
+   *
+   * Lo único que NO se puede recuperar son las filas que una regla de ignorar
+   * descartó al importar: esas nunca se guardaron.
+   */
+  function reaplicarReglas(productos, reglas, catalogo) {
+    reglas = reglas || VLM.ubicaciones.reglasDefault();
+    catalogo = catalogo || VLM.labs.catalogoDefault();
+
+    productos.forEach(p => {
+      const dets = p.detalle || [];
+      if (!dets.length) return;
+
+      let pick = 0, alt = 0;
+      const zonaPeso = {}, ambitoPeso = {};
+      const ubicPicking = [], ubicAltura = [], ubicaciones = [];
+
+      dets.forEach(d => {
+        const regla = VLM.ubicaciones.evaluar(d.ubicacion, reglas);
+        d.tipo = (regla && regla.tipo) || 'picking';
+        const zona = regla && regla.zona ? regla.zona : null;
+        if (zona && !p.zonaDeColumna) d.zona = zona;
+
+        if (d.tipo === 'altura') {
+          alt += d.stock;
+          if (d.ubicacion && ubicAltura.indexOf(d.ubicacion) === -1) ubicAltura.push(d.ubicacion);
+        } else {
+          pick += d.stock;
+          if (d.ubicacion && ubicPicking.indexOf(d.ubicacion) === -1) ubicPicking.push(d.ubicacion);
+        }
+        if (d.ubicacion && ubicaciones.indexOf(d.ubicacion) === -1) ubicaciones.push(d.ubicacion);
+
+        // el picking pesa doble: es desde donde se sirve
+        const peso = (d.stock || 0) * (d.tipo === 'picking' ? 2 : 1) + 1;
+        if (zona) zonaPeso[zona] = (zonaPeso[zona] || 0) + peso;
+        if (regla && regla.ambito) ambitoPeso[regla.ambito] = (ambitoPeso[regla.ambito] || 0) + peso;
+      });
+
+      const mayor = o => Object.keys(o).sort((a, b) => o[b] - o[a])[0];
+      const zonaGana   = mayor(zonaPeso);
+      const ambitoGana = mayor(ambitoPeso);
+
+      p.stockPicking = pick;
+      p.stockAltura  = alt;
+      p.ubicaciones  = ubicaciones;
+      p.ubicPicking  = ubicPicking;
+      p.ubicAltura   = ubicAltura;
+      p.sinPicking   = ubicPicking.length === 0;
+      p.zonasMixtas  = Object.keys(zonaPeso).length > 1;
+      p.ubicacion    = ubicPicking.length ? ubicPicking[0] : (ubicaciones[0] || '');
+      if (ubicaciones.length > 1) p.ubicacion += ' +' + (ubicaciones.length - 1);
+
+      // la columna de la planilla, si existe, le gana a la regla
+      if (zonaGana && !p.zonaDeColumna) { p.zonaPlanilla = zonaGana; p.zonaExplicita = true; }
+      if (ambitoGana) p.ambitoPos = ambitoGana;
+
+      VLM.labs.clasificar(p, catalogo);
+    });
+    return productos;
+  }
+
   /** ¿Hay más de una fila por código? (export por posición o por lote) */
   function hayRepetidos(productos) {
     const vistos = {};
@@ -2353,6 +2422,7 @@ VLM.parser = (function () {
       }
       if (p.ambitoPos) g.ambitoPeso[p.ambitoPos] = (g.ambitoPeso[p.ambitoPos] || 0) + peso;
 
+      if (p.zonaDeColumna) g.zonaDeColumna = true;
       g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
       g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
       if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
@@ -2457,7 +2527,8 @@ VLM.parser = (function () {
       if (ubic && !regla) sinRegla++;
 
       // la columna de la planilla manda sobre la regla de posición
-      const zonaFila = VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons) ||
+      const zonaCol = VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons);
+      const zonaFila = zonaCol ||
                        (regla && regla.zona) || null;
 
       const cod = String(codigo === null ? '' : codigo).trim() || ('#' + (productos.length + 1));
@@ -2478,6 +2549,9 @@ VLM.parser = (function () {
         // una columna de conservación explícita en la planilla
         zonaPlanilla:  zonaFila,
         zonaExplicita: !!zonaFila,
+        // si la zona vino de una columna de la planilla, ninguna regla de
+        // posición la pisa después (ver reaplicarReglas)
+        zonaDeColumna: !!zonaCol,
         ambitoPos:     regla && regla.ambito ? regla.ambito : null,
         tipoPos:       (regla && regla.tipo) || 'picking',
         ubicacion:     ubic,
@@ -2585,7 +2659,7 @@ VLM.parser = (function () {
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
     autoMapear, normalizar, generarPlantilla,
-    detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones
+    detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, reaplicarReglas
   };
 })();
 
@@ -4330,9 +4404,14 @@ VLM.app = (function () {
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       if (motivo === 'posiciones') reaplicarPosiciones();
+      if (motivo === 'ubicaciones') reaplicarReglas();
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
       render();
     });
+    // Al abrir: las reglas de posición pueden haber cambiado desde la última
+    // importación (por editarlas o por abrir una versión nueva de la app), y
+    // los productos guardados traen la clasificación de ese momento.
+    if (S.hayDatos()) reaplicarReglas(true);
     render();
     setInterval(actualizarEstado, 60000);
   }
@@ -4345,6 +4424,20 @@ VLM.app = (function () {
     P.aplicarPosiciones(S.state.productos, S.state.posiciones);
     S.guardar();
     calculados = null;
+  }
+
+  /**
+   * Reaplica las reglas de posición: tipo (picking/altura), zona y ámbito.
+   * No hace falta reimportar; cada producto guarda sus ubicaciones.
+   *
+   * @param silencioso al arrancar, sin avisar ni redibujar de más
+   */
+  function reaplicarReglas(silencioso) {
+    P.reaplicarReglas(S.state.productos, S.state.reglasUbic, S.state.labs);
+    P.aplicarPosiciones(S.state.productos, S.state.posiciones);
+    S.guardar();
+    calculados = null;
+    if (!silencioso) U.toast('Reglas aplicadas sobre el stock cargado', 'ok');
   }
 
   /** Reaplica el catálogo de laboratorios sobre los productos ya cargados. */

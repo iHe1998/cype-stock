@@ -181,6 +181,11 @@ muestra cuántas ubicaciones del archivo cargado cubre cada regla.
 | `0*` | altura · ambiente | pasillos 013, 014… |
 | `*` | altura | red de seguridad: lo que no encaje en nada |
 
+Las reglas se **reaplican sobre el stock ya cargado**: al editarlas, y también al abrir
+una versión de la app que trae reglas nuevas. No hace falta reimportar — cada producto
+guarda las ubicaciones de sus líneas. Lo único que no vuelve son las filas que una regla
+de ignorar descartó al importar: esas nunca se guardaron.
+
 ### Adentro del VLM la ubicación no distingue nada
 
 Todo lo que está en la torre comparte `VLMVENTA01` o `VLMVENTA02` aunque físicamente esté
