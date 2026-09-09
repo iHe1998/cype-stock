@@ -482,6 +482,15 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   margin-bottom: 12px;
 }
+/* Sin flechitas en los campos numéricos.
+   Comen la mitad de un input angosto —el mínimo y el máximo de cada
+   posición— y tapan el número; peor todavía, el primer clic cae sobre la
+   flecha en vez de sobre el texto, así que había que hacer clic dos veces
+   para poder escribir. Los valores se escriben, no se suben de a uno. */
+input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
 .input, .select {
   height: 34px; padding: 0 11px;
   font: inherit; font-size: 13px; color: var(--text);

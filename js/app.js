@@ -92,6 +92,10 @@ VLM.app = (function () {
      RENDER
      ============================================================ */
   function render() {
+    // guardar un valor redibuja la vista entera: sin esto, cargar de corrido
+    // los máximos de la tabla de posiciones perdía el cursor en cada número
+    const focoPrev = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.k : null;
     const hay = S.hayDatos();
     $('#empty').hidden = hay;
     $('#tabs').hidden = !hay;
@@ -145,7 +149,17 @@ VLM.app = (function () {
       });
     });
 
+    if (focoPrev) restaurarFoco(el, focoPrev);
+
     if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+  }
+
+  /** Devuelve el cursor al mismo campo después de redibujar. */
+  function restaurarFoco(el, clave) {
+    const n = el.querySelector('[data-k="' + clave.replace(/"/g, '\\"') + '"]');
+    if (!n) return;
+    n.focus();
+    if (n.select) n.select();
   }
 
   function abrirArticulo(codigo, items, cfg) {

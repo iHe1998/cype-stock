@@ -768,10 +768,7 @@ VLM.views = (function () {
           '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
             (f.descripcion && f.descripcion !== f.codigo ? ' ' + U.esc(f.descripcion) : '') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
-          '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" data-campo="min" value="' + (f.min || '') + '"></td>' +
-          '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-            'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" data-campo="max" value="' + (f.max || '') + '"></td>' +
+          celdaInp(f, 'min') + celdaInp(f, 'max') +
           '<td>' + est + '</td>' +
           '</tr>';
       });
@@ -786,11 +783,16 @@ VLM.views = (function () {
     U.$$('.chip', el).forEach(c => c.addEventListener('click', () =>
       VLM.store.setUi({ filtroTipoPos: c.dataset.val })));
     // al editar se re-asocia al artículo que ocupa la posición ahora
-    U.$$('.pos-inp', el).forEach(inp => inp.addEventListener('change', () => {
-      const v = parseInt(inp.value, 10);
-      VLM.store.setPosicion(inp.dataset.ubic,
-        { [inp.dataset.campo]: isFinite(v) && v > 0 ? v : 0 }, inp.dataset.art);
-    }));
+    U.$$('.pos-inp', el).forEach(inp => {
+      // un clic selecciona lo que ya está: se carga escribiendo el número
+      // nuevo encima, sin tener que borrar antes
+      inp.addEventListener('focus', () => inp.select());
+      inp.addEventListener('change', () => {
+        const v = parseInt(inp.value, 10);
+        VLM.store.setPosicion(inp.dataset.ubic,
+          { [inp.dataset.campo]: isFinite(v) && v > 0 ? v : 0 }, inp.dataset.art);
+      });
+    });
     U.$$('.pos-ok', el).forEach(b => b.addEventListener('click', () => {
       VLM.store.setPosicion(b.dataset.ubic, {}, b.dataset.art);
       U.toast('Confirmado para el artículo nuevo', 'ok');
@@ -800,6 +802,20 @@ VLM.views = (function () {
     $('#posFile', el).addEventListener('change', e => {
       if (e.target.files[0]) importarPosiciones(e.target.files[0]);
     });
+  }
+
+  /**
+   * Celda editable de mínimo o máximo.
+   * `data-k` identifica la celda entre redibujos: al guardar un valor se
+   * vuelve a dibujar toda la tabla, y sin esa clave el cursor se perdía en
+   * cada número cargado (ver restaurarFoco en app.js).
+   */
+  function celdaInp(f, campo) {
+    return '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
+      'inputmode="numeric" ' +
+      'data-k="' + U.esc(f.ubicacion + '|' + f.codigo + '|' + campo) + '" ' +
+      'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" ' +
+      'data-campo="' + campo + '" value="' + (f[campo] || '') + '"></td>';
   }
 
   /**
