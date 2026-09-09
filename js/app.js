@@ -620,7 +620,7 @@ VLM.app = (function () {
     const cont = $('#labsEditor');
 
     cont.innerHTML =
-      '<div class="labs-head"><span>Laboratorio</span><span>Ámbito</span><span>Conservación</span><span></span></div>' +
+      '<div class="labs-head"><span>Laboratorio</span><span>Ámbito</span><span></span></div>' +
       labs.map((l, i) =>
         '<div class="lab-row" data-i="' + i + '">' +
           '<div>' +
@@ -630,10 +630,6 @@ VLM.app = (function () {
           '<select data-campo="ambito">' +
             Object.keys(L.AMBITOS).map(k => '<option value="' + k + '"' +
               (l.ambito === k ? ' selected' : '') + '>' + L.AMBITOS[k].corto + '</option>').join('') +
-          '</select>' +
-          '<select data-campo="zona">' +
-            Object.keys(L.ZONAS).map(k => '<option value="' + k + '"' +
-              (l.zona === k ? ' selected' : '') + '>' + L.ZONAS[k].icono + ' ' + L.ZONAS[k].corto + '</option>').join('') +
           '</select>' +
           '<button class="btn btn-icon lab-row-del" title="Quitar del catálogo">' +
             '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +

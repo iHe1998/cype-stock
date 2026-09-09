@@ -83,6 +83,25 @@ VLM.ubicaciones = (function () {
     return REGLAS_DEFAULT.map(r => Object.assign({}, r));
   }
 
+  /**
+   * Reconcilia las reglas guardadas con las de esta versión.
+   *
+   * Sin esto, una lista guardada en el navegador le gana para siempre a las
+   * reglas nuevas que trae la app: alguien que editó una regla hace meses no
+   * vería nunca las de VLMVENTA01/02, y su stock del VLM seguiría cayendo en
+   * la red de seguridad. Las reglas propias (patrones que no están en las de
+   * fábrica) se conservan, antes del `*` final para que sigan teniendo efecto.
+   */
+  function migrarReglas(guardadas) {
+    const def = reglasDefault();
+    const patrones = def.map(r => String(r.patron).toUpperCase());
+    const propias = (guardadas || []).filter(r =>
+      r && r.patron && patrones.indexOf(String(r.patron).toUpperCase()) === -1);
+    if (!propias.length) return def;
+    const i = def.length - 1;              // antes del comodín `*`
+    return def.slice(0, i).concat(propias, def.slice(i));
+  }
+
   /* ------------------------------------------------------------
      Normalización
      ------------------------------------------------------------ */
@@ -165,5 +184,5 @@ VLM.ubicaciones = (function () {
     return { conteo, sinRegla };
   }
 
-  return { TIPOS, REGLAS_DEFAULT, reglasDefault, normalizar, coincide, evaluar, cobertura };
+  return { TIPOS, REGLAS_DEFAULT, reglasDefault, migrarReglas, normalizar, coincide, evaluar, cobertura };
 })();

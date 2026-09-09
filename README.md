@@ -110,14 +110,19 @@ La barra superior filtra por cualquiera de las dos y afecta a todas las vistas.
 
 ### Catálogo (editable en ⚙ Configuración)
 
-| Laboratorio | Ámbito | Conservación por defecto |
-|---|---|---|
-| AstraZeneca | VLM | Ambiente |
-| Roche | VLM | Frío |
-| Sanofi Aventis | VLM | Ambiente |
-| Amgen | VLM | Frío |
-| Abbvie | Fuera del VLM | Frío |
-| Biosidus Argentina | Fuera del VLM | Frío |
+| Laboratorio | Ámbito |
+|---|---|
+| AstraZeneca | VLM |
+| Roche | VLM |
+| Sanofi Aventis | VLM |
+| Amgen | VLM |
+| Abbvie | Fuera del VLM |
+| Biosidus Argentina | Fuera del VLM |
+
+El laboratorio define el **ámbito** y nada más. **La conservación no se configura por
+laboratorio**: un mismo laboratorio tiene artículos en `VLMVENTA01` (frío) y en
+`VLMVENTA02` (ambiente), así que un default por laboratorio sólo puede estar bien para la
+mitad. Sale de la posición.
 
 **Sólo se procesan los laboratorios del catálogo.** Los demás quedan fuera de KPIs y
 gráficos, pero la app *dice cuántos son* en la barra superior — para que un nombre mal
@@ -128,16 +133,18 @@ El matcheo es tolerante: reconoce razones sociales completas. `LAB. ROCHE S.A.Q.
 
 ### De dónde sale frío o ambiente
 
-Se resuelve con esta prioridad:
+**De la posición**, que es donde está la mercadería:
 
 1. **La columna de conservación de la planilla**, si existe. Entiende `Frío`, `Refrigerado`,
    `2-8°C`, `Termolábil`, `Heladera`, `Ambiente`, `15-25°C`, `Seco`. En una columna llamada
    `Cadena de frío`, un `SI`/`NO` también se interpreta bien.
-2. **El valor por defecto del laboratorio**, según la tabla de arriba.
-3. Si no hay ninguno de los dos: `Ambiente`.
+2. **La regla de la posición**: `VLMVENTA01` es frío, `VLMVENTA02` es ambiente, los pasillos
+   `1xx` son cámara y los `0xx` ambiente.
+3. Si ninguna regla la define: `Ambiente`, y la posición sale listada en el aviso de
+   importación para que se note que le falta una regla.
 
-Así un laboratorio puede tener productos en las dos zonas (Roche tiene los biológicos en
-frío y Xeloda o Tamiflu en ambiente) y aparece en los dos cuadrantes.
+Así un laboratorio aparece en los dos cuadrantes según dónde esté cada artículo, que es lo
+que pasa en la realidad.
 
 ---
 

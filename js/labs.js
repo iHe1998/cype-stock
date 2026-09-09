@@ -25,21 +25,25 @@ VLM.labs = (function () {
   /* ---------------- catálogo por defecto ----------------
      `alias` se compara normalizado (sin acentos ni puntuación) contra el
      valor de la columna Laboratorio, primero exacto y después por contención.
-     `zona` es el valor por defecto cuando la planilla no trae conservación.
+     El laboratorio define el ÁMBITO (si su mercadería vive en la torre) y
+     nada más. La conservación NO sale de acá: sale de la posición, que es
+     donde está la mercadería de verdad. Un mismo laboratorio tiene artículos
+     en VLMVENTA01 (frío) y en VLMVENTA02 (ambiente), así que un default por
+     laboratorio sólo puede estar mal para la mitad.
      ------------------------------------------------------ */
   const CATALOGO_DEFAULT = [
     { id: 'astrazeneca', nombre: 'AstraZeneca',         ambito: 'vlm',
-      alias: ['astrazeneca', 'astra zeneca', 'astra', 'az'],                  zona: 'ambiente' },
+      alias: ['astrazeneca', 'astra zeneca', 'astra', 'az'] },
     { id: 'roche',       nombre: 'Roche',               ambito: 'vlm',
-      alias: ['roche', 'productos roche', 'roche argentina'],                 zona: 'frio' },
+      alias: ['roche', 'productos roche', 'roche argentina'] },
     { id: 'sanofi',      nombre: 'Sanofi Aventis',      ambito: 'vlm',
-      alias: ['sanofi aventis', 'sanofi', 'aventis', 'sanofi argentina'],     zona: 'ambiente' },
+      alias: ['sanofi aventis', 'sanofi', 'aventis', 'sanofi argentina'] },
     { id: 'amgen',       nombre: 'Amgen',               ambito: 'vlm',
-      alias: ['amgen', 'amgen argentina'],                                    zona: 'frio' },
+      alias: ['amgen', 'amgen argentina'] },
     { id: 'abbvie',      nombre: 'Abbvie',              ambito: 'externo',
-      alias: ['abbvie', 'abb vie', 'abbott vie'],                             zona: 'frio' },
+      alias: ['abbvie', 'abb vie', 'abbott vie'] },
     { id: 'biosidus',    nombre: 'Biosidus Argentina',  ambito: 'externo',
-      alias: ['biosidus argentina', 'biosidus'],                              zona: 'frio' }
+      alias: ['biosidus argentina', 'biosidus'] }
   ];
 
   /** Copia profunda, para no mutar la constante al editar en Configuración. */
@@ -107,11 +111,17 @@ VLM.labs = (function () {
 
   /**
    * Resuelve la conservación final de un producto.
-   * Prioridad: lo que diga la planilla > el default del laboratorio > ambiente.
+   *
+   * Sale de la POSICIÓN: de una columna de conservación de la planilla, o de
+   * la regla de la posición (VLMVENTA01 es frío, VLMVENTA02 es ambiente). El
+   * laboratorio no vota: tiene artículos de los dos lados.
+   *
+   * Si ninguna regla la define queda `ambiente`, pero la posición aparece en
+   * el aviso de "posiciones sin zona" para que se note que falta una regla y
+   * no pase por un dato bueno.
    */
-  function resolverZona(zonaDePlanilla, lab) {
+  function resolverZona(zonaDePlanilla) {
     if (zonaDePlanilla === 'frio' || zonaDePlanilla === 'ambiente') return zonaDePlanilla;
-    if (lab && (lab.zona === 'frio' || lab.zona === 'ambiente')) return lab.zona;
     return 'ambiente';
   }
 
@@ -127,8 +137,28 @@ VLM.labs = (function () {
     // el ámbito sale de la posición si una regla lo define: dónde está la
     // mercadería es un hecho físico, el laboratorio es sólo el default
     p.ambito      = p.ambitoPos || (lab ? lab.ambito : 'externo');
-    p.conservacion = resolverZona(p.zonaPlanilla, lab);
+    p.conservacion = resolverZona(p.zonaPlanilla);
+    p.zonaSupuesta = !p.zonaExplicita;
     return p;
+  }
+
+  /**
+   * Los catálogos guardados por versiones anteriores traen `zona` por
+   * laboratorio. Se descarta: la conservación es de la posición.
+   * Además se agregan los laboratorios nuevos que el catálogo guardado
+   * no tenga, sin tocar los que el usuario haya editado.
+   */
+  function migrarCatalogo(guardado) {
+    const lista = (guardado || []).map(l => {
+      const c = Object.assign({}, l);
+      delete c.zona;
+      return c;
+    });
+    const ids = lista.map(l => l.id);
+    CATALOGO_DEFAULT.forEach(d => {
+      if (ids.indexOf(d.id) === -1) lista.push(Object.assign({}, d, { alias: d.alias.slice() }));
+    });
+    return lista;
   }
 
   /** Clave de agrupación "vlm|frio" y su etiqueta legible. */
@@ -143,7 +173,7 @@ VLM.labs = (function () {
 
   return {
     AMBITOS, ZONAS, GRUPOS, CATALOGO_DEFAULT,
-    catalogoDefault, buscar, parsearConservacion, resolverZona, clasificar,
+    catalogoDefault, migrarCatalogo, buscar, parsearConservacion, resolverZona, clasificar,
     claveGrupo, labelGrupo
   };
 })();

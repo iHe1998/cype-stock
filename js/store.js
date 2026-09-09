@@ -111,13 +111,15 @@ VLM.store = (function () {
     } catch (e) {}
     try {
       const labs = JSON.parse(localStorage.getItem(KEY_LABS) || 'null');
-      state.labs = (labs && labs.length) ? labs : VLM.labs.catalogoDefault();
+      state.labs = (labs && labs.length)
+        ? VLM.labs.migrarCatalogo(labs) : VLM.labs.catalogoDefault();
     } catch (e) {
       state.labs = VLM.labs.catalogoDefault();
     }
     try {
       const ru = JSON.parse(localStorage.getItem(KEY_UBIC) || 'null');
-      state.reglasUbic = (ru && ru.length) ? ru : VLM.ubicaciones.reglasDefault();
+      state.reglasUbic = (ru && ru.length)
+        ? VLM.ubicaciones.migrarReglas(ru) : VLM.ubicaciones.reglasDefault();
     } catch (e) {
       state.reglasUbic = VLM.ubicaciones.reglasDefault();
     }

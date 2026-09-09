@@ -50,7 +50,7 @@ VLM.parser = (function () {
       alias: ['stock maximo', 'maximo', 'max', 'stock max', 'capacidad', 'cap', 'nivel maximo'] },
 
     { id: 'conservacion', label: 'Conservación', req: false, tipo: 'texto',
-      hint: 'Frío o ambiente; si falta se usa el default del laboratorio',
+      hint: 'Frío o ambiente; si falta se usa la regla de la posición',
       alias: ['conservacion', 'cadena de frio', 'cadena frio', 'temperatura', 'refrigerado',
               'termolabil', 'condicion de conservacion', 'tipo de conservacion',
               'condiciones de conservacion', 'almacenamiento', 'frio'] },
@@ -470,6 +470,9 @@ VLM.parser = (function () {
     let ignoradas = 0, sinRegla = 0, filtradas = 0;
     const ignoradasPorPatron = {};
     const filtradasPorValor = {};
+    // posiciones que ninguna regla ubica en frío o ambiente: quedan en ambiente
+    // por descarte, y eso hay que decirlo
+    const sinZona = {};
     // todas las posiciones que aparecen en el archivo, incluidas las ignoradas:
     // el editor de reglas las necesita para decir cuántas cubre cada regla
     const ubicVistas = {};
@@ -531,6 +534,7 @@ VLM.parser = (function () {
 
       // la columna de la planilla manda sobre la regla de posición
       const zonaCol = VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons);
+      if (!zonaCol && !(regla && regla.zona) && ubic) sinZona[ubic] = (sinZona[ubic] || 0) + 1;
       const zonaFila = zonaCol ||
                        (regla && regla.zona) || null;
 
@@ -604,6 +608,12 @@ VLM.parser = (function () {
     if (sinRegla) {
       avisos.push(sinRegla + ' fila(s) con posiciones que ninguna regla cubre.');
     }
+    const zonasFaltantes = Object.keys(sinZona);
+    if (zonasFaltantes.length) {
+      avisos.push(zonasFaltantes.length + ' posición(es) sin frío ni ambiente definido (' +
+        zonasFaltantes.slice(0, 4).join(', ') + (zonasFaltantes.length > 4 ? '…' : '') +
+        '): quedan en Ambiente por descarte. Agregales una regla con zona.');
+    }
     if (filtradas) {
       const porQue = Object.keys(filtradasPorValor)
         .sort((a, b) => filtradasPorValor[b] - filtradasPorValor[a])
@@ -626,7 +636,7 @@ VLM.parser = (function () {
       avisos.push('Las fechas se leyeron como mes/día/año (formato de EE.UU.).');
     }
     if (mapa.conservacion === undefined) {
-      avisos.push('Sin columna de conservación: se usa el valor por defecto de cada laboratorio (editable en Configuración).');
+      avisos.push('Sin columna de conservación: frío o ambiente salen de la regla de cada posición.');
     }
     if (nombresNoListados.length) {
       avisos.push(nombresNoListados.length + ' laboratorio(s) fuera del catálogo: ' +
@@ -635,7 +645,7 @@ VLM.parser = (function () {
     }
     return { productos: lista, descartadas, avisos, noListados, nombresNoListados,
              repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha,
-             ignoradas, sinRegla, ignoradasPorPatron, filtradas, filtradasPorValor,
+             ignoradas, sinRegla, ignoradasPorPatron, filtradas, filtradasPorValor, sinZona,
              ubicacionesVistas: Object.keys(ubicVistas), posReasignadas };
   }
 
