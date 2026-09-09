@@ -309,7 +309,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
    ============================================================ */
 .labs-editor { display: flex; flex-direction: column; gap: 8px; }
 .lab-row {
-  display: grid; grid-template-columns: 1fr 110px 118px 32px;
+  display: grid; grid-template-columns: 1fr 130px 32px;
   gap: 8px; align-items: center;
   padding: 9px 10px;
   background: var(--surface-2); border: 1px solid var(--border-soft);
@@ -326,7 +326,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .lab-row-del { color: var(--muted); }
 .lab-row-del:hover { color: var(--crit); border-color: var(--crit); }
 .labs-head {
-  display: grid; grid-template-columns: 1fr 110px 118px 32px; gap: 8px;
+  display: grid; grid-template-columns: 1fr 130px 32px; gap: 8px;
   font-size: 10.5px; font-weight: 650; text-transform: uppercase;
   letter-spacing: .05em; color: var(--muted); padding: 0 10px 2px;
 }
@@ -1095,8 +1095,9 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 
       <h3 class="section-title">Laboratorios</h3>
       <p class="muted small">Sólo se procesan los laboratorios de esta lista. <strong>Ámbito</strong>
-        indica si el producto vive dentro del VLM o fuera. <strong>Conservación</strong> es el
-        valor por defecto cuando la planilla no trae una columna que lo indique.</p>
+        indica si el producto vive dentro del VLM o fuera. La <strong>conservación</strong> no se
+        configura acá: sale de la posición, porque un mismo laboratorio tiene artículos en
+        <code>VLMVENTA01</code> (frío) y en <code>VLMVENTA02</code> (ambiente).</p>
       <div class="labs-editor" id="labsEditor"></div>
       <div class="cfg-actions" style="margin-top:10px">
         <button class="btn" id="btnAddLab">+ Agregar laboratorio</button>
@@ -1114,7 +1115,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 08/09/2026 21:10 - ef8764e</span>
+      <span class="muted small" id="appVersion">compilado 08/09/2026 21:20 - ecbd1aa</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1414,21 +1415,25 @@ VLM.labs = (function () {
   /* ---------------- catálogo por defecto ----------------
      `alias` se compara normalizado (sin acentos ni puntuación) contra el
      valor de la columna Laboratorio, primero exacto y después por contención.
-     `zona` es el valor por defecto cuando la planilla no trae conservación.
+     El laboratorio define el ÁMBITO (si su mercadería vive en la torre) y
+     nada más. La conservación NO sale de acá: sale de la posición, que es
+     donde está la mercadería de verdad. Un mismo laboratorio tiene artículos
+     en VLMVENTA01 (frío) y en VLMVENTA02 (ambiente), así que un default por
+     laboratorio sólo puede estar mal para la mitad.
      ------------------------------------------------------ */
   const CATALOGO_DEFAULT = [
     { id: 'astrazeneca', nombre: 'AstraZeneca',         ambito: 'vlm',
-      alias: ['astrazeneca', 'astra zeneca', 'astra', 'az'],                  zona: 'ambiente' },
+      alias: ['astrazeneca', 'astra zeneca', 'astra', 'az'] },
     { id: 'roche',       nombre: 'Roche',               ambito: 'vlm',
-      alias: ['roche', 'productos roche', 'roche argentina'],                 zona: 'frio' },
+      alias: ['roche', 'productos roche', 'roche argentina'] },
     { id: 'sanofi',      nombre: 'Sanofi Aventis',      ambito: 'vlm',
-      alias: ['sanofi aventis', 'sanofi', 'aventis', 'sanofi argentina'],     zona: 'ambiente' },
+      alias: ['sanofi aventis', 'sanofi', 'aventis', 'sanofi argentina'] },
     { id: 'amgen',       nombre: 'Amgen',               ambito: 'vlm',
-      alias: ['amgen', 'amgen argentina'],                                    zona: 'frio' },
+      alias: ['amgen', 'amgen argentina'] },
     { id: 'abbvie',      nombre: 'Abbvie',              ambito: 'externo',
-      alias: ['abbvie', 'abb vie', 'abbott vie'],                             zona: 'frio' },
+      alias: ['abbvie', 'abb vie', 'abbott vie'] },
     { id: 'biosidus',    nombre: 'Biosidus Argentina',  ambito: 'externo',
-      alias: ['biosidus argentina', 'biosidus'],                              zona: 'frio' }
+      alias: ['biosidus argentina', 'biosidus'] }
   ];
 
   /** Copia profunda, para no mutar la constante al editar en Configuración. */
@@ -1496,11 +1501,17 @@ VLM.labs = (function () {
 
   /**
    * Resuelve la conservación final de un producto.
-   * Prioridad: lo que diga la planilla > el default del laboratorio > ambiente.
+   *
+   * Sale de la POSICIÓN: de una columna de conservación de la planilla, o de
+   * la regla de la posición (VLMVENTA01 es frío, VLMVENTA02 es ambiente). El
+   * laboratorio no vota: tiene artículos de los dos lados.
+   *
+   * Si ninguna regla la define queda `ambiente`, pero la posición aparece en
+   * el aviso de "posiciones sin zona" para que se note que falta una regla y
+   * no pase por un dato bueno.
    */
-  function resolverZona(zonaDePlanilla, lab) {
+  function resolverZona(zonaDePlanilla) {
     if (zonaDePlanilla === 'frio' || zonaDePlanilla === 'ambiente') return zonaDePlanilla;
-    if (lab && (lab.zona === 'frio' || lab.zona === 'ambiente')) return lab.zona;
     return 'ambiente';
   }
 
@@ -1516,8 +1527,28 @@ VLM.labs = (function () {
     // el ámbito sale de la posición si una regla lo define: dónde está la
     // mercadería es un hecho físico, el laboratorio es sólo el default
     p.ambito      = p.ambitoPos || (lab ? lab.ambito : 'externo');
-    p.conservacion = resolverZona(p.zonaPlanilla, lab);
+    p.conservacion = resolverZona(p.zonaPlanilla);
+    p.zonaSupuesta = !p.zonaExplicita;
     return p;
+  }
+
+  /**
+   * Los catálogos guardados por versiones anteriores traen `zona` por
+   * laboratorio. Se descarta: la conservación es de la posición.
+   * Además se agregan los laboratorios nuevos que el catálogo guardado
+   * no tenga, sin tocar los que el usuario haya editado.
+   */
+  function migrarCatalogo(guardado) {
+    const lista = (guardado || []).map(l => {
+      const c = Object.assign({}, l);
+      delete c.zona;
+      return c;
+    });
+    const ids = lista.map(l => l.id);
+    CATALOGO_DEFAULT.forEach(d => {
+      if (ids.indexOf(d.id) === -1) lista.push(Object.assign({}, d, { alias: d.alias.slice() }));
+    });
+    return lista;
   }
 
   /** Clave de agrupación "vlm|frio" y su etiqueta legible. */
@@ -1532,7 +1563,7 @@ VLM.labs = (function () {
 
   return {
     AMBITOS, ZONAS, GRUPOS, CATALOGO_DEFAULT,
-    catalogoDefault, buscar, parsearConservacion, resolverZona, clasificar,
+    catalogoDefault, migrarCatalogo, buscar, parsearConservacion, resolverZona, clasificar,
     claveGrupo, labelGrupo
   };
 })();
@@ -1624,6 +1655,25 @@ VLM.ubicaciones = (function () {
     return REGLAS_DEFAULT.map(r => Object.assign({}, r));
   }
 
+  /**
+   * Reconcilia las reglas guardadas con las de esta versión.
+   *
+   * Sin esto, una lista guardada en el navegador le gana para siempre a las
+   * reglas nuevas que trae la app: alguien que editó una regla hace meses no
+   * vería nunca las de VLMVENTA01/02, y su stock del VLM seguiría cayendo en
+   * la red de seguridad. Las reglas propias (patrones que no están en las de
+   * fábrica) se conservan, antes del `*` final para que sigan teniendo efecto.
+   */
+  function migrarReglas(guardadas) {
+    const def = reglasDefault();
+    const patrones = def.map(r => String(r.patron).toUpperCase());
+    const propias = (guardadas || []).filter(r =>
+      r && r.patron && patrones.indexOf(String(r.patron).toUpperCase()) === -1);
+    if (!propias.length) return def;
+    const i = def.length - 1;              // antes del comodín `*`
+    return def.slice(0, i).concat(propias, def.slice(i));
+  }
+
   /* ------------------------------------------------------------
      Normalización
      ------------------------------------------------------------ */
@@ -1706,7 +1756,7 @@ VLM.ubicaciones = (function () {
     return { conteo, sinRegla };
   }
 
-  return { TIPOS, REGLAS_DEFAULT, reglasDefault, normalizar, coincide, evaluar, cobertura };
+  return { TIPOS, REGLAS_DEFAULT, reglasDefault, migrarReglas, normalizar, coincide, evaluar, cobertura };
 })();
 
 </script>
@@ -1824,13 +1874,15 @@ VLM.store = (function () {
     } catch (e) {}
     try {
       const labs = JSON.parse(localStorage.getItem(KEY_LABS) || 'null');
-      state.labs = (labs && labs.length) ? labs : VLM.labs.catalogoDefault();
+      state.labs = (labs && labs.length)
+        ? VLM.labs.migrarCatalogo(labs) : VLM.labs.catalogoDefault();
     } catch (e) {
       state.labs = VLM.labs.catalogoDefault();
     }
     try {
       const ru = JSON.parse(localStorage.getItem(KEY_UBIC) || 'null');
-      state.reglasUbic = (ru && ru.length) ? ru : VLM.ubicaciones.reglasDefault();
+      state.reglasUbic = (ru && ru.length)
+        ? VLM.ubicaciones.migrarReglas(ru) : VLM.ubicaciones.reglasDefault();
     } catch (e) {
       state.reglasUbic = VLM.ubicaciones.reglasDefault();
     }
@@ -2047,7 +2099,7 @@ VLM.parser = (function () {
       alias: ['stock maximo', 'maximo', 'max', 'stock max', 'capacidad', 'cap', 'nivel maximo'] },
 
     { id: 'conservacion', label: 'Conservación', req: false, tipo: 'texto',
-      hint: 'Frío o ambiente; si falta se usa el default del laboratorio',
+      hint: 'Frío o ambiente; si falta se usa la regla de la posición',
       alias: ['conservacion', 'cadena de frio', 'cadena frio', 'temperatura', 'refrigerado',
               'termolabil', 'condicion de conservacion', 'tipo de conservacion',
               'condiciones de conservacion', 'almacenamiento', 'frio'] },
@@ -2467,6 +2519,9 @@ VLM.parser = (function () {
     let ignoradas = 0, sinRegla = 0, filtradas = 0;
     const ignoradasPorPatron = {};
     const filtradasPorValor = {};
+    // posiciones que ninguna regla ubica en frío o ambiente: quedan en ambiente
+    // por descarte, y eso hay que decirlo
+    const sinZona = {};
     // todas las posiciones que aparecen en el archivo, incluidas las ignoradas:
     // el editor de reglas las necesita para decir cuántas cubre cada regla
     const ubicVistas = {};
@@ -2528,6 +2583,7 @@ VLM.parser = (function () {
 
       // la columna de la planilla manda sobre la regla de posición
       const zonaCol = VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons);
+      if (!zonaCol && !(regla && regla.zona) && ubic) sinZona[ubic] = (sinZona[ubic] || 0) + 1;
       const zonaFila = zonaCol ||
                        (regla && regla.zona) || null;
 
@@ -2601,6 +2657,12 @@ VLM.parser = (function () {
     if (sinRegla) {
       avisos.push(sinRegla + ' fila(s) con posiciones que ninguna regla cubre.');
     }
+    const zonasFaltantes = Object.keys(sinZona);
+    if (zonasFaltantes.length) {
+      avisos.push(zonasFaltantes.length + ' posición(es) sin frío ni ambiente definido (' +
+        zonasFaltantes.slice(0, 4).join(', ') + (zonasFaltantes.length > 4 ? '…' : '') +
+        '): quedan en Ambiente por descarte. Agregales una regla con zona.');
+    }
     if (filtradas) {
       const porQue = Object.keys(filtradasPorValor)
         .sort((a, b) => filtradasPorValor[b] - filtradasPorValor[a])
@@ -2623,7 +2685,7 @@ VLM.parser = (function () {
       avisos.push('Las fechas se leyeron como mes/día/año (formato de EE.UU.).');
     }
     if (mapa.conservacion === undefined) {
-      avisos.push('Sin columna de conservación: se usa el valor por defecto de cada laboratorio (editable en Configuración).');
+      avisos.push('Sin columna de conservación: frío o ambiente salen de la regla de cada posición.');
     }
     if (nombresNoListados.length) {
       avisos.push(nombresNoListados.length + ' laboratorio(s) fuera del catálogo: ' +
@@ -2632,7 +2694,7 @@ VLM.parser = (function () {
     }
     return { productos: lista, descartadas, avisos, noListados, nombresNoListados,
              repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha,
-             ignoradas, sinRegla, ignoradasPorPatron, filtradas, filtradasPorValor,
+             ignoradas, sinRegla, ignoradasPorPatron, filtradas, filtradasPorValor, sinZona,
              ubicacionesVistas: Object.keys(ubicVistas), posReasignadas };
   }
 
@@ -4994,7 +5056,7 @@ VLM.app = (function () {
     const cont = $('#labsEditor');
 
     cont.innerHTML =
-      '<div class="labs-head"><span>Laboratorio</span><span>Ámbito</span><span>Conservación</span><span></span></div>' +
+      '<div class="labs-head"><span>Laboratorio</span><span>Ámbito</span><span></span></div>' +
       labs.map((l, i) =>
         '<div class="lab-row" data-i="' + i + '">' +
           '<div>' +
@@ -5004,10 +5066,6 @@ VLM.app = (function () {
           '<select data-campo="ambito">' +
             Object.keys(L.AMBITOS).map(k => '<option value="' + k + '"' +
               (l.ambito === k ? ' selected' : '') + '>' + L.AMBITOS[k].corto + '</option>').join('') +
-          '</select>' +
-          '<select data-campo="zona">' +
-            Object.keys(L.ZONAS).map(k => '<option value="' + k + '"' +
-              (l.zona === k ? ' selected' : '') + '>' + L.ZONAS[k].icono + ' ' + L.ZONAS[k].corto + '</option>').join('') +
           '</select>' +
           '<button class="btn btn-icon lab-row-del" title="Quitar del catálogo">' +
             '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
