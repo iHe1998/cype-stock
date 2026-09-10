@@ -232,6 +232,18 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .zonebar[hidden] { display: none; }
 .zonebar-sep { width: 1px; height: 20px; background: var(--border); }
 
+/* Filtro de laboratorio. Va en la misma barra que ámbito y conservación
+   porque hace lo mismo: recorta todo lo que se ve, gráficos incluidos.
+   Cuando hay uno elegido se pinta, para que no pase por un desplegable
+   apagado y alguien lea el panel creyendo que ve el depósito entero. */
+.zonebar-lab { height: 30px; min-width: 0; max-width: 230px; font-size: 12.5px; }
+.zonebar-lab.is-active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
+  font-weight: 600;
+}
+
 .seg {
   display: inline-flex; padding: 2px;
   background: var(--surface-2);

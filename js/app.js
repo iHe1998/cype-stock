@@ -78,14 +78,25 @@ VLM.app = (function () {
    * Productos que se muestran: calculados, sin los laboratorios fuera del
    * catálogo (si así está configurado) y filtrados por ámbito y conservación.
    */
-  function itemsVisibles() {
+  /**
+   * @param sinLab deja afuera el filtro de laboratorio. Lo usa la propia barra
+   *   para armar su desplegable: si se filtrara, quedaría una sola opción y no
+   *   habría cómo volver.
+   */
+  function itemsVisibles(sinLab) {
     const cfg = S.state.cfg, ui = S.state.ui;
     if (!calculados) {
       calculados = A.calcular(S.state.productos, cfg);
     }
     let items = calculados;
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
-    return A.filtrarPorZona(items, ui);
+    items = A.filtrarPorZona(items, ui);
+    // el laboratorio es un filtro global como los otros dos: afecta al resumen
+    // y a sus gráficos, no sólo a las listas
+    if (!sinLab && ui.filtroLab) {
+      items = items.filter(p => (p.labNombre || p.laboratorio) === ui.filtroLab);
+    }
+    return items;
   }
 
   /* ============================================================
@@ -106,7 +117,7 @@ VLM.app = (function () {
 
     const cfg = S.state.cfg;
     const items = itemsVisibles();
-    sincronizarZonebar(items);
+    sincronizarZonebar(items, itemsVisibles(true));
 
     const vista = S.state.ui.vista;
     $$('.tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === vista));
@@ -116,7 +127,7 @@ VLM.app = (function () {
 
     if (!items.length) {
       el.innerHTML = '<div class="no-results"><strong>Ningún producto coincide con el filtro</strong><br>' +
-        '<span class="small">Probá con “Todo” y “Todas” en la barra de arriba.</span></div>';
+        '<span class="small">Probá con “Todo”, “Todas” y “Todos los laboratorios” en la barra de arriba.</span></div>';
       return;
     }
     try {
@@ -180,15 +191,46 @@ VLM.app = (function () {
         S.setUi({ [clave]: btn.dataset.val || null });
       }));
     });
+    $('#zoneLab').addEventListener('change', e => {
+      S.setUi({ filtroLab: e.target.value || null });
+    });
   }
 
-  function sincronizarZonebar(items) {
+  /**
+   * @param items      lo que se está mostrando, con todos los filtros puestos
+   * @param itemsSinLab lo mismo pero sin el filtro de laboratorio: de ahí
+   *   salen las opciones del desplegable, para que se pueda volver a "todos"
+   *   y para que no quede una sola opción una vez elegido uno.
+   */
+  function sincronizarZonebar(items, itemsSinLab) {
     const ui = S.state.ui;
     $$('#zonebar .seg').forEach(seg => {
       const actual = ui[seg.dataset.key] || '';
       U.$$('.seg-btn', seg).forEach(btn =>
         btn.classList.toggle('is-active', btn.dataset.val === actual));
     });
+
+    // --- laboratorios presentes en lo que se está viendo ---
+    const cuenta = {};
+    itemsSinLab.forEach(p => {
+      const n = p.labNombre || p.laboratorio;
+      cuenta[n] = (cuenta[n] || 0) + 1;
+    });
+    const nombres = Object.keys(cuenta).sort((a, b) => a.localeCompare(b, 'es'));
+    // el elegido va igual aunque el filtro de zona lo haya dejado sin productos:
+    // si no, el desplegable mostraría otra cosa que la que se está filtrando
+    if (ui.filtroLab && nombres.indexOf(ui.filtroLab) === -1) nombres.push(ui.filtroLab);
+
+    const sel = $('#zoneLab');
+    const firma = nombres.map(n => n + ':' + (cuenta[n] || 0)).join('|') + '#' + (ui.filtroLab || '');
+    if (sel.dataset.firma !== firma) {
+      sel.innerHTML = '<option value="">Todos los laboratorios</option>' +
+        nombres.map(n => '<option value="' + U.esc(n) + '"' +
+          (ui.filtroLab === n ? ' selected' : '') + '>' + U.esc(n) +
+          (cuenta[n] ? ' (' + cuenta[n] + ')' : '') + '</option>').join('');
+      sel.dataset.firma = firma;
+    }
+    sel.classList.toggle('is-active', !!ui.filtroLab);
 
     const total = S.state.productos.length;
     const excluidos = S.state.cfg.labsNoListados === 'excluir'
