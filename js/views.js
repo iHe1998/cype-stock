@@ -119,21 +119,30 @@ VLM.views = (function () {
 
     /* --- gráficos --- */
     html += '<h3 class="section-title">Situación del stock</h3>';
-    // el corte principal es el artículo: adentro del VLM la ubicación no
-    // distingue nada, todos comparten VLMVENTA01 o VLMVENTA02
-    const topArt = Math.min(items.length, 15);
-    html += cardChart('Stock por artículo', topArt < items.length
-        ? 'unidades en picking · los ' + topArt + ' de mayor stock, de ' + items.length
-        : 'unidades en picking',
+    /* El corte principal es el artículo: adentro del VLM la ubicación no
+       distingue nada, todos comparten VLMVENTA01 o VLMVENTA02.
+
+       Los que están sólo en reserva no entran: no tienen posición de picking,
+       así que no hay nada que reponer y sólo aportarían barras en cero. */
+    const conPicking = items.filter(p => !p.sinPicking);
+    const soloReserva = items.length - conPicking.length;
+    const topArt = Math.min(conPicking.length, 15);
+    html += cardChart('Stock por artículo',
+        (topArt < conPicking.length
+          ? 'unidades en picking · los ' + topArt + ' de mayor stock, de ' + conPicking.length
+          : 'unidades en picking') +
+        (soloReserva ? ' · ' + soloReserva + ' sólo en reserva, fuera del gráfico' : ''),
         'chArtStock', Math.max(280, topArt * 24 + 50));
     html += '<div class="grid grid-2" style="margin-top:14px">' +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
       '</div>';
 
-    /* --- posiciones sin configurar: sin máximo no hay alerta posible --- */
-    const sinConfig = items.filter(p => !(p.stockMax > 0) && !(p.stockMin > 0)).length;
-    if (sinConfig) html += avisoSinConfig(sinConfig, items.length, cfg);
+    /* --- posiciones sin configurar: sin máximo no hay alerta posible ---
+       Sólo cuentan los que tienen picking: a los de pura reserva no se les
+       carga máximo, así que nunca se van a poder "terminar de configurar". */
+    const sinConfig = conPicking.filter(p => !(p.stockMax > 0) && !(p.stockMin > 0)).length;
+    if (sinConfig) html += avisoSinConfig(sinConfig, conPicking.length, cfg);
 
     /* --- top urgentes --- */
     if (urgentes.length) {
@@ -145,7 +154,7 @@ VLM.views = (function () {
     el.innerHTML = html;
 
     /* --- montaje de gráficos --- */
-    C.stockPorArticulo($('#chArtStock', el), items);
+    C.stockPorArticulo($('#chArtStock', el), conPicking);
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
   }
@@ -640,7 +649,6 @@ VLM.views = (function () {
   function posiciones(el, items, cfg) {
     const ui = VLM.store.state.ui;
     const cfgPos = VLM.store.state.posiciones;
-    const Ub = VLM.ubicaciones;
 
     /* UNA fila por POSICIÓN + ARTÍCULO.
        Afuera del VLM cada posición de picking tiene un solo artículo y la
@@ -648,9 +656,16 @@ VLM.views = (function () {
        comparten VLMVENTA01/02, así que la fila es el artículo dentro de esa
        posición: es lo único que se puede configurar por separado. */
     const porSlot = {}, artsPorUbic = {};
+    let enReserva = 0;
     items.forEach(p => {
       (p.detalle || []).forEach(d => {
         if (!d.ubicacion) return;
+        // La reserva no se configura. Un mínimo y un máximo dicen cuándo
+        // rellenar una posición y cuánto entra; en altura —o en el pasillo que
+        // abastece al VLM— no se rellena nada, se saca. Cargarles un número
+        // sería inventar una alerta que nadie va a atender, y son la mayoría
+        // de las filas: taparían las que sí importan.
+        if (d.tipo === 'altura') { enReserva++; return; }
         const u = d.ubicacion.toUpperCase();
         const k = u + '|' + String(p.codigo).toUpperCase();
         if (!artsPorUbic[u]) artsPorUbic[u] = {};
@@ -682,20 +697,17 @@ VLM.views = (function () {
       f.reasignada = !compartida && !!(f.artConfig && (f.min || f.max) && f.artConfig !== f.codigo);
     });
 
-    const tipoFiltro = ui.filtroTipoPos || 'picking';
     const q = U.norm(ui.busquedaPos || '');
     const vis = filas.filter(f => {
-      if (tipoFiltro !== 'todas' && f.tipo !== tipoFiltro) return false;
-      if (q && U.norm(f.ubicacion + ' ' + f.arts.map(a => a.codigo + ' ' + a.descripcion).join(' ')).indexOf(q) === -1) return false;
+      if (q && U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion).indexOf(q) === -1) return false;
       return true;
     });
 
     const configuradas = filas.filter(f => f.min || f.max).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-      kpi('Artículos ubicados', U.fmt(filas.length),
-          filas.filter(f => f.tipo === 'picking').length + ' en picking · ' +
-          filas.filter(f => f.tipo === 'altura').length + ' en altura') +
+      kpi('Posiciones de picking', U.fmt(filas.length),
+          enReserva ? U.fmt(enReserva) + ' de reserva, que no se configuran' : 'una fila por artículo') +
       kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
@@ -709,11 +721,6 @@ VLM.views = (function () {
 
     html += '<div class="toolbar">' +
       '<input class="input" id="posSearch" type="search" placeholder="Buscar posición o artículo…" value="' + U.esc(ui.busquedaPos || '') + '">' +
-      '<div class="chip-row">' +
-        chipTipo('picking', 'Picking', tipoFiltro === 'picking') +
-        chipTipo('altura', 'Altura', tipoFiltro === 'altura') +
-        chipTipo('todas', 'Todas', tipoFiltro === 'todas') +
-      '</div>' +
       '<div class="spacer"></div>' +
       '<button class="btn" id="posExport">Exportar plantilla</button>' +
       '<button class="btn" id="posImport">Importar completada</button>' +
@@ -725,20 +732,22 @@ VLM.views = (function () {
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
       '<div>Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
-      '(cuánto entra) de cada artículo en su posición. Se guardan y se aplican al instante.<br>' +
+      '(cuánto entra) de cada artículo en su posición de picking. Se guardan y se aplican al instante.<br>' +
+      '<span class="small muted">La reserva —altura y el pasillo que abastece al VLM— no se ' +
+      'configura: de ahí se saca, no se rellena. Se ve en el detalle del artículo y en la reposición.</span><br>' +
       '<span class="small muted">Si son muchas, exportá la plantilla, completá las columnas Mínimo y Máximo en Excel y volvé a importarla.</span>' +
       '</div></div>';
 
     html += '<div class="table-wrap"><table class="table" id="posTable">' +
       '<thead><tr>' +
-        '<th class="no-sort">Posición</th><th class="no-sort">Tipo</th><th class="no-sort">Zona</th>' +
+        '<th class="no-sort">Posición</th><th class="no-sort">Zona</th>' +
         '<th class="no-sort">Artículo</th><th class="no-sort t-num">Stock</th>' +
         '<th class="no-sort t-num">Mínimo</th><th class="no-sort t-num">Máximo</th>' +
         '<th class="no-sort">Estado</th>' +
       '</tr></thead><tbody>';
 
     if (!vis.length) {
-      html += '<tr><td colspan="8"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
+      html += '<tr><td colspan="7"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
     } else {
       vis.forEach(f => {
         let est = '', clase = '';
@@ -762,8 +771,6 @@ VLM.views = (function () {
         }
         html += '<tr class="' + clase + '">' +
           '<td class="t-code"><strong>' + U.esc(f.ubicacion) + '</strong></td>' +
-          '<td><span class="zchip ' + (f.tipo === 'altura' ? 'a-externo' : 'a-vlm') + '">' +
-            Ub.TIPOS[f.tipo].corto + '</span></td>' +
           '<td>' + zchip(f.zona) + '</td>' +
           '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
             (f.descripcion && f.descripcion !== f.codigo ? ' ' + U.esc(f.descripcion) : '') + '</td>' +
@@ -780,8 +787,6 @@ VLM.views = (function () {
     $('#posSearch', el).addEventListener('input', U.debounce(e => {
       VLM.store.setUi({ busquedaPos: e.target.value });
     }, 220));
-    U.$$('.chip', el).forEach(c => c.addEventListener('click', () =>
-      VLM.store.setUi({ filtroTipoPos: c.dataset.val })));
     // al editar se re-asocia al artículo que ocupa la posición ahora
     U.$$('.pos-inp', el).forEach(inp => {
       // un clic selecciona lo que ya está: se carga escribiendo el número
@@ -826,19 +831,15 @@ VLM.views = (function () {
     return A.estadoDeNivel(f.stock, f.min, f.max, cfg);
   }
 
-  function chipTipo(val, label, activo) {
-    return '<button class="chip' + (activo ? ' is-active' : '') + '" data-val="' + val + '">' + label + '</button>';
-  }
-
   /**
    * Exporta a .xlsx, no a CSV, y fuerza Posición y Artículo a texto.
    * En CSV, Excel lee "010004100" como número y le come el cero de adelante:
    * al reimportarlo la configuración no matchearía ninguna posición.
    */
   function exportarPosiciones(filas) {
-    const out = [['Posicion', 'Tipo', 'Zona', 'Articulo', 'Descripcion', 'Stock', 'Minimo', 'Maximo']];
+    const out = [['Posicion', 'Zona', 'Articulo', 'Descripcion', 'Stock', 'Minimo', 'Maximo']];
     filas.forEach(f => out.push([
-      f.ubicacion, f.tipo, f.zona || '',
+      f.ubicacion, f.zona || '',
       f.codigo, f.descripcion === f.codigo ? '' : f.descripcion,
       f.stock, f.min || '', f.max || ''
     ]));

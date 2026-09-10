@@ -52,7 +52,6 @@ VLM.store = (function () {
       filtroEstado: null,
       filtroAmbito: null,   // 'vlm' | 'externo' | null (todos)
       filtroZona: null,     // 'frio' | 'ambiente' | null (todas)
-      filtroTipoPos: 'picking',
       busquedaPos: '',
       busqueda: '',
       orden: { campo: 'ocupacion', dir: 'asc' }

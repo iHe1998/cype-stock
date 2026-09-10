@@ -239,10 +239,20 @@ tener regla de zona) tapaba a las posiciones de picking.
 
 ## Posiciones: mínimo y máximo
 
-La pestaña **Posiciones** lista una fila por **posición + artículo** —las ignoradas por
-reglas no aparecen— con su stock y el **mínimo** y el **máximo** editables ahí mismo. El
+La pestaña **Posiciones** lista una fila por **posición de picking + artículo** con su
+stock y el **mínimo** y el **máximo** editables ahí mismo. El
 **máximo** es el que manda: de él salen los umbrales de crítico y bajo, y el porcentaje de
 llenado que muestra cada fila. Se guardan solos y se aplican al instante, sin reimportar.
+
+**La reserva no se configura ni se grafica.** Un mínimo y un máximo dicen cuándo rellenar
+una posición y cuánto entra; de la altura —y del pasillo que abastece al VLM— no se
+rellena nada, se saca. Esas filas no aparecen en la pestaña, que si no serían la mayoría y
+taparían las que sí hay que cargar. Un artículo que existe **sólo** en reserva tampoco
+entra en el gráfico: no tiene nada que reponer y sería una barra en cero. El resumen dice
+cuántos son, para que no desaparezcan en silencio.
+
+La reserva sigue viéndose donde sirve: en el detalle del artículo y en la lista de
+reposición, que dice de qué posición bajar la mercadería.
 
 La clave es posición **más** artículo, no la posición sola. Afuera del VLM cada posición
 de picking tiene un artículo y da lo mismo, pero adentro de la torre todos comparten
