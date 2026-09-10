@@ -268,8 +268,17 @@ VLM.parser = (function () {
   }
 
   /**
-   * Reaplica las reglas de posición sobre productos ya cargados.
+   * Clasifica cada artículo: VLM o fuera, frío o ambiente, y qué posiciones
+   * suyas son picking y cuáles reserva.
    *
+   * El orden importa: primero el SKU, después la ubicación. Que un artículo
+   * viva en la torre no lo decide su laboratorio —AstraZeneca tiene de los dos
+   * tipos— sino que aparezca en una posición del VLM. Y recién sabiendo eso se
+   * puede leer el resto de sus ubicaciones: el nivel 100 de un artículo del VLM
+   * es la reserva para rellenar la torre, mientras que el mismo nivel 100 en un
+   * artículo de pasillo es la posición desde la que se sirve.
+   *
+
    * Sin esto, cambiar una regla —o abrir una versión nueva de la app que trae
    * reglas nuevas— dejaba la clasificación vieja pegada hasta reimportar la
    * planilla: el artículo seguía en la zona y el ámbito que le tocaron el día
@@ -284,16 +293,41 @@ VLM.parser = (function () {
     catalogo = catalogo || VLM.labs.catalogoDefault();
 
     productos.forEach(p => {
-      const dets = p.detalle || [];
-      if (!dets.length) return;
+      // sin agrupar (una fila por producto) no hay detalle: la única ubicación
+      // del producto hace de detalle para poder clasificarlo igual
+      const dets = (p.detalle && p.detalle.length)
+        ? p.detalle : [{ ubicacion: p.ubicacion, stock: p.stock }];
+
+      // --- 1. el SKU: ¿vive en la torre? ---
+      // Manda que el artículo aparezca en una posición del VLM, no de dónde
+      // sea el laboratorio. AstraZeneca tiene artículos adentro de la torre y
+      // otros que se pickean de pasillo; son el mismo laboratorio y no se
+      // clasifican igual.
+      const evaluadas = dets.map(d => ({
+        det: d, regla: VLM.ubicaciones.evaluar(d.ubicacion, reglas)
+      }));
+      const enVLM = evaluadas.filter(e => e.regla && e.regla.ambito === 'vlm');
+      const esVLM = enVLM.length > 0;
 
       let pick = 0, alt = 0;
-      const zonaPeso = {}, ambitoPeso = {};
+      const zonaPeso = {};
       const ubicPicking = [], ubicAltura = [], ubicaciones = [];
 
-      dets.forEach(d => {
-        const regla = VLM.ubicaciones.evaluar(d.ubicacion, reglas);
-        d.tipo = (regla && regla.tipo) || 'picking';
+      // --- 2. la ubicación, leída según lo que sea el SKU ---
+      evaluadas.forEach(e => {
+        const d = e.det, regla = e.regla;
+        const esPosVLM = !!(regla && regla.ambito === 'vlm');
+
+        /* Un artículo del VLM se pickea SÓLO de la torre. Todo lo que tenga
+           en pasillo —incluido el nivel 100, que en cualquier otro artículo
+           sería picking— es la reserva con la que se rellena la torre. Sin
+           esta distinción, el nivel 100 de un artículo del VLM se contaba
+           como si se sirviera de ahí y los gráficos mostraban un picking que
+           no existe. */
+        d.tipo = esVLM ? (esPosVLM ? 'picking' : 'altura')
+                       : ((regla && regla.tipo) || 'picking');
+        d.reservaVLM = esVLM && !esPosVLM;
+
         const zona = regla && regla.zona ? regla.zona : null;
         if (zona && !p.zonaDeColumna) d.zona = zona;
 
@@ -306,15 +340,17 @@ VLM.parser = (function () {
         }
         if (d.ubicacion && ubicaciones.indexOf(d.ubicacion) === -1) ubicaciones.push(d.ubicacion);
 
-        // el picking pesa doble: es desde donde se sirve
-        const peso = (d.stock || 0) * (d.tipo === 'picking' ? 2 : 1) + 1;
-        if (zona) zonaPeso[zona] = (zonaPeso[zona] || 0) + peso;
-        if (regla && regla.ambito) ambitoPeso[regla.ambito] = (ambitoPeso[regla.ambito] || 0) + peso;
+        /* La zona sale de la cara de picking: para un artículo del VLM, de si
+           está en VLMVENTA01 (frío) o 02 (ambiente), sin que la reserva de
+           pasillo pueda torcerlo. Para el resto, del pasillo, con el picking
+           pesando doble. */
+        if (!zona) return;
+        if (esVLM && !esPosVLM) return;
+        zonaPeso[zona] = (zonaPeso[zona] || 0) + (d.stock || 0) * (d.tipo === 'picking' ? 2 : 1) + 1;
       });
 
       const mayor = o => Object.keys(o).sort((a, b) => o[b] - o[a])[0];
-      const zonaGana   = mayor(zonaPeso);
-      const ambitoGana = mayor(ambitoPeso);
+      const zonaGana = mayor(zonaPeso);
 
       p.stockPicking = pick;
       p.stockAltura  = alt;
@@ -328,7 +364,7 @@ VLM.parser = (function () {
 
       // la columna de la planilla, si existe, le gana a la regla
       if (zonaGana && !p.zonaDeColumna) { p.zonaPlanilla = zonaGana; p.zonaExplicita = true; }
-      if (ambitoGana) p.ambitoPos = ambitoGana;
+      p.ambitoPos = esVLM ? 'vlm' : 'externo';
 
       VLM.labs.clasificar(p, catalogo);
     });
@@ -363,8 +399,7 @@ VLM.parser = (function () {
           ubicaciones: [], ubicPicking: [], ubicAltura: [], lotes: [], detalle: [],
           posiciones: 0, stockPicking: 0, stockAltura: 0,
           disponible: 0, asignado: 0, hayDisponible: false,
-          minPos: 0, maxPos: 0, stockPosConfig: 0, tieneConfigPos: false,
-          zonaPeso: {}, ambitoPeso: {}
+          minPos: 0, maxPos: 0, stockPosConfig: 0, tieneConfigPos: false
         });
         orden.push(k);
         mapa[k].stock = 0;
@@ -413,18 +448,9 @@ VLM.parser = (function () {
         vencimiento: p.vencimiento
       });
 
-      // La zona y el ámbito se deciden por peso, pero SÓLO votan las filas
-      // donde el dato es explícito: una columna de la planilla o una regla de
-      // posición. Las que caen al default del laboratorio no votan, porque es
-      // una suposición y no puede ganarle a un dato real — si no, el stock de
-      // altura (que suele no tener regla de zona) tapa a las posiciones de
-      // picking, que son las que definen desde dónde se sirve el artículo.
-      const peso = (p.stock || 0) * (p.tipoPos === 'picking' ? 2 : 1) + 1;
-      if (p.zonaExplicita && p.conservacion) {
-        g.zonaPeso[p.conservacion] = (g.zonaPeso[p.conservacion] || 0) + peso;
-      }
-      if (p.ambitoPos) g.ambitoPeso[p.ambitoPos] = (g.ambitoPeso[p.ambitoPos] || 0) + peso;
-
+      // La zona y el ámbito NO se deciden acá: hace falta ver todas las
+      // ubicaciones del artículo juntas, y eso lo hace reaplicarReglas() sobre
+      // la lista ya agrupada. Acá sólo se junta el stock.
       if (p.zonaDeColumna) g.zonaDeColumna = true;
       g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
       g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
@@ -432,20 +458,11 @@ VLM.parser = (function () {
       if (!g.descripcion || g.descripcion === g.codigo) g.descripcion = p.descripcion;
     });
 
-    const mayor = o => Object.keys(o).sort((a, b) => o[b] - o[a])[0];
-
     return orden.map(k => {
       const g = mapa[k];
-      g.ubicacion = g.ubicPicking.length ? g.ubicPicking[0] : (g.ubicaciones[0] || '');
-      if (g.ubicaciones.length > 1) g.ubicacion += ' +' + (g.ubicaciones.length - 1);
       g.lote = g.lotes.length > 1 ? g.lotes.length + ' lotes' : (g.lotes[0] || '');
       if (!g.hayDisponible) g.disponible = null;
       delete g.hayDisponible;
-      g.conservacion = mayor(g.zonaPeso) || g.conservacion;
-      g.ambito       = mayor(g.ambitoPeso) || g.ambito;
-      g.zonasMixtas  = Object.keys(g.zonaPeso).length > 1;
-      g.sinPicking   = g.ubicPicking.length === 0;
-      delete g.zonaPeso; delete g.ambitoPeso;
       return g;
     });
   }
@@ -584,6 +601,10 @@ VLM.parser = (function () {
     const agrupado = repetidos && opciones.agrupar !== false;
     const filasLeidas = productos.length;
     let lista = agrupado ? agrupar(productos) : productos;
+    // VLM o fuera, frío o ambiente, picking o reserva: se decide por artículo,
+    // una vez que están todas sus ubicaciones juntas. Es la misma función que
+    // corre al editar las reglas, así que importar y reclasificar dan igual.
+    reaplicarReglas(lista, reglas, catalogo);
     // el mínimo y el máximo se resuelven al final, desde el detalle por
     // posición: es la misma función que corre al editarlos sin reimportar
     aplicarPosiciones(lista, cfgPosiciones);

@@ -108,21 +108,35 @@ Los productos se clasifican en dos dimensiones independientes, que se combinan
 en cuatro cuadrantes: **VLM · Frío**, **VLM · Ambiente**, **Fuera · Frío**, **Fuera · Ambiente**.
 La barra superior filtra por cualquiera de las dos y afecta a todas las vistas.
 
-### Catálogo (editable en ⚙ Configuración)
+### El SKU es el que manda
 
-| Laboratorio | Ámbito |
-|---|---|
-| AstraZeneca | VLM |
-| Roche | VLM |
-| Sanofi Aventis | VLM |
-| Amgen | VLM |
-| Abbvie | Fuera del VLM |
-| Biosidus Argentina | Fuera del VLM |
+**Ni el ámbito ni la conservación salen del laboratorio.** Se deciden por artículo, en
+este orden:
 
-El laboratorio define el **ámbito** y nada más. **La conservación no se configura por
-laboratorio**: un mismo laboratorio tiene artículos en `VLMVENTA01` (frío) y en
-`VLMVENTA02` (ambiente), así que un default por laboratorio sólo puede estar bien para la
-mitad. Sale de la posición.
+1. **¿El SKU aparece en alguna posición `VLMVENTA*`?** Si sí, es del VLM. Si no, es de
+   afuera. AstraZeneca tiene artículos de los dos tipos, así que preguntárselo al
+   laboratorio da la respuesta equivocada para la mitad.
+2. **Recién ahí se leen sus otras ubicaciones**, y significan cosas distintas según lo
+   anterior:
+
+| El SKU está en… | `VLMVENTA01/02` | Nivel `100`/`150` de pasillo | Nivel `200`+ |
+|---|---|---|---|
+| **el VLM** | picking | **reserva** para rellenar la torre | reserva |
+| **pasillo** | — | picking | reserva |
+
+El nivel `100` es el caso que importa: en un artículo de pasillo es la posición desde la
+que se sirve, y en uno del VLM es con lo que se rellena la torre. Sin la distinción, un
+artículo del VLM mostraba un picking de pasillo que nadie usa.
+
+> **Ejemplo real.** `4002905XAR` está en `VLMVENTA02` con 120 unidades, y además tiene
+> `005023300` y `004023200`. Queda como **VLM · Ambiente**, con 120 en picking y el resto
+> como reserva — y esas dos posiciones aparecen en la lista de reposición como el lugar de
+> donde bajar la mercadería.
+
+### Catálogo de laboratorios (editable en ⚙ Configuración)
+
+AstraZeneca, Roche, Sanofi Aventis, Amgen, Abbvie y Biosidus Argentina. El catálogo dice
+**cuáles** se procesan y cómo se llaman; nada más.
 
 **Sólo se procesan los laboratorios del catálogo.** Los demás quedan fuera de KPIs y
 gráficos, pero la app *dice cuántos son* en la barra superior — para que un nombre mal
@@ -138,10 +152,14 @@ El matcheo es tolerante: reconoce razones sociales completas. `LAB. ROCHE S.A.Q.
 1. **La columna de conservación de la planilla**, si existe. Entiende `Frío`, `Refrigerado`,
    `2-8°C`, `Termolábil`, `Heladera`, `Ambiente`, `15-25°C`, `Seco`. En una columna llamada
    `Cadena de frío`, un `SI`/`NO` también se interpreta bien.
-2. **La regla de la posición**: `VLMVENTA01` es frío, `VLMVENTA02` es ambiente, los pasillos
-   `1xx` son cámara y los `0xx` ambiente.
+2. **La regla de la posición de picking**: `VLMVENTA01` es frío, `VLMVENTA02` es ambiente,
+   los pasillos `1xx` son cámara y los `0xx` ambiente.
 3. Si ninguna regla la define: `Ambiente`, y la posición sale listada en el aviso de
    importación para que se note que le falta una regla.
+
+Para un artículo del VLM manda **su cara de picking en la torre**: su reserva de pasillo no
+vota. Uno que se sirve de `VLMVENTA01` sigue siendo frío aunque tenga miles de unidades
+guardadas en un pasillo de ambiente.
 
 Así un laboratorio aparece en los dos cuadrantes según dónde esté cada artículo, que es lo
 que pasa en la realidad.

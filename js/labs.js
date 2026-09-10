@@ -25,24 +25,26 @@ VLM.labs = (function () {
   /* ---------------- catálogo por defecto ----------------
      `alias` se compara normalizado (sin acentos ni puntuación) contra el
      valor de la columna Laboratorio, primero exacto y después por contención.
-     El laboratorio define el ÁMBITO (si su mercadería vive en la torre) y
-     nada más. La conservación NO sale de acá: sale de la posición, que es
-     donde está la mercadería de verdad. Un mismo laboratorio tiene artículos
-     en VLMVENTA01 (frío) y en VLMVENTA02 (ambiente), así que un default por
-     laboratorio sólo puede estar mal para la mitad.
+     El catálogo dice QUÉ laboratorios se procesan y cómo se llaman. Nada más.
+     Ni el ámbito ni la conservación salen de acá: los dos son propiedades de
+     dónde está la mercadería, y un laboratorio tiene de todo. AstraZeneca
+     tiene artículos adentro de la torre y otros que se pickean de pasillo, y
+     adentro de la torre los tiene en VLMVENTA01 (frío) y en VLMVENTA02
+     (ambiente). Cualquier default por laboratorio sólo puede estar bien para
+     una parte.
      ------------------------------------------------------ */
   const CATALOGO_DEFAULT = [
-    { id: 'astrazeneca', nombre: 'AstraZeneca',         ambito: 'vlm',
+    { id: 'astrazeneca', nombre: 'AstraZeneca',
       alias: ['astrazeneca', 'astra zeneca', 'astra', 'az'] },
-    { id: 'roche',       nombre: 'Roche',               ambito: 'vlm',
+    { id: 'roche', nombre: 'Roche',
       alias: ['roche', 'productos roche', 'roche argentina'] },
-    { id: 'sanofi',      nombre: 'Sanofi Aventis',      ambito: 'vlm',
+    { id: 'sanofi', nombre: 'Sanofi Aventis',
       alias: ['sanofi aventis', 'sanofi', 'aventis', 'sanofi argentina'] },
-    { id: 'amgen',       nombre: 'Amgen',               ambito: 'vlm',
+    { id: 'amgen', nombre: 'Amgen',
       alias: ['amgen', 'amgen argentina'] },
-    { id: 'abbvie',      nombre: 'Abbvie',              ambito: 'externo',
+    { id: 'abbvie', nombre: 'Abbvie',
       alias: ['abbvie', 'abb vie', 'abbott vie'] },
-    { id: 'biosidus',    nombre: 'Biosidus Argentina',  ambito: 'externo',
+    { id: 'biosidus', nombre: 'Biosidus Argentina',
       alias: ['biosidus argentina', 'biosidus'] }
   ];
 
@@ -126,25 +128,26 @@ VLM.labs = (function () {
   }
 
   /**
-   * Clasifica un producto ya normalizado: le agrega labId, labNombre,
-   * ambito, conservacion y gestionado.
+   * Clasifica un producto ya normalizado.
+   *
+   * El laboratorio sólo aporta el nombre lindo y si está en el catálogo. El
+   * ámbito y la conservación los decide parser.reaplicarReglas() mirando las
+   * ubicaciones del artículo, así que acá sólo se copian.
    */
   function clasificar(p, catalogo) {
     const lab = buscar(p.laboratorio, catalogo);
     p.labId       = lab ? lab.id : null;
     p.labNombre   = lab ? lab.nombre : p.laboratorio;
     p.gestionado  = !!lab;
-    // el ámbito sale de la posición si una regla lo define: dónde está la
-    // mercadería es un hecho físico, el laboratorio es sólo el default
-    p.ambito      = p.ambitoPos || (lab ? lab.ambito : 'externo');
+    p.ambito      = p.ambitoPos || 'externo';
     p.conservacion = resolverZona(p.zonaPlanilla);
     p.zonaSupuesta = !p.zonaExplicita;
     return p;
   }
 
   /**
-   * Los catálogos guardados por versiones anteriores traen `zona` por
-   * laboratorio. Se descarta: la conservación es de la posición.
+   * Los catálogos guardados por versiones anteriores traen `zona` y `ambito`
+   * por laboratorio. Se descartan: los dos salen de la posición.
    * Además se agregan los laboratorios nuevos que el catálogo guardado
    * no tenga, sin tocar los que el usuario haya editado.
    */
@@ -152,6 +155,7 @@ VLM.labs = (function () {
     const lista = (guardado || []).map(l => {
       const c = Object.assign({}, l);
       delete c.zona;
+      delete c.ambito;
       return c;
     });
     const ids = lista.map(l => l.id);

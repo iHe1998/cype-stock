@@ -460,12 +460,17 @@ VLM.app = (function () {
     ['AZ-101','Tagrisso 80mg x30 comp','ASTRAZENECA','VLMVENTA02',140,110,30,'OK',60,320,'AZ4411','FMNZ','1000','2027-08-31'],
     ['AZ-102','Forxiga 10mg x28 comp','ASTRAZENECA','VLMVENTA02',62,62,0,'OK',80,400,'AZ4418','EGKD','1000','2027-11-30'],
     ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','VLMVENTA02',410,395,15,'OK',120,600,'AZ4423','SX695','1000','2028-02-28'],
+    // reserva de un artículo del VLM: pasillo, y una en nivel 100 — que en un
+    // artículo de pasillo sería picking, pero acá es con lo que se rellena la torre
+    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','005023300',900,900,0,'OK',120,600,'AZ4423','SX695','1000','2028-02-28'],
+    ['AZ-103','Crestor 20mg x30 comp','ASTRAZENECA','004023100',240,240,0,'OK',120,600,'AZ4423','SX695','1000','2028-02-28'],
     ['AZ-104','Symbicort 160/4.5 turbuhaler','ASTRAZENECA','VLMVENTA02',228,228,0,'OK',90,450,'AZ4430','VKRT','1000','2027-06-30'],
     ['AZ-105','Imfinzi 500mg vial','ASTRAZENECA','VLMVENTA01',18,4,14,'OK',12,60,'AZ7702','BCDG','1000','2027-03-31'],
     ['AZ-106','Faslodex 250mg jeringa x2','ASTRAZENECA','VLMVENTA01',34,34,0,'OK',20,90,'AZ7715','SW829','1000','2027-09-30'],
 
     // --- ROCHE · VLM ---
     ['RO-201','Herceptin 440mg vial','ROCHE','VLMVENTA01',4,4,0,'OK',10,40,'RO8801','1004379','1000','2027-05-31'],
+    ['RO-201','Herceptin 440mg vial','ROCHE','104008200',120,120,0,'OK',10,40,'RO8801','1004379','1000','2027-05-31'],
     ['RO-202','MabThera 500mg vial','ROCHE','VLMVENTA01',11,11,0,'OK',10,45,'RO8809','1005985','1000','2027-07-31'],
     ['RO-203','Avastin 400mg vial','ROCHE','VLMVENTA01',26,20,6,'OK',14,60,'RO8814','1006056','1000','2028-01-31'],
     ['RO-204','Actemra 400mg vial','ROCHE','VLMVENTA01',31,31,0,'OK',12,50,'RO8820','423216','1000','2027-10-31'],
@@ -634,17 +639,13 @@ VLM.app = (function () {
     const cont = $('#labsEditor');
 
     cont.innerHTML =
-      '<div class="labs-head"><span>Laboratorio</span><span>Ámbito</span><span></span></div>' +
+      '<div class="labs-head"><span>Laboratorio</span><span></span></div>' +
       labs.map((l, i) =>
         '<div class="lab-row" data-i="' + i + '">' +
           '<div>' +
             '<input type="text" data-campo="nombre" value="' + U.esc(l.nombre) + '" placeholder="Nombre">' +
             '<span class="lab-alias">Reconoce: ' + U.esc(l.alias.join(', ')) + '</span>' +
           '</div>' +
-          '<select data-campo="ambito">' +
-            Object.keys(L.AMBITOS).map(k => '<option value="' + k + '"' +
-              (l.ambito === k ? ' selected' : '') + '>' + L.AMBITOS[k].corto + '</option>').join('') +
-          '</select>' +
           '<button class="btn btn-icon lab-row-del" title="Quitar del catálogo">' +
             '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
         '</div>').join('');
@@ -686,9 +687,7 @@ VLM.app = (function () {
     S.setLabs(S.state.labs.concat([{
       id: U.norm(nombre).replace(/ /g, '-') || ('lab' + Date.now()),
       nombre: nombre,
-      alias: [nombre],
-      ambito: 'vlm',
-      zona: 'ambiente'
+      alias: [nombre]
     }]));
     pintarLabsEditor();
     U.toast('Agregado: ' + nombre, 'ok');
