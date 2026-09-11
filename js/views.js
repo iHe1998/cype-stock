@@ -350,22 +350,32 @@ VLM.views = (function () {
     });
 
     const total = altura.reduce((s, d) => s + d.stock, 0);
-    const muestra = lotes.slice(0, 2);
+    // Ocupa una fila propia a todo el ancho de la tarjeta, así que entran tres
+    // lotes uno al lado del otro en vez de dos apilados en una columna angosta.
+    const muestra = lotes.slice(0, 3);
+    const resto = lotes.length - muestra.length;
 
     return '<div class="repo-altura">' +
-      '<b>' + U.fmt(total) + '</b> en altura' +
-      muestra.map(g =>
-        '<div class="alt-lote' + (g.mismo ? ' es-mismo' : '') + '">' +
-          '<span class="alt-ubics">' + U.esc(g.ubics.slice(0, 2).join(', ')) +
-            (g.ubics.length > 2 ? ' +' + (g.ubics.length - 2) : '') + '</span>' +
-          '<span class="alt-meta">' + U.fmt(g.stock) + ' u' +
-            (g.lote ? ' · lote ' + U.esc(g.lote) : '') +
-            (g.lote2 ? ' · ' + U.esc(g.lote2) : '') +
-            (g.mismo ? ' · <strong>mismo lote</strong>' : '') +
-            (g.vto ? ' · vto ' + U.fmtFechaCorta(g.vto) : '') +
-          '</span>' +
-        '</div>').join('') +
-      (lotes.length > 2 ? '<div class="alt-mas">+' + (lotes.length - 2) + ' lote(s) más</div>' : '') +
+      '<div class="alt-head">' +
+        '<svg viewBox="0 0 24 24" class="ico alt-ico"><path d="M12 5v14m0 0-6-6m6 6 6-6"/></svg>' +
+        '<span class="alt-title">Bajar de</span>' +
+        '<b>' + U.fmt(total) + '</b><span class="alt-u">unidades en altura</span>' +
+        (resto ? '<span class="alt-mas">+' + resto + ' lote(s) más</span>' : '') +
+      '</div>' +
+      '<div class="alt-lotes">' +
+        muestra.map(g =>
+          '<div class="alt-lote' + (g.mismo ? ' es-mismo' : '') + '">' +
+            '<span class="alt-ubics">' + U.esc(g.ubics.slice(0, 2).join(' · ')) +
+              (g.ubics.length > 2 ? ' +' + (g.ubics.length - 2) : '') + '</span>' +
+            '<span class="alt-cant">' + U.fmt(g.stock) + ' u</span>' +
+            '<span class="alt-meta">' +
+              (g.lote ? 'lote ' + U.esc(g.lote) : '') +
+              (g.lote2 ? ' · ' + U.esc(g.lote2) : '') +
+              (g.vto ? ' · vto ' + U.fmtFechaCorta(g.vto) : '') +
+            '</span>' +
+            (g.mismo ? '<span class="alt-mismo">mismo lote</span>' : '') +
+          '</div>').join('') +
+      '</div>' +
       '</div>';
   }
 
@@ -374,6 +384,7 @@ VLM.views = (function () {
     const pct = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
 
     return '<div class="repo-item row-link ' + clase + '" data-art="' + U.esc(p.codigo) + '">' +
+      '<div class="repo-fila">' +
       '<div class="repo-rank">' + rank + '</div>' +
       '<div class="repo-main">' +
         '<strong>' + U.esc(p.descripcion) + '</strong>' +
@@ -385,12 +396,15 @@ VLM.views = (function () {
             : p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
         '</div>' +
       '</div>' +
-      fuentesAltura(p) +
       '<div class="repo-metric"><b>' + U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock) +
         '</b><span>en picking</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + pct + '</b><span>de su capacidad</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
+      '</div>' +
+      // fuera de la grilla de arriba: adentro, al cruzar varias columnas, le
+      // movía los anchos a las métricas y le comía espacio al artículo
+      fuentesAltura(p) +
       '</div>';
   }
 

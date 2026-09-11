@@ -582,42 +582,80 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    REPOSICIÓN
    ============================================================ */
 .repo-list { display: flex; flex-direction: column; gap: 8px; }
+/* La tarjeta son dos bloques apilados: la fila de siempre y, debajo, de dónde
+   bajar la mercadería. El de abajo queda FUERA de la grilla a propósito: como
+   parte de ella cruzaba varias columnas, les movía el ancho a las métricas y
+   le comía espacio al artículo. */
 .repo-item {
-  display: grid;
-  grid-template-columns: 44px 1fr auto auto auto auto;
-  gap: 14px; align-items: center;
   padding: 12px 16px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-left: 3px solid var(--crit);
   border-radius: var(--r);
 }
+.repo-fila {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 104px 104px 104px;
+  column-gap: 14px; align-items: center;
+}
 .repo-item.r-bajo { border-left-color: var(--warn); }
 .repo-item.r-agotado { border-left-color: var(--agotado); background: color-mix(in srgb, var(--agotado) 16%, var(--surface)); }
 .repo-rank { font-size: 18px; font-weight: 700; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
-.repo-main strong { display: block; font-size: 14px; font-weight: 600; }
+/* Sólo el título del artículo, no cualquier <strong> de adentro: el de la
+   posición en la meta se iba a un renglón propio y salía en cuerpo 14. */
+.repo-main > strong { display: block; font-size: 14px; font-weight: 600; }
 .repo-meta { font-size: 12px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+/* cada dato entero o en la línea siguiente: el 📍 no se separa de su posición */
+.repo-meta > span { white-space: nowrap; }
 .repo-metric { text-align: right; min-width: 92px; }
 .repo-metric b { display: block; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .repo-metric span { font-size: 11px; color: var(--muted); }
-/* de dónde bajar mercadería para rellenar la posición de picking */
+/* De dónde bajar mercadería para rellenar la posición de picking.
+
+   Va en una fila propia, a todo el ancho de la tarjeta, y no apretado en una
+   columna al lado de los números: es la instrucción de qué hacer —a qué
+   posición ir a buscar— así que necesita el espacio y tiene que verse. Antes
+   entraba en 230px y el texto se partía en cuatro renglones mientras la mitad
+   de la fila quedaba vacía. */
 .repo-altura {
-  font-size: 11.5px; line-height: 1.35; text-align: right;
-  padding: 5px 10px; border-radius: var(--r-sm);
-  background: var(--surface-2); border: 1px solid var(--border-soft);
-  color: var(--muted); min-width: 190px; max-width: 230px;
-}
-.repo-altura b { color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
-.alt-lote {
-  margin-top: 5px; padding-top: 5px;
-  border-top: 1px solid var(--border-soft);
+  /* alineado con el título del artículo: 44 del número + 14 del gap */
+  margin: 9px 0 1px 58px;
+  padding: 8px 11px; border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent);
   text-align: left;
 }
-.alt-lote.es-mismo { border-left: 2px solid var(--ok); padding-left: 6px; border-top-color: transparent; }
-.alt-ubics { display: block; font-family: var(--mono); font-size: 11px; color: var(--text-2); }
-.alt-meta  { display: block; font-size: 10px; color: var(--muted); }
-.alt-lote.es-mismo .alt-meta strong { color: var(--ok); }
-.alt-mas { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.alt-head { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.alt-ico { width: 13px; height: 13px; color: var(--accent); align-self: center; }
+.alt-title {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-2);
+}
+.repo-altura b { color: var(--text); font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.alt-u { font-size: 11.5px; color: var(--muted); }
+.alt-mas { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+.alt-lotes { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+.alt-lote {
+  flex: 1 1 240px; min-width: 0;
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 6px 9px; border-radius: 5px;
+  background: var(--surface); border: 1px solid var(--border-soft);
+}
+/* el lote que ya está abajo va primero y marcado: rellenar con otro mezcla partidas */
+.alt-lote.es-mismo {
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+  background: color-mix(in srgb, var(--ok-fill) 8%, var(--surface));
+}
+.alt-ubics { font-family: var(--mono); font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.alt-cant  { font-size: 12px; font-weight: 650; color: var(--text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.alt-meta  { font-size: 11px; color: var(--muted); min-width: 0; }
+.alt-mismo {
+  margin-left: auto; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  color: var(--ok); white-space: nowrap;
+}
 .sin-pick { color: var(--crit); font-weight: 700; }
 
 .repo-metric.m-crit b { color: var(--crit); }
@@ -825,7 +863,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   .tabs { position: static; }
   #app { padding: 16px 12px 50px; }
   .imp-grid, .cfg-grid { grid-template-columns: 1fr; }
-  .repo-item { grid-template-columns: 34px 1fr; row-gap: 8px; }
+  .repo-fila { grid-template-columns: 34px 1fr; row-gap: 8px; }
+  .repo-altura { margin-left: 0; }
   .repo-metric { text-align: left; }
   .tv-kpis { grid-template-columns: repeat(2, 1fr); }
   .tv-split { grid-template-columns: 1fr; }
