@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VLM Stock · Panel de Control</title>
 <meta name="description" content="Panel de control de stock para torre de picking vertical (VLM)">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0f14'/%3E%3Crect x='7' y='6' width='18' height='4' rx='1' fill='%2338bdf8'/%3E%3Crect x='7' y='13' width='18' height='4' rx='1' fill='%2322c55e'/%3E%3Crect x='7' y='20' width='18' height='4' rx='1' fill='%23f59e0b'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0f14'/%3E%3Crect x='7' y='6' width='18' height='4' rx='1' fill='%2322c55e'/%3E%3Crect x='7' y='13' width='18' height='4' rx='1' fill='%23f59e0b'/%3E%3Crect x='7' y='20' width='18' height='4' rx='1' fill='%23f66a6a'/%3E%3C/svg%3E">
 <style>
 /* ============================================================
    VLM Stock · Design system
@@ -182,9 +182,12 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .brand { display: flex; align-items: center; gap: 11px; }
 .brand-ico { width: 30px; height: 30px; }
 .bi-body { fill: none; stroke: var(--border); stroke-width: 1.5; }
-.bi-a { fill: var(--accent); }
-.bi-b { fill: var(--ok); }
-.bi-c { fill: var(--warn); }
+/* Las tres bandejas del logo son los tres estados que mira el panel, de
+   arriba hacia abajo: OK, bajo y crítico. Usan los mismos tokens que las
+   etiquetas, así que el logo cambia con el tema junto con todo lo demás. */
+.bi-a { fill: var(--ok); }
+.bi-b { fill: var(--warn); }
+.bi-c { fill: var(--crit); }
 .brand-txt { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-txt strong { font-size: 15px; letter-spacing: -.01em; }
 .brand-txt span { font-size: 11px; color: var(--muted); }
@@ -396,9 +399,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .empty[hidden] { display: none; }
 .empty-art svg { width: 110px; height: 110px; margin-bottom: 18px; }
 .es-body { fill: var(--surface); stroke: var(--border); stroke-width: 2; }
-.es-r1 { fill: var(--accent); opacity: .85; }
-.es-r2 { fill: var(--ok); opacity: .7; }
-.es-r3 { fill: var(--warn); opacity: .6; }
+/* mismo motivo que el logo, mismos tres estados */
+.es-r1 { fill: var(--ok); opacity: .85; }
+.es-r2 { fill: var(--warn); opacity: .7; }
+.es-r3 { fill: var(--crit); opacity: .6; }
 .es-r4 { fill: var(--surface-3); }
 .es-r5 { fill: var(--surface-3); }
 .empty h1 { font-size: 24px; margin-bottom: 10px; }
@@ -1209,7 +1213,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 11/09/2026 18:31 - edb1cc9</span>
+      <span class="muted small" id="appVersion">compilado 11/09/2026 18:53 - 1e3e122</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
