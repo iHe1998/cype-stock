@@ -660,6 +660,22 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   text-transform: uppercase; letter-spacing: .04em;
   color: var(--ok); white-space: nowrap;
 }
+
+/* Fin de lote: en la reserva no queda el lote que está en la posición, así que
+   lo que se baje va a ser de otra partida. Se ve antes de ir a buscarlo. */
+.alt-fin {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--warn); background: var(--warn-dim);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  white-space: nowrap;
+}
+.alt-fin .ico { width: 12px; height: 12px; }
+.repo-altura.es-fin { border-left-color: var(--warn); }
+/* sin reserva: el bloque es sólo el aviso, en una línea */
+.repo-altura.es-fin > .alt-fin { margin-right: 8px; }
 .sin-pick { color: var(--crit); font-weight: 700; }
 
 .repo-metric.m-crit b { color: var(--crit); }

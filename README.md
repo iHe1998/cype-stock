@@ -290,6 +290,16 @@ mercadería, cruzadas por **artículo + lote + Atributo02**. Primero las del **m
 que ya está en la posición de picking —rellenar con otro lote mezcla partidas— y después
 las demás ordenadas por vencimiento, que es el orden en que conviene sacarlas.
 
+### Fin de lote
+
+Si en la reserva **no queda nada del lote que está en la posición**, aparece un aviso de
+`FIN DE LOTE`: lo que se baje va a ser de otra partida. Conviene saberlo antes de ir a
+buscar la mercadería, no cuando ya se está frente a la posición. Sale igual cuando el
+artículo directamente no tiene reserva, aclarando que no hay de dónde sacar.
+
+No aplica si la posición está vacía —ahí no hay ningún lote que se esté terminando— ni si
+la planilla no trae columna de lote, porque no habría con qué comparar.
+
 Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con una fila por
 posición y artículo, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve
 con **Importar completada**. Las columnas `Posicion` y `Articulo` son las que arman la

@@ -311,6 +311,15 @@ VLM.views = (function () {
     return '<button class="chip' + (activo ? ' is-active' : '') + '" data-val="' + val + '">' + label + '</button>';
   }
 
+  /** Aviso de que el lote que está en la posición no se puede continuar. */
+  function chipFinDeLote() {
+    return '<span class="alt-fin" title="En la reserva no queda el lote que ' +
+      'está en la posición: lo que se baje va a ser de otra partida">' +
+      '<svg viewBox="0 0 24 24" class="ico"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 ' +
+        '1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
+      'Fin de lote</span>';
+  }
+
   /**
    * De dónde bajar mercadería para rellenar el picking.
    *
@@ -323,11 +332,29 @@ VLM.views = (function () {
   function fuentesAltura(p) {
     const det = p.detalle || [];
     const altura = det.filter(d => d.tipo === 'altura' && d.stock > 0);
-    if (!altura.length) return '';
 
     const clave = d => (d.lote || '') + '|' + (d.lote2 || '');
     const enPicking = {};
-    det.filter(d => d.tipo === 'picking' && d.stock > 0).forEach(d => { enPicking[clave(d)] = true; });
+    const picking = det.filter(d => d.tipo === 'picking' && d.stock > 0);
+    picking.forEach(d => { enPicking[clave(d)] = true; });
+
+    /* FIN DE LOTE: hay algo abajo, pero de ese lote no queda nada en la
+       reserva. Lo que se reponga va a ser de otra partida, y eso hay que
+       saberlo antes de ir a buscarlo, no cuando ya se está en la posición.
+       Sólo aplica si la posición todavía tiene stock con lote: vacía no hay
+       lote que se esté terminando, y sin columna de lote no hay con qué
+       comparar. */
+    const conLote = picking.filter(d => d.lote || d.lote2);
+    const finDeLote = conLote.length > 0 && !altura.some(d => enPicking[clave(d)]);
+
+    if (!altura.length) {
+      // sin reserva no hay bloque de "bajar de", pero si el lote se termina
+      // el aviso tiene que salir igual
+      return finDeLote
+        ? '<div class="repo-altura es-fin">' + chipFinDeLote() +
+          '<span class="alt-u">no queda reserva de este artículo</span></div>'
+        : '';
+    }
 
     // agrupar las alturas por lote, sumando lo que hay en cada una
     const porLote = {};
@@ -355,11 +382,12 @@ VLM.views = (function () {
     const muestra = lotes.slice(0, 3);
     const resto = lotes.length - muestra.length;
 
-    return '<div class="repo-altura">' +
+    return '<div class="repo-altura' + (finDeLote ? ' es-fin' : '') + '">' +
       '<div class="alt-head">' +
         '<svg viewBox="0 0 24 24" class="ico alt-ico"><path d="M12 5v14m0 0-6-6m6 6 6-6"/></svg>' +
         '<span class="alt-title">Bajar de</span>' +
         '<b>' + U.fmt(total) + '</b><span class="alt-u">unidades en altura</span>' +
+        (finDeLote ? chipFinDeLote() : '') +
         (resto ? '<span class="alt-mas">+' + resto + ' lote(s) más</span>' : '') +
       '</div>' +
       '<div class="alt-lotes">' +
