@@ -173,9 +173,12 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .brand { display: flex; align-items: center; gap: 11px; }
 .brand-ico { width: 30px; height: 30px; }
 .bi-body { fill: none; stroke: var(--border); stroke-width: 1.5; }
-.bi-a { fill: var(--accent); }
-.bi-b { fill: var(--ok); }
-.bi-c { fill: var(--warn); }
+/* Las tres bandejas del logo son los tres estados que mira el panel, de
+   arriba hacia abajo: OK, bajo y crítico. Usan los mismos tokens que las
+   etiquetas, así que el logo cambia con el tema junto con todo lo demás. */
+.bi-a { fill: var(--ok); }
+.bi-b { fill: var(--warn); }
+.bi-c { fill: var(--crit); }
 .brand-txt { display: flex; flex-direction: column; line-height: 1.15; }
 .brand-txt strong { font-size: 15px; letter-spacing: -.01em; }
 .brand-txt span { font-size: 11px; color: var(--muted); }
@@ -387,9 +390,10 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .empty[hidden] { display: none; }
 .empty-art svg { width: 110px; height: 110px; margin-bottom: 18px; }
 .es-body { fill: var(--surface); stroke: var(--border); stroke-width: 2; }
-.es-r1 { fill: var(--accent); opacity: .85; }
-.es-r2 { fill: var(--ok); opacity: .7; }
-.es-r3 { fill: var(--warn); opacity: .6; }
+/* mismo motivo que el logo, mismos tres estados */
+.es-r1 { fill: var(--ok); opacity: .85; }
+.es-r2 { fill: var(--warn); opacity: .7; }
+.es-r3 { fill: var(--crit); opacity: .6; }
 .es-r4 { fill: var(--surface-3); }
 .es-r5 { fill: var(--surface-3); }
 .empty h1 { font-size: 24px; margin-bottom: 10px; }
