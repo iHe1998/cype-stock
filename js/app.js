@@ -12,6 +12,7 @@ VLM.app = (function () {
   const $ = U.$, $$ = U.$$;
 
   let calculados = null;    // productos con métricas, cache por render
+  let vistaDibujada = null; // qué vista mostró el último render, para el scroll
 
   /* ============================================================
      ARRANQUE
@@ -76,9 +77,9 @@ VLM.app = (function () {
 
   /**
    * Productos que se muestran: calculados, sin los laboratorios fuera del
-   * catálogo (si así está configurado) y filtrados por ámbito y conservación.
-   */
-  /**
+   * catálogo (si así está configurado) y filtrados por ámbito, conservación
+   * y laboratorio.
+   *
    * @param sinLab deja afuera el filtro de laboratorio. Lo usa la propia barra
    *   para armar su desplegable: si se filtrara, quedaría una sola opción y no
    *   habría cómo volver.
@@ -103,10 +104,18 @@ VLM.app = (function () {
      RENDER
      ============================================================ */
   function render() {
-    // guardar un valor redibuja la vista entera: sin esto, cargar de corrido
-    // los máximos de la tabla de posiciones perdía el cursor en cada número
+    /* Guardar un valor redibuja la vista entera. Sin esto, cargar de corrido
+       los máximos de la tabla de posiciones perdía dos cosas en cada número:
+       el cursor, y el lugar de la lista. Al reemplazar el innerHTML la página
+       se queda sin alto por un instante, el navegador recorta el scroll a lo
+       que entra —o sea, arriba de todo— y cuando vuelve el contenido ya se
+       perdió. Cargar los últimos artículos de la lista era bajar de nuevo
+       después de cada carga. */
     const focoPrev = document.activeElement && document.activeElement.dataset
       ? document.activeElement.dataset.k : null;
+    const scrollPrev = window.scrollY;
+    const tablasPrev = scrollDeTablas();
+    const vistaPrev = vistaDibujada;
     const hay = S.hayDatos();
     $('#empty').hidden = hay;
     $('#tabs').hidden = !hay;
@@ -162,14 +171,55 @@ VLM.app = (function () {
 
     if (focoPrev) restaurarFoco(el, focoPrev);
 
+    // Volver a donde estaba, pero sólo si es la MISMA vista: al cambiar de
+    // pestaña se arranca arriba, que es de donde se empieza a leer.
+    if (vista === vistaPrev) {
+      if (scrollPrev > 0) window.scrollTo(0, scrollPrev);
+      restaurarScrollDeTablas(tablasPrev);
+    } else if (vistaPrev !== null) window.scrollTo(0, 0);
+    vistaDibujada = vista;
+
     if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+  }
+
+  /* Las tablas de Inventario y Posiciones tienen su propio scroll, aparte del
+     de la página, y ahí estaba el salto de verdad: al redibujar, la tabla
+     nueva arranca arriba de todo aunque la página no se haya movido. Cargando
+     los máximos de los últimos artículos, cada número devolvía la lista al
+     principio. Se toman por orden de aparición, que es estable entre un
+     redibujo y el siguiente. */
+  function scrollDeTablas() {
+    return $$('.view:not([hidden]) .table-wrap')
+      .map(w => [w.scrollTop, w.scrollLeft]);
+  }
+
+  function restaurarScrollDeTablas(previos) {
+    if (!previos || !previos.length) return;
+    const aplicar = () => {
+      $$('.view:not([hidden]) .table-wrap').forEach((w, i) => {
+        const p = previos[i];
+        if (!p) return;
+        // leer scrollHeight fuerza el cálculo del layout: sin esto se asigna
+        // sobre una tabla que todavía no tiene alto y el navegador recorta el
+        // valor a lo que entra
+        void w.scrollHeight;
+        if (p[0]) w.scrollTop = p[0];
+        if (p[1]) w.scrollLeft = p[1];
+      });
+    };
+    aplicar();
+    // y de nuevo en el próximo cuadro, por si en el primer intento la tabla
+    // todavía no tenía su alto definitivo y el valor quedó recortado
+    requestAnimationFrame(aplicar);
   }
 
   /** Devuelve el cursor al mismo campo después de redibujar. */
   function restaurarFoco(el, clave) {
     const n = el.querySelector('[data-k="' + clave.replace(/"/g, '\\"') + '"]');
     if (!n) return;
-    n.focus();
+    // preventScroll: focus() por defecto lleva el elemento a la vista, y eso
+    // pelearía con la restauración del scroll de unas líneas más abajo
+    n.focus({ preventScroll: true });
     if (n.select) n.select();
   }
 
