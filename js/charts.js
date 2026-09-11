@@ -15,12 +15,15 @@ VLM.charts = (function () {
       muted:  U.cssVar('--muted') || '#7c8ca0',
       grid:   U.cssVar('--border-soft') || '#1b2532',
       surf:   U.cssVar('--surface') || '#111823',
-      accent: U.cssVar('--accent') || '#38bdf8',
-      ok:     U.cssVar('--ok') || '#22c55e',
-      warn:   U.cssVar('--warn') || '#f59e0b',
-      crit:   U.cssVar('--crit') || '#ef4444',
-      info:   U.cssVar('--info') || '#a78bfa',
-      agotado: U.cssVar('--agotado') || '#414c5c'
+      // los `-fill` son los de bloque: en el tema claro van más suaves que los
+      // de texto, porque una barra grande de color saturado sobre fondo claro
+      // vibra y cansa. En el oscuro son el mismo color.
+      accent: U.cssVar('--accent-fill') || U.cssVar('--accent') || '#38bdf8',
+      ok:     U.cssVar('--ok-fill') || '#22c55e',
+      warn:   U.cssVar('--warn-fill') || '#f59e0b',
+      crit:   U.cssVar('--crit-fill') || '#ef4444',
+      info:   U.cssVar('--info-fill') || '#a78bfa',
+      agotado: U.cssVar('--agotado-fill') || '#414c5c'
     };
   }
 

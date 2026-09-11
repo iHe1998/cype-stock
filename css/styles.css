@@ -16,7 +16,7 @@
   /* texto */
   --text:        #e8eef6;
   --text-2:      #b3c1d1;
-  --muted:       #7c8ca0;
+  --muted:       #8a9ab0;
 
   /* marca / estados */
   --accent:      #38bdf8;
@@ -25,8 +25,8 @@
   --ok-dim:      #103a22;
   --warn:        #f59e0b;
   --warn-dim:    #402c07;
-  --crit:        #ef4444;
-  --crit-dim:    #431414;
+  --crit:        #f66a6a;
+  --crit-dim:    #401111;
   --info:        #a78bfa;
   --info-dim:    #2c2350;
 
@@ -37,6 +37,16 @@
   --agotado:     #414c5c;
   --agotado-dim: #0b1016;
   --agotado-txt: #b8c3d1;
+
+  /* Color de bloque (barras de gráfico, rellenos). En oscuro es el mismo que
+     el del texto; el tema claro lo baja, porque ahí un bloque grande de color
+     saturado vibra. Ver el comentario del tema claro. */
+  --ok-fill:      #22c55e;
+  --warn-fill:    #f59e0b;
+  --crit-fill:    #ef4444;
+  --info-fill:    #a78bfa;
+  --agotado-fill: #414c5c;
+  --accent-fill:  #38bdf8;
 
   /* zonas de conservación */
   --frio:        #22d3ee;
@@ -58,40 +68,62 @@
   --tabs-h: 46px;
 }
 
-/* Tema claro. Nada de blanco puro: las tarjetas son un blanco roto y el
-   fondo un gris suave, para que no encandile en una pantalla grande y a
-   plena luz del depósito. Los fondos pastel de los estados también van un
-   punto más bajos por el mismo motivo. */
+/* ---------------------------------------------------------------
+   Tema claro.
+
+   Tres cosas lo hacían cansador y las tres están corregidas acá:
+
+   1. Fondo y tarjetas tenían casi el mismo valor, así que no había
+      jerarquía y el ojo tenía que separar las zonas solo. Ahora la
+      tarjeta es netamente más clara que la página, pero sin llegar al
+      blanco puro, que encandila en una pantalla grande.
+   2. El texto secundario estaba en 4,9:1, apenas arriba del mínimo, y
+      encima en minúscula chica. Ahora los tres niveles de texto pasan
+      7:1 (AAA).
+   3. Los colores de estado servían para dos cosas a la vez: texto y
+      bloque. Como texto tienen que ser oscuros; como bloque grande, un
+      tono oscuro y saturado sobre fondo claro vibra. Por eso ahora hay
+      un color aparte para los bloques (--*-fill), más suave.
+   --------------------------------------------------------------- */
 [data-theme="light"] {
-  --bg:          #e2e7ee;
-  --bg-grad:     radial-gradient(1200px 600px at 20% -10%, #d8e0eb 0%, transparent 60%);
-  --surface:     #f1f4f8;
-  --surface-2:   #e9eef4;
-  --surface-3:   #dee5ee;
-  --border:      #c6d1e0;
-  --border-soft: #d5dde8;
-  --text:        #18222f;
-  --text-2:      #45566b;
-  --muted:       #5c6b80;
-  --accent:      #025f8f;
-  --accent-dim:  #cce4f6;
-  --ok:          #15703a;
-  --ok-dim:      #cee8d7;
-  --warn:        #a04a08;
-  --warn-dim:    #f2e2bc;
-  --crit:        #b91c1c;
-  --crit-dim:    #f2d5d5;
-  --info:        #6d31d9;
-  --info-dim:    #ddd8f6;
-  --agotado:     #374151;
-  --agotado-dim: #d1d7e0;
-  --agotado-txt: #1f2937;
-  --frio:        #0a6379;
-  --frio-dim:    #c2e5ee;
-  --ambiente:    #8f4a08;
-  --ambiente-dim:#efdcc2;
-  --shadow:      0 1px 2px rgba(16,24,38,.07), 0 8px 24px rgba(16,24,38,.08);
-  --shadow-lg:   0 24px 64px rgba(16,24,38,.20);
+  --bg:          #e9edf3;
+  --bg-grad:     radial-gradient(1200px 600px at 20% -10%, #dfe6ef 0%, transparent 60%);
+  --surface:     #f8fafd;
+  --surface-2:   #eef2f8;
+  --surface-3:   #e2e8f1;
+  --border:      #c2cddc;
+  --border-soft: #dae1ec;
+  --text:        #101722;
+  --text-2:      #34435a;
+  --muted:       #4b5a70;
+  --accent:      #0a5c88;
+  --accent-dim:  #d5e8f5;
+  --ok:          #146c39;
+  --ok-dim:      #dcefe2;
+  --warn:        #8a4408;
+  --warn-dim:    #f6e6cb;
+  --crit:        #ac1b1b;
+  --crit-dim:    #f7dedd;
+  --info:        #5b2ec0;
+  --info-dim:    #e3dcf7;
+  --agotado:     #3a4656;
+  --agotado-dim: #dae0e9;
+  --agotado-txt: #1c2632;
+  --frio:        #0a5e73;
+  --frio-dim:    #d0e8f0;
+  --ambiente:    #85450a;
+  --ambiente-dim:#f2e2ca;
+
+  /* Bloques: barras de gráfico, rellenos, barras de progreso. */
+  --ok-fill:      #4f9d6d;
+  --warn-fill:    #cf9440;
+  --crit-fill:    #cf5f57;
+  --info-fill:    #8a72cd;
+  --agotado-fill: #97a2b2;
+  --accent-fill:  #4e93bd;
+
+  --shadow:      0 1px 2px rgba(16,24,38,.06), 0 8px 24px rgba(16,24,38,.07);
+  --shadow-lg:   0 24px 64px rgba(16,24,38,.18);
 }
 
 * { box-sizing: border-box; }
@@ -477,17 +509,17 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .table .t-num { text-align: right; font-variant-numeric: tabular-nums; }
 .table .t-code { font-family: var(--mono); font-size: 12px; color: var(--text-2); }
 .table .t-desc { min-width: 220px; }
-.row-critico td { background: color-mix(in srgb, var(--crit) 7%, transparent); }
-.row-agotado td { background: color-mix(in srgb, var(--agotado) 22%, transparent); }
-.row-bajo td    { background: color-mix(in srgb, var(--warn) 6%, transparent); }
+.row-critico td { background: color-mix(in srgb, var(--crit-fill) 8%, transparent); }
+.row-agotado td { background: color-mix(in srgb, var(--agotado-fill) 20%, transparent); }
+.row-bajo td    { background: color-mix(in srgb, var(--warn-fill) 8%, transparent); }
 
 /* barra mini de cobertura */
 .minibar { height: 5px; border-radius: 3px; background: var(--surface-3); overflow: hidden; min-width: 60px; }
-.minibar > i { display: block; height: 100%; border-radius: 3px; background: var(--ok); }
-.minibar.m-bajo > i { background: var(--warn); }
-.minibar.m-critico > i { background: var(--crit); }
-.minibar.m-agotado > i { background: var(--agotado); }
-.minibar.m-exceso > i { background: var(--info); }
+.minibar > i { display: block; height: 100%; border-radius: 3px; background: var(--ok-fill); }
+.minibar.m-bajo > i { background: var(--warn-fill); }
+.minibar.m-critico > i { background: var(--crit-fill); }
+.minibar.m-agotado > i { background: var(--agotado-fill); }
+.minibar.m-exceso > i { background: var(--info-fill); }
 
 /* ---------- toolbar de filtros ---------- */
 .toolbar {
@@ -537,11 +569,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .lab-stat.s-warn b { color: var(--warn); }
 .stackbar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: var(--surface-3); }
 .stackbar > i { display: block; height: 100%; }
-.sb-ok { background: var(--ok); }
-.sb-bajo { background: var(--warn); }
-.sb-critico { background: var(--crit); }
-.sb-agotado { background: var(--agotado); }
-.sb-exceso { background: var(--info); }
+.sb-ok { background: var(--ok-fill); }
+.sb-bajo { background: var(--warn-fill); }
+.sb-critico { background: var(--crit-fill); }
+.sb-agotado { background: var(--agotado-fill); }
+.sb-exceso { background: var(--info-fill); }
 .sb-sd { background: var(--surface-3); }
 .lab-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 9px; font-size: 11.5px; color: var(--muted); }
 .lab-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
@@ -868,9 +900,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* barra físico vs disponible: lo lleno es lo que queda libre de verdad */
 .art-barra {
   height: 10px; border-radius: 5px; overflow: hidden;
-  background: var(--warn); margin-top: 4px;
+  background: var(--warn-fill); margin-top: 4px;
 }
-.art-barra > i { display: block; height: 100%; background: var(--ok); }
+.art-barra > i { display: block; height: 100%; background: var(--ok-fill); }
 .art-barra-leyenda { display: flex; justify-content: space-between; margin: 4px 0 2px; }
 .t-warn { color: var(--warn); }
 /* fila clicable: el detalle se abre desde el inventario y la reposición */
