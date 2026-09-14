@@ -323,11 +323,16 @@ VLM.views = (function () {
   /**
    * De dónde bajar mercadería para rellenar el picking.
    *
-   * Se cruza por artículo + lote + Atributo02: rellenar una posición de
-   * picking con otro lote mezcla partidas, así que primero se ofrecen las
-   * alturas del MISMO lote que ya está abajo. Si no hay ninguna —o la
-   * posición de picking está vacía— se listan las demás por vencimiento,
-   * que es el orden en que conviene sacarlas.
+   * El lote tiene que coincidir con el que está en la posición: rellenar con
+   * otra partida las mezcla, así que una altura de otro lote NO es una fuente
+   * válida y no se ofrece como tal. Se cruza por artículo + lote + Atributo02.
+   *
+   * Si la posición está vacía no hay nada que mezclar: ahí sirve cualquiera y
+   * se ordenan por vencimiento, que es como conviene sacarlas.
+   *
+   * Las alturas de otra partida no se esconden —el artículo las tiene y los
+   * totales tienen que cerrar— pero van aparte y marcadas, como lo que entra
+   * después de que la posición se vacíe.
    */
   function fuentesAltura(p) {
     const det = p.detalle || [];
@@ -376,19 +381,47 @@ VLM.views = (function () {
       return b.stock - a.stock;
     });
 
-    const total = altura.reduce((s, d) => s + d.stock, 0);
+    /* Con algo abajo, la única fuente válida es su mismo lote. Con la posición
+       vacía no hay nada que mezclar y sirve cualquiera. */
+    const hayLoteAbajo = conLote.length > 0;
+    const fuentes = hayLoteAbajo ? lotes.filter(l => l.mismo) : lotes;
+    const otros   = hayLoteAbajo ? lotes.filter(l => !l.mismo) : [];
+
+    const stockOtros = otros.reduce((s, g) => s + g.stock, 0);
+    const notaOtros = otros.length
+      ? '<div class="alt-otros">' + U.fmt(stockOtros) + ' u en ' + otros.length +
+        (otros.length === 1 ? ' lote de otra partida' : ' lotes de otras partidas') +
+        (fuentes.length
+          ? (otros.length === 1 ? ': no sirve' : ': no sirven') + ' para rellenar ésta'
+          : ', para cuando la posición se vacíe') + '. ' +
+        otros.slice(0, 2).map(g => U.esc(g.ubics[0] || '') +
+          (g.lote ? ' lote ' + U.esc(g.lote) : '')).join(' · ') +
+        (otros.length > 2 ? ' · +' + (otros.length - 2) : '') +
+        '</div>'
+      : '';
+
+    // no hay del lote que está abajo: sólo el aviso y, aparte, lo que vendría después
+    if (!fuentes.length) {
+      return '<div class="repo-altura es-fin">' +
+        '<div class="alt-head">' + chipFinDeLote() +
+          '<span class="alt-u">no queda de este lote en la reserva</span>' +
+        '</div>' + notaOtros + '</div>';
+    }
+
+    const total = fuentes.reduce((s, g) => s + g.stock, 0);
     // Ocupa una fila propia a todo el ancho de la tarjeta, así que entran tres
     // lotes uno al lado del otro en vez de dos apilados en una columna angosta.
-    const muestra = lotes.slice(0, 3);
-    const resto = lotes.length - muestra.length;
+    const muestra = fuentes.slice(0, 3);
+    const resto = fuentes.length - muestra.length;
 
-    return '<div class="repo-altura' + (finDeLote ? ' es-fin' : '') + '">' +
+    return '<div class="repo-altura">' +
       '<div class="alt-head">' +
         '<svg viewBox="0 0 24 24" class="ico alt-ico"><path d="M12 5v14m0 0-6-6m6 6 6-6"/></svg>' +
         '<span class="alt-title">Bajar de</span>' +
-        '<b>' + U.fmt(total) + '</b><span class="alt-u">unidades en altura</span>' +
-        (finDeLote ? chipFinDeLote() : '') +
-        (resto ? '<span class="alt-mas">+' + resto + ' lote(s) más</span>' : '') +
+        '<b>' + U.fmt(total) + '</b>' +
+        '<span class="alt-u">unidades' + (hayLoteAbajo ? ' del mismo lote' : ' en altura') + '</span>' +
+        (resto ? '<span class="alt-mas">+' + resto +
+          (resto === 1 ? ' posición más' : ' posiciones más') + '</span>' : '') +
       '</div>' +
       '<div class="alt-lotes">' +
         muestra.map(g =>
@@ -403,7 +436,7 @@ VLM.views = (function () {
             '</span>' +
             (g.mismo ? '<span class="alt-mismo">mismo lote</span>' : '') +
           '</div>').join('') +
-      '</div>' +
+      '</div>' + notaOtros +
       '</div>';
   }
 

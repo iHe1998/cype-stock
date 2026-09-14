@@ -285,10 +285,19 @@ VLM) que haya otro artículo configurado es lo normal, no un cambio de ocupante.
 
 ### De dónde bajar para rellenar
 
-En la lista de reposición, cada producto muestra las posiciones de altura de donde sacar
-mercadería, cruzadas por **artículo + lote + Atributo02**. Primero las del **mismo lote**
-que ya está en la posición de picking —rellenar con otro lote mezcla partidas— y después
-las demás ordenadas por vencimiento, que es el orden en que conviene sacarlas.
+En la lista de reposición, cada producto muestra de qué posición de altura sacar
+mercadería, cruzando **artículo + lote + Atributo02**.
+
+**El lote tiene que coincidir con el que está en la posición.** Rellenar con otra partida
+las mezcla, así que una altura de otro lote no se ofrece como fuente: sólo aparecen las del
+mismo lote, y el total de la cabecera es el de esas posiciones, no el de toda la altura del
+artículo.
+
+Las de otra partida no se esconden —el artículo las tiene y los totales tienen que cerrar—
+pero van aparte, en gris, como lo que entra **después** de que la posición se vacíe.
+
+Si la posición de picking está vacía no hay nada que mezclar: ahí sirve cualquier lote y se
+ordenan por vencimiento, que es como conviene sacarlos.
 
 ### Fin de lote
 
