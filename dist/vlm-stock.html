@@ -1244,7 +1244,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 15/09/2026 14:48 - 8e6740a</span>
+      <span class="muted small" id="appVersion">compilado 15/09/2026 15:08 - 06b3cd6</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1414,14 +1414,27 @@ VLM.util = (function () {
     return isNaN(d) ? null : d;
   }
 
+  /* Una fecha que viene de localStorage es texto, no Date. El origen se
+     arregla al cargar (ver store.cargar), pero formatear no tiene por qué
+     ser el lugar donde eso explote: una fecha mal tipeada no puede tumbar
+     la vista entera. */
+  function aFecha(d) {
+    if (!d) return null;
+    if (d instanceof Date) return isFinite(d.getTime()) ? d : null;
+    const f = new Date(d);
+    return isFinite(f.getTime()) ? f : null;
+  }
+
   function fmtFecha(d) {
-    if (!d) return '—';
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const f = aFecha(d);
+    if (!f) return '—';
+    return f.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
   function fmtFechaCorta(d) {
-    if (!d) return '—';
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+    const f = aFecha(d);
+    if (!f) return '—';
+    return f.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
   }
 
   function addDias(base, n) {
@@ -2038,7 +2051,14 @@ VLM.store = (function () {
           try { localStorage.removeItem(KEY_DATA); } catch (e2) {}
         } else {
           state.productos = d.productos.map(p => {
+            // Las fechas van a JSON como texto y hay que reconstruirlas. También
+            // las del detalle: quedaban como string y la reposición se caía al
+            // formatearlas, así que el Resumen moría cada vez que se reabría la
+            // app con datos ya cargados.
             if (p.vencimiento) p.vencimiento = new Date(p.vencimiento);
+            (p.detalle || []).forEach(dd => {
+              if (dd.vencimiento) dd.vencimiento = new Date(dd.vencimiento);
+            });
             // Reclasificar SIEMPRE: los productos guardados por una versión
             // anterior no traen gestionado/ambito/conservacion, y sin esto
             // quedarían todos como "fuera del catálogo".
