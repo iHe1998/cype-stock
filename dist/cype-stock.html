@@ -1050,6 +1050,30 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   .cfg-layout { grid-template-columns: 1fr; }
 }
 
+/* Conexión a la base: plegada. Viene de config.js y ya funciona, así que
+   tenerla desplegada era dejar la clave a la vista de cualquiera que mire
+   la pantalla —en una reunión, proyectada— para algo que casi nunca se toca. */
+.cfg-avanzado {
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.cfg-avanzado > summary {
+  cursor: pointer; list-style: none;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.cfg-avanzado > summary::-webkit-details-marker { display: none; }
+.cfg-avanzado > summary::before {
+  content: "▸"; font-size: 10px; transition: transform .12s;
+}
+.cfg-avanzado[open] > summary::before { transform: rotate(90deg); }
+.cfg-avanzado > summary:hover { color: var(--text-2); }
+.cfg-avanzado > p { margin-top: 10px; }
+/* El navegador oculta el contenido plegado con un display:none propio, pero
+   es de su hoja de estilos: cualquier display que pongamos nosotros le gana
+   y los campos quedaban a la vista igual con el bloque cerrado. */
+.cfg-avanzado:not([open]) > *:not(summary) { display: none; }
+
 </style>
 </head>
 <body>
@@ -1275,16 +1299,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <h3>Stock y máximos compartidos</h3>
       <p class="muted small">Sin conectar, todo vive en <strong>esta</strong> PC y cada máquina
         necesita su propia carga. Conectada, se carga una vez y lo ven todas.</p>
-      <div class="cfg-grid">
-        <label class="field">
-          <span>URL del proyecto</span>
-          <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
-        </label>
-        <label class="field">
-          <span>Clave anónima (anon)</span>
-          <input type="text" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false">
-        </label>
-      </div>
       <div class="nube-estado" id="nubeEstado"></div>
       <div class="cfg-grid" id="nubeLogin" hidden>
         <label class="field">
@@ -1300,11 +1314,33 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         <button class="btn btn-primary" id="btnNubeEntrar">Iniciar sesión</button>
       </div>
       <div class="cfg-actions">
-        <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
         <button class="btn" id="btnNubeBajar">Traer de la base</button>
         <button class="btn" id="btnNubeSubir">Subir máximos</button>
         <button class="btn" id="btnNubeSubirStock">Subir stock</button>
       </div>
+
+      <!-- La conexión no se muestra: viene de config.js y ya está andando.
+           Tenerla a la vista era dejar la clave proyectada en una reunión y
+           ocupar media tarjeta con dos campos que casi nunca se tocan. Queda
+           acá abajo para el caso de apuntar a otra base. -->
+      <details class="cfg-avanzado">
+        <summary>Conexión</summary>
+        <p class="muted small">Sólo hace falta tocar esto para apuntar a otra base. Lo que se
+          guarde acá vale <strong>en esta PC</strong> y manda sobre la conexión del repositorio.</p>
+        <div class="cfg-grid">
+          <label class="field">
+            <span>URL del proyecto</span>
+            <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
+          </label>
+          <label class="field">
+            <span>Clave anónima (anon)</span>
+            <input type="password" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false" autocomplete="off">
+          </label>
+        </div>
+        <div class="cfg-actions">
+          <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
+        </div>
+      </details>
       </section>
 
       <section class="cfg-card">
@@ -1350,7 +1386,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 15/09/2026 17:26 - 7e8e3a7</span>
+      <span class="muted small" id="appVersion">compilado 15/09/2026 20:57 - c23800c</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>

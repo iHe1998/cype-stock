@@ -1040,3 +1040,27 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 @media (max-width: 760px) {
   .cfg-layout { grid-template-columns: 1fr; }
 }
+
+/* Conexión a la base: plegada. Viene de config.js y ya funciona, así que
+   tenerla desplegada era dejar la clave a la vista de cualquiera que mire
+   la pantalla —en una reunión, proyectada— para algo que casi nunca se toca. */
+.cfg-avanzado {
+  margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.cfg-avanzado > summary {
+  cursor: pointer; list-style: none;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.cfg-avanzado > summary::-webkit-details-marker { display: none; }
+.cfg-avanzado > summary::before {
+  content: "▸"; font-size: 10px; transition: transform .12s;
+}
+.cfg-avanzado[open] > summary::before { transform: rotate(90deg); }
+.cfg-avanzado > summary:hover { color: var(--text-2); }
+.cfg-avanzado > p { margin-top: 10px; }
+/* El navegador oculta el contenido plegado con un display:none propio, pero
+   es de su hoja de estilos: cualquier display que pongamos nosotros le gana
+   y los campos quedaban a la vista igual con el bloque cerrado. */
+.cfg-avanzado:not([open]) > *:not(summary) { display: none; }

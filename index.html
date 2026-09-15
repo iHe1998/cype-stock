@@ -231,16 +231,6 @@
       <h3>Stock y máximos compartidos</h3>
       <p class="muted small">Sin conectar, todo vive en <strong>esta</strong> PC y cada máquina
         necesita su propia carga. Conectada, se carga una vez y lo ven todas.</p>
-      <div class="cfg-grid">
-        <label class="field">
-          <span>URL del proyecto</span>
-          <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
-        </label>
-        <label class="field">
-          <span>Clave anónima (anon)</span>
-          <input type="text" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false">
-        </label>
-      </div>
       <div class="nube-estado" id="nubeEstado"></div>
       <div class="cfg-grid" id="nubeLogin" hidden>
         <label class="field">
@@ -256,11 +246,33 @@
         <button class="btn btn-primary" id="btnNubeEntrar">Iniciar sesión</button>
       </div>
       <div class="cfg-actions">
-        <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
         <button class="btn" id="btnNubeBajar">Traer de la base</button>
         <button class="btn" id="btnNubeSubir">Subir máximos</button>
         <button class="btn" id="btnNubeSubirStock">Subir stock</button>
       </div>
+
+      <!-- La conexión no se muestra: viene de config.js y ya está andando.
+           Tenerla a la vista era dejar la clave proyectada en una reunión y
+           ocupar media tarjeta con dos campos que casi nunca se tocan. Queda
+           acá abajo para el caso de apuntar a otra base. -->
+      <details class="cfg-avanzado">
+        <summary>Conexión</summary>
+        <p class="muted small">Sólo hace falta tocar esto para apuntar a otra base. Lo que se
+          guarde acá vale <strong>en esta PC</strong> y manda sobre la conexión del repositorio.</p>
+        <div class="cfg-grid">
+          <label class="field">
+            <span>URL del proyecto</span>
+            <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
+          </label>
+          <label class="field">
+            <span>Clave anónima (anon)</span>
+            <input type="password" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false" autocomplete="off">
+          </label>
+        </div>
+        <div class="cfg-actions">
+          <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
+        </div>
+      </details>
       </section>
 
       <section class="cfg-card">
