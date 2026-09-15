@@ -113,14 +113,27 @@ VLM.util = (function () {
     return isNaN(d) ? null : d;
   }
 
+  /* Una fecha que viene de localStorage es texto, no Date. El origen se
+     arregla al cargar (ver store.cargar), pero formatear no tiene por qué
+     ser el lugar donde eso explote: una fecha mal tipeada no puede tumbar
+     la vista entera. */
+  function aFecha(d) {
+    if (!d) return null;
+    if (d instanceof Date) return isFinite(d.getTime()) ? d : null;
+    const f = new Date(d);
+    return isFinite(f.getTime()) ? f : null;
+  }
+
   function fmtFecha(d) {
-    if (!d) return '—';
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const f = aFecha(d);
+    if (!f) return '—';
+    return f.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
   function fmtFechaCorta(d) {
-    if (!d) return '—';
-    return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+    const f = aFecha(d);
+    if (!f) return '—';
+    return f.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
   }
 
   function addDias(base, n) {

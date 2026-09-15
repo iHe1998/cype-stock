@@ -142,7 +142,14 @@ VLM.store = (function () {
           try { localStorage.removeItem(KEY_DATA); } catch (e2) {}
         } else {
           state.productos = d.productos.map(p => {
+            // Las fechas van a JSON como texto y hay que reconstruirlas. También
+            // las del detalle: quedaban como string y la reposición se caía al
+            // formatearlas, así que el Resumen moría cada vez que se reabría la
+            // app con datos ya cargados.
             if (p.vencimiento) p.vencimiento = new Date(p.vencimiento);
+            (p.detalle || []).forEach(dd => {
+              if (dd.vencimiento) dd.vencimiento = new Date(dd.vencimiento);
+            });
             // Reclasificar SIEMPRE: los productos guardados por una versión
             // anterior no traen gestionado/ambito/conservacion, y sin esto
             // quedarían todos como "fuera del catálogo".
