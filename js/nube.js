@@ -27,7 +27,8 @@ window.VLM = window.VLM || {};
 VLM.nube = (function () {
   const KEY_CFG  = 'vlm.nube.v1';
   const KEY_SESS = 'vlm.nube.sesion.v1';
-  const TABLA    = 'maximos';
+  const TABLA       = 'maximos';
+  const TABLA_STOCK = 'stock';
 
   let cfg = null;      // { url, anonKey }
   let sesion = null;   // { access_token, refresh_token, email }
@@ -171,10 +172,47 @@ VLM.nube = (function () {
       { method: 'DELETE' }, true);
   }
 
+  /* ---------------- stock ----------------
+     Una sola fila con la foto del stock: el mismo arreglo de productos que
+     se guarda en el navegador, tal cual. Así la PC del depósito y la de la
+     tele no necesitan que nadie les suba la planilla — la cargan de acá.
+
+     Es UNA fila, no una por artículo, porque la app trabaja con la lista
+     entera de una: subirla y bajarla completa es una llamada en vez de
+     doscientas, y no hay estados intermedios donde la pantalla muestre
+     medio stock.
+
+     Cuando SCE escriba solo, va a escribir en esta misma fila: el panel no
+     se entera de si del otro lado hubo una persona o un sistema. */
+
+  async function bajarStock() {
+    const filas = await pedir('/rest/v1/' + TABLA_STOCK + '?id=eq.actual&select=productos,meta,actualizado,por',
+      { method: 'GET' });
+    const f = (filas || [])[0];
+    if (!f || !f.productos) return null;
+    return { productos: f.productos, meta: f.meta || {}, actualizado: f.actualizado, por: f.por };
+  }
+
+  async function subirStock(productos, meta) {
+    await pedir('/rest/v1/' + TABLA_STOCK + '?on_conflict=id', {
+      method: 'POST',
+      headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([{
+        id: 'actual',
+        productos: productos,
+        meta: meta || {},
+        por: (sesion && sesion.email) || null,
+        actualizado: new Date().toISOString()
+      }])
+    }, true);
+    return productos.length;
+  }
+
   cargar();
 
   return {
     cargar, configurada, conSesion, esPorDefecto, email, datos, setConfig,
-    entrar, salir, bajarMaximos, subirMaximos, borrarMaximo
+    entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
+    bajarStock, subirStock
   };
 })();

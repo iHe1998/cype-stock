@@ -1266,8 +1266,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
       <div class="cfg-actions" style="margin-top:10px">
         <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
-        <button class="btn" id="btnNubeBajar">Traer máximos</button>
+        <button class="btn" id="btnNubeBajar">Traer de la base</button>
         <button class="btn" id="btnNubeSubir">Subir máximos</button>
+        <button class="btn" id="btnNubeSubirStock">Subir stock</button>
       </div>
       <div class="nube-estado" id="nubeEstado"></div>
       <div class="cfg-grid" id="nubeLogin" hidden>
@@ -1291,7 +1292,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 15/09/2026 16:53 - b934fe0</span>
+      <span class="muted small" id="appVersion">compilado 15/09/2026 17:01 - 2d1104b</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1644,7 +1645,8 @@ window.VLM = window.VLM || {};
 VLM.nube = (function () {
   const KEY_CFG  = 'vlm.nube.v1';
   const KEY_SESS = 'vlm.nube.sesion.v1';
-  const TABLA    = 'maximos';
+  const TABLA       = 'maximos';
+  const TABLA_STOCK = 'stock';
 
   let cfg = null;      // { url, anonKey }
   let sesion = null;   // { access_token, refresh_token, email }
@@ -1788,11 +1790,48 @@ VLM.nube = (function () {
       { method: 'DELETE' }, true);
   }
 
+  /* ---------------- stock ----------------
+     Una sola fila con la foto del stock: el mismo arreglo de productos que
+     se guarda en el navegador, tal cual. Así la PC del depósito y la de la
+     tele no necesitan que nadie les suba la planilla — la cargan de acá.
+
+     Es UNA fila, no una por artículo, porque la app trabaja con la lista
+     entera de una: subirla y bajarla completa es una llamada en vez de
+     doscientas, y no hay estados intermedios donde la pantalla muestre
+     medio stock.
+
+     Cuando SCE escriba solo, va a escribir en esta misma fila: el panel no
+     se entera de si del otro lado hubo una persona o un sistema. */
+
+  async function bajarStock() {
+    const filas = await pedir('/rest/v1/' + TABLA_STOCK + '?id=eq.actual&select=productos,meta,actualizado,por',
+      { method: 'GET' });
+    const f = (filas || [])[0];
+    if (!f || !f.productos) return null;
+    return { productos: f.productos, meta: f.meta || {}, actualizado: f.actualizado, por: f.por };
+  }
+
+  async function subirStock(productos, meta) {
+    await pedir('/rest/v1/' + TABLA_STOCK + '?on_conflict=id', {
+      method: 'POST',
+      headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([{
+        id: 'actual',
+        productos: productos,
+        meta: meta || {},
+        por: (sesion && sesion.email) || null,
+        actualizado: new Date().toISOString()
+      }])
+    }, true);
+    return productos.length;
+  }
+
   cargar();
 
   return {
     cargar, configurada, conSesion, esPorDefecto, email, datos, setConfig,
-    entrar, salir, bajarMaximos, subirMaximos, borrarMaximo
+    entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
+    bajarStock, subirStock
   };
 })();
 
@@ -2280,6 +2319,20 @@ VLM.store = (function () {
     try { localStorage.setItem(KEY_POS, JSON.stringify(state.posiciones)); } catch (e) {}
   }
 
+  /**
+   * Las fechas viajan como texto en JSON y hay que reconstruirlas, tanto al
+   * leer del navegador como al bajar de la base. También las del DETALLE:
+   * quedaban como string y la reposición se caía al formatearlas, así que el
+   * Resumen moría cada vez que se reabría la app con datos ya cargados.
+   */
+  function hidratarFechas(p) {
+    if (p.vencimiento) p.vencimiento = new Date(p.vencimiento);
+    (p.detalle || []).forEach(d => {
+      if (d.vencimiento) d.vencimiento = new Date(d.vencimiento);
+    });
+    return p;
+  }
+
   function cargar() {
     try {
       const cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null');
@@ -2319,14 +2372,7 @@ VLM.store = (function () {
           try { localStorage.removeItem(KEY_DATA); } catch (e2) {}
         } else {
           state.productos = d.productos.map(p => {
-            // Las fechas van a JSON como texto y hay que reconstruirlas. También
-            // las del detalle: quedaban como string y la reposición se caía al
-            // formatearlas, así que el Resumen moría cada vez que se reabría la
-            // app con datos ya cargados.
-            if (p.vencimiento) p.vencimiento = new Date(p.vencimiento);
-            (p.detalle || []).forEach(dd => {
-              if (dd.vencimiento) dd.vencimiento = new Date(dd.vencimiento);
-            });
+            hidratarFechas(p);
             // Reclasificar SIEMPRE: los productos guardados por una versión
             // anterior no traen gestionado/ambito/conservacion, y sin esto
             // quedarían todos como "fuera del catálogo".
@@ -2461,7 +2507,7 @@ VLM.store = (function () {
     on, emit, cargar, guardar,
     setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
     setReglasUbic, resetReglasUbic,
-    setPosicion, setPosiciones, limpiarPosiciones, clavePos, hayDatos
+    setPosicion, setPosiciones, limpiarPosiciones, clavePos, hidratarFechas, hayDatos
   };
 })();
 
@@ -5329,7 +5375,11 @@ VLM.app = (function () {
     const edad = Date.now() - (meta.importadoEn || 0);
     dot.className = 'dot ' + (edad > 12 * 3600e3 ? 'stale' : 'live');
     txt.innerHTML = U.esc(meta.archivo || 'datos') + ' · ' +
-      S.state.productos.length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
+      S.state.productos.length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>' +
+      // de dónde salió lo que se está viendo: en la PC del depósito nadie
+      // cargó nada, así que conviene decir que vino de la base y quién la subió
+      (meta.deNube ? ' · <span class="muted">de la base' +
+        (meta.subidoPor ? ', por ' + U.esc(meta.subidoPor) : '') + '</span>' : '');
   }
 
   function irA(vista) {
@@ -5564,6 +5614,8 @@ VLM.app = (function () {
     $('#modalImport').hidden = true;
     U.toast('Importados ' + r.productos.length + ' productos', 'ok');
     r.avisos.forEach(a => U.toast(a));
+    // y se comparte solo: quien importa no tiene que acordarse de subirlo
+    subirStockANube();
   }
 
   /* ============================================================
@@ -5665,6 +5717,7 @@ VLM.app = (function () {
     $('#nubeLogin').hidden = !hayLogin;
     $('#nubeLoginBtns').hidden = !hayLogin;
     $('#btnNubeSubir').disabled = !N.conSesion();
+    $('#btnNubeSubirStock').disabled = !N.conSesion();
 
     if (!N.configurada()) {
       est.className = 'nube-estado';
@@ -5683,10 +5736,32 @@ VLM.app = (function () {
     }
   }
 
-  /** Trae los máximos de la base y los aplica sobre lo que hay cargado. */
+  /**
+   * Trae de la base lo compartido: el stock y los máximos.
+   *
+   * El stock primero, porque los máximos se aplican sobre los productos. Y
+   * los dos por separado: que falle uno no tiene por qué dejar sin el otro.
+   */
   async function bajarDeNube(silencioso) {
     const N = VLM.nube;
     if (!N.configurada()) return;
+
+    try {
+      const s = await N.bajarStock();
+      if (s && s.productos && s.productos.length) {
+        const productos = s.productos.map(p => VLM.labs.clasificar(S.hidratarFechas(p), S.state.labs));
+        S.setProductos(productos, Object.assign({}, s.meta, {
+          deNube: true, subidoPor: s.por, subidoEn: s.actualizado
+        }));
+        if (!silencioso) U.toast('Traído el stock: ' + productos.length + ' productos', 'ok');
+      } else if (!silencioso) {
+        U.toast('No hay stock cargado en la base todavía');
+      }
+    } catch (e) {
+      if (!silencioso) U.toast('No se pudo traer el stock: ' + e.message, 'err');
+      else console.warn('nube (stock):', e.message);
+    }
+
     try {
       const mapa = await N.bajarMaximos();
       const n = Object.keys(mapa).length;
@@ -5697,7 +5772,24 @@ VLM.app = (function () {
       // sin internet o con la base caída, el panel tiene que seguir andando
       // con lo último que haya quedado guardado en el navegador
       if (!silencioso) U.toast('No se pudieron traer los máximos: ' + e.message, 'err');
-      else console.warn('nube:', e.message);
+      else console.warn('nube (máximos):', e.message);
+    }
+  }
+
+  /**
+   * Sube el stock recién importado, para que lo vean las demás PCs.
+   * Sólo con sesión: el panel del depósito no tiene que poder pisarlo.
+   */
+  async function subirStockANube() {
+    const N = VLM.nube;
+    if (!N.configurada() || !N.conSesion()) return false;
+    try {
+      await N.subirStock(S.state.productos, S.state.meta);
+      U.toast('Stock subido: lo ven todas las PCs', 'ok');
+      return true;
+    } catch (e) {
+      U.toast('No se pudo subir el stock: ' + e.message, 'err');
+      return false;
     }
   }
 
@@ -5719,6 +5811,11 @@ VLM.app = (function () {
         const n = await N.subirMaximos(S.state.posiciones);
         U.toast('Subidos ' + n + ' máximos', 'ok');
       } catch (e) { U.toast('No se pudieron subir: ' + e.message, 'err'); }
+    });
+
+    $('#btnNubeSubirStock').addEventListener('click', () => {
+      if (!S.hayDatos()) { U.toast('No hay stock cargado para subir', 'err'); return; }
+      subirStockANube();
     });
 
     $('#btnNubeEntrar').addEventListener('click', async () => {

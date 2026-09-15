@@ -103,6 +103,20 @@ VLM.store = (function () {
     try { localStorage.setItem(KEY_POS, JSON.stringify(state.posiciones)); } catch (e) {}
   }
 
+  /**
+   * Las fechas viajan como texto en JSON y hay que reconstruirlas, tanto al
+   * leer del navegador como al bajar de la base. También las del DETALLE:
+   * quedaban como string y la reposición se caía al formatearlas, así que el
+   * Resumen moría cada vez que se reabría la app con datos ya cargados.
+   */
+  function hidratarFechas(p) {
+    if (p.vencimiento) p.vencimiento = new Date(p.vencimiento);
+    (p.detalle || []).forEach(d => {
+      if (d.vencimiento) d.vencimiento = new Date(d.vencimiento);
+    });
+    return p;
+  }
+
   function cargar() {
     try {
       const cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null');
@@ -142,14 +156,7 @@ VLM.store = (function () {
           try { localStorage.removeItem(KEY_DATA); } catch (e2) {}
         } else {
           state.productos = d.productos.map(p => {
-            // Las fechas van a JSON como texto y hay que reconstruirlas. También
-            // las del detalle: quedaban como string y la reposición se caía al
-            // formatearlas, así que el Resumen moría cada vez que se reabría la
-            // app con datos ya cargados.
-            if (p.vencimiento) p.vencimiento = new Date(p.vencimiento);
-            (p.detalle || []).forEach(dd => {
-              if (dd.vencimiento) dd.vencimiento = new Date(dd.vencimiento);
-            });
+            hidratarFechas(p);
             // Reclasificar SIEMPRE: los productos guardados por una versión
             // anterior no traen gestionado/ambito/conservacion, y sin esto
             // quedarían todos como "fuera del catálogo".
@@ -284,6 +291,6 @@ VLM.store = (function () {
     on, emit, cargar, guardar,
     setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
     setReglasUbic, resetReglasUbic,
-    setPosicion, setPosiciones, limpiarPosiciones, clavePos, hayDatos
+    setPosicion, setPosiciones, limpiarPosiciones, clavePos, hidratarFechas, hayDatos
   };
 })();

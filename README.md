@@ -426,11 +426,29 @@ El panel del depósito muestra los máximos sin poder tocarlos; quien los config
 su usuario. La clave `anon` es pública a propósito —Supabase la publica en el cliente— y lo
 que protege de verdad son las políticas RLS de la tabla.
 
-### La tabla
+### Qué se comparte
+
+| | Dónde vive | Quién la escribe |
+|---|---|---|
+| **Stock** | tabla `stock`, una fila con la foto entera | se sube solo al importar el Excel |
+| **Máximos** | tabla `maximos`, una fila por posición + artículo | se suben desde ⚙ Configuración |
+
+Sin el stock compartido, cada PC tendría que cargar la planilla a mano —la de la tele
+también—. Así se importa una vez y lo ven todas.
+
+El stock va en **una sola fila**, no una por artículo: la app trabaja con la lista entera
+de una, así que subirla y bajarla completa es una llamada en vez de doscientas, y no hay
+estados intermedios donde la pantalla muestre medio stock.
+
+> Cuando SCE escriba solo, va a escribir en esa misma fila. El panel no se entera de si
+> del otro lado hubo una persona subiendo un Excel o un sistema.
+
+### Las tablas
 
 En **Supabase → SQL Editor**, una vez:
 
 ```sql
+-- máximos por posición + artículo
 create table maximos (
   clave       text primary key,          -- UBICACION|ARTICULO
   ubicacion   text not null,
@@ -440,14 +458,28 @@ create table maximos (
   actualizado timestamptz default now()
 );
 
-alter table maximos enable row level security;
+-- el stock: una sola fila, id = 'actual'
+create table stock (
+  id          text primary key,
+  productos   jsonb not null,
+  meta        jsonb,
+  por         text,
+  actualizado timestamptz default now()
+);
 
--- lectura para cualquiera que abra el panel
+alter table maximos enable row level security;
+alter table stock   enable row level security;
+
+-- leer: cualquiera que abra el panel
 create policy "leer" on maximos
   for select to anon, authenticated using (true);
+create policy "leer" on stock
+  for select to anon, authenticated using (true);
 
--- escritura sólo con sesión
+-- escribir: sólo con sesión
 create policy "escribir" on maximos
+  for all to authenticated using (true) with check (true);
+create policy "escribir" on stock
   for all to authenticated using (true) with check (true);
 ```
 
@@ -482,11 +514,15 @@ apuntar a otra base.
 En **⚙ Configuración → Máximos compartidos** se pegan la **URL del proyecto** y la **clave
 anon** (Supabase → Project Settings → API), y listo. Los botones:
 
-- **Traer máximos** — baja lo que hay en la base y pisa lo local.
-- **Subir máximos** — manda lo local a la base. Necesita sesión iniciada.
+- **Traer de la base** — baja el stock y los máximos, y pisa lo local.
+- **Subir máximos** / **Subir stock** — mandan lo local a la base. Necesitan sesión.
 
-Al abrir la app, si hay conexión configurada, los máximos se traen solos. Si la base no
-responde, el panel arranca igual con lo último guardado en el navegador.
+Al abrir la app, si hay conexión configurada, **el stock y los máximos se traen solos**. Y
+al importar un Excel se sube solo, sin que haya que acordarse. Si la base no responde, el
+panel arranca igual con lo último guardado en el navegador.
+
+La barra de arriba dice de dónde salió lo que se está viendo: *"de la base, por
+fulano@…"*. En la PC del depósito nadie cargó nada, así que conviene que quede claro.
 
 ---
 

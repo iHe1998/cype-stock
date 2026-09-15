@@ -305,7 +305,11 @@ VLM.app = (function () {
     const edad = Date.now() - (meta.importadoEn || 0);
     dot.className = 'dot ' + (edad > 12 * 3600e3 ? 'stale' : 'live');
     txt.innerHTML = U.esc(meta.archivo || 'datos') + ' · ' +
-      S.state.productos.length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
+      S.state.productos.length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>' +
+      // de dónde salió lo que se está viendo: en la PC del depósito nadie
+      // cargó nada, así que conviene decir que vino de la base y quién la subió
+      (meta.deNube ? ' · <span class="muted">de la base' +
+        (meta.subidoPor ? ', por ' + U.esc(meta.subidoPor) : '') + '</span>' : '');
   }
 
   function irA(vista) {
@@ -540,6 +544,8 @@ VLM.app = (function () {
     $('#modalImport').hidden = true;
     U.toast('Importados ' + r.productos.length + ' productos', 'ok');
     r.avisos.forEach(a => U.toast(a));
+    // y se comparte solo: quien importa no tiene que acordarse de subirlo
+    subirStockANube();
   }
 
   /* ============================================================
@@ -641,6 +647,7 @@ VLM.app = (function () {
     $('#nubeLogin').hidden = !hayLogin;
     $('#nubeLoginBtns').hidden = !hayLogin;
     $('#btnNubeSubir').disabled = !N.conSesion();
+    $('#btnNubeSubirStock').disabled = !N.conSesion();
 
     if (!N.configurada()) {
       est.className = 'nube-estado';
@@ -659,10 +666,32 @@ VLM.app = (function () {
     }
   }
 
-  /** Trae los máximos de la base y los aplica sobre lo que hay cargado. */
+  /**
+   * Trae de la base lo compartido: el stock y los máximos.
+   *
+   * El stock primero, porque los máximos se aplican sobre los productos. Y
+   * los dos por separado: que falle uno no tiene por qué dejar sin el otro.
+   */
   async function bajarDeNube(silencioso) {
     const N = VLM.nube;
     if (!N.configurada()) return;
+
+    try {
+      const s = await N.bajarStock();
+      if (s && s.productos && s.productos.length) {
+        const productos = s.productos.map(p => VLM.labs.clasificar(S.hidratarFechas(p), S.state.labs));
+        S.setProductos(productos, Object.assign({}, s.meta, {
+          deNube: true, subidoPor: s.por, subidoEn: s.actualizado
+        }));
+        if (!silencioso) U.toast('Traído el stock: ' + productos.length + ' productos', 'ok');
+      } else if (!silencioso) {
+        U.toast('No hay stock cargado en la base todavía');
+      }
+    } catch (e) {
+      if (!silencioso) U.toast('No se pudo traer el stock: ' + e.message, 'err');
+      else console.warn('nube (stock):', e.message);
+    }
+
     try {
       const mapa = await N.bajarMaximos();
       const n = Object.keys(mapa).length;
@@ -673,7 +702,24 @@ VLM.app = (function () {
       // sin internet o con la base caída, el panel tiene que seguir andando
       // con lo último que haya quedado guardado en el navegador
       if (!silencioso) U.toast('No se pudieron traer los máximos: ' + e.message, 'err');
-      else console.warn('nube:', e.message);
+      else console.warn('nube (máximos):', e.message);
+    }
+  }
+
+  /**
+   * Sube el stock recién importado, para que lo vean las demás PCs.
+   * Sólo con sesión: el panel del depósito no tiene que poder pisarlo.
+   */
+  async function subirStockANube() {
+    const N = VLM.nube;
+    if (!N.configurada() || !N.conSesion()) return false;
+    try {
+      await N.subirStock(S.state.productos, S.state.meta);
+      U.toast('Stock subido: lo ven todas las PCs', 'ok');
+      return true;
+    } catch (e) {
+      U.toast('No se pudo subir el stock: ' + e.message, 'err');
+      return false;
     }
   }
 
@@ -695,6 +741,11 @@ VLM.app = (function () {
         const n = await N.subirMaximos(S.state.posiciones);
         U.toast('Subidos ' + n + ' máximos', 'ok');
       } catch (e) { U.toast('No se pudieron subir: ' + e.message, 'err'); }
+    });
+
+    $('#btnNubeSubirStock').addEventListener('click', () => {
+      if (!S.hayDatos()) { U.toast('No hay stock cargado para subir', 'err'); return; }
+      subirStockANube();
     });
 
     $('#btnNubeEntrar').addEventListener('click', async () => {
