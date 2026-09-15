@@ -66,6 +66,7 @@ tolera acentos, filas de título arriba del encabezado y números en formato `1.
 | Lote | — | Lote, Partida, Batch |
 | Lote secundario | — | Atributo02, Lote Proveedor |
 | Vencimiento | — | Vencimiento, Vto, Caducidad |
+| Paquete | — | Paquete, Empaque, Envase |
 | Estatus *(filtro)* | — | Estatus, Estado, Status |
 | Atributo 07 *(filtro)* | — | Atributo 07 |
 
@@ -82,6 +83,21 @@ Los gráficos, los KPIs y los estados usan **siempre el físico** — el panel e
 qué reponer, y lo que se repone es lo que está en el estante. El disponible aparece sólo
 al abrir un artículo (clic en cualquier fila del inventario o de la reposición), junto con
 el desglose por lote.
+
+### Paquete
+
+El código de empaque de la planilla. **Es sólo informativo**: no filtra, no se edita y no
+entra en ningún cálculo. Se muestra en la pestaña **Posiciones**, entre el artículo y el
+stock, y en el detalle de cada artículo.
+
+La forma habitual es `PREFIJO-…-UNIDADES-PALLET-ARTÍCULO`. En `E-1-0-024-1152-110027286`
+son **24 por caja** y **1.152 por pallet**; el desglose aparece debajo del código. El
+artículo siempre cierra el código, así que los dos números se cuentan desde el final, que
+es lo único estable.
+
+No todos siguen esa forma —los hay con un solo número, y los hay que ni son códigos, como
+`LITERATURA` o `STD`—. Ahí se muestra el código tal cual, sin desglose: mejor sin lectura
+que con una equivocada. En el archivo de 1.672 filas, 224 de 251 artículos se desglosan.
 
 ### Filas que no entran
 

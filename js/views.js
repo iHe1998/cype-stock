@@ -311,6 +311,41 @@ VLM.views = (function () {
     return '<button class="chip' + (activo ? ' is-active' : '') + '" data-val="' + val + '">' + label + '</button>';
   }
 
+  /* ---------- paquete ----------
+     El código de empaque que trae la planilla. Es informativo: no filtra, no
+     se edita y no entra en ningún cálculo. La gente lo lee de la caja.
+
+     La forma habitual es PREFIJO-...-UNIDADES-PALLET-ARTICULO, por ejemplo
+     E-1-0-024-1152-110027286: 24 por caja y 1.152 por pallet. El artículo
+     siempre cierra el código, así que los dos números se cuentan desde el
+     final, que es lo único estable.
+
+     No todos siguen esa forma: los hay con un solo número (E-1-0-1000-ART) y
+     los hay que ni son códigos (LITERATURA, STD). Ahí se muestra el código
+     tal cual y no se inventa una lectura: mejor sin desglose que con uno
+     equivocado. */
+  function parsearPaquete(cod) {
+    const s = String(cod || '').trim();
+    if (!s) return null;
+    const p = s.split('-');
+    if (p.length < 6) return { codigo: s };
+    const caja   = U.toNum(p[p.length - 3]);
+    const pallet = U.toNum(p[p.length - 2]);
+    if (!(caja > 0) || !(pallet > 0)) return { codigo: s };
+    return { codigo: s, porCaja: caja, porPallet: pallet };
+  }
+
+  /** Celda de paquete: el código, y debajo el desglose si se pudo leer. */
+  function celdaPaquete(cod) {
+    const q = parsearPaquete(cod);
+    if (!q) return '<td class="t-paq">—</td>';
+    return '<td class="t-paq"><span class="paq-cod">' + U.esc(q.codigo) + '</span>' +
+      (q.porCaja
+        ? '<span class="paq-desglose">' + U.fmt(q.porCaja) + ' por caja · ' +
+          U.fmt(q.porPallet) + ' por pallet</span>'
+        : '') + '</td>';
+  }
+
   /** Aviso de que el lote que está en la posición no se puede continuar. */
   function chipFinDeLote() {
     return '<span class="alt-fin" title="En la reserva no queda el lote que ' +
@@ -492,6 +527,13 @@ VLM.views = (function () {
         badge(p.estado) + ' ' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</div>' +
       '<div class="muted small">' + U.esc(p.labNombre || p.laboratorio) +
         (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</div>' +
+      (function () {
+        const q = parsearPaquete(p.paquete);
+        if (!q) return '';
+        return '<div class="art-paq"><span class="paq-cod">' + U.esc(q.codigo) + '</span>' +
+          (q.porCaja ? '<span class="paq-desglose">' + U.fmt(q.porCaja) + ' por caja · ' +
+            U.fmt(q.porPallet) + ' por pallet</span>' : '') + '</div>';
+      })() +
       '</div>';
 
     html += '<div class="kpi-grid" style="margin:14px 0">' +
@@ -750,7 +792,7 @@ VLM.views = (function () {
           porSlot[k] = {
             clave: k, ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
             arts: [{ codigo: p.codigo, descripcion: p.descripcion }],
-            codigo: p.codigo, descripcion: p.descripcion,
+            codigo: p.codigo, descripcion: p.descripcion, paquete: p.paquete,
             stock: 0, min: c.min || 0, max: c.max || 0,
             artConfig: c.articulo || null
           };
@@ -816,13 +858,14 @@ VLM.views = (function () {
     html += '<div class="table-wrap"><table class="table" id="posTable">' +
       '<thead><tr>' +
         '<th class="no-sort">Posición</th><th class="no-sort">Zona</th>' +
-        '<th class="no-sort">Artículo</th><th class="no-sort t-num">Stock</th>' +
+        '<th class="no-sort">Artículo</th><th class="no-sort">Paquete</th>' +
+        '<th class="no-sort t-num">Stock</th>' +
         '<th class="no-sort t-num">Mínimo</th><th class="no-sort t-num">Máximo</th>' +
         '<th class="no-sort">Estado</th>' +
       '</tr></thead><tbody>';
 
     if (!vis.length) {
-      html += '<tr><td colspan="7"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
+      html += '<tr><td colspan="8"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
     } else {
       vis.forEach(f => {
         let est = '', clase = '';
@@ -849,6 +892,7 @@ VLM.views = (function () {
           '<td>' + zchip(f.zona) + '</td>' +
           '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
             (f.descripcion && f.descripcion !== f.codigo ? ' ' + U.esc(f.descripcion) : '') + '</td>' +
+          celdaPaquete(f.paquete) +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
           celdaInp(f, 'min') + celdaInp(f, 'max') +
           '<td>' + est + '</td>' +
@@ -912,10 +956,11 @@ VLM.views = (function () {
    * al reimportarlo la configuración no matchearía ninguna posición.
    */
   function exportarPosiciones(filas) {
-    const out = [['Posicion', 'Zona', 'Articulo', 'Descripcion', 'Stock', 'Minimo', 'Maximo']];
+    const out = [['Posicion', 'Zona', 'Articulo', 'Descripcion', 'Paquete', 'Stock', 'Minimo', 'Maximo']];
     filas.forEach(f => out.push([
       f.ubicacion, f.zona || '',
       f.codigo, f.descripcion === f.codigo ? '' : f.descripcion,
+      f.paquete || '',
       f.stock, f.min || '', f.max || ''
     ]));
 

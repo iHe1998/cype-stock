@@ -63,6 +63,10 @@ VLM.parser = (function () {
       hint: 'Segundo identificador de partida, si la planilla lo trae',
       alias: ['atributo02', 'atributo 02', 'atributo2', 'lote proveedor', 'lote secundario', 'partida proveedor', 'lote fabricante'] },
 
+    { id: 'paquete', label: 'Paquete', req: false, tipo: 'texto',
+      hint: 'Código de empaque. Sólo se muestra; no filtra ni se edita.',
+      alias: ['paquete', 'package', 'empaque', 'envase', 'codigo de paquete'] },
+
     { id: 'vencimiento', label: 'Vencimiento', req: false, tipo: 'fecha',
       hint: 'Fecha de caducidad',
       alias: ['vencimiento', 'vto', 'vence', 'caducidad', 'fecha vencimiento', 'fecha vto', 'expira', 'expiry'] },
@@ -452,6 +456,8 @@ VLM.parser = (function () {
       // ubicaciones del artículo juntas, y eso lo hace reaplicarReglas() sobre
       // la lista ya agrupada. Acá sólo se junta el stock.
       if (p.zonaDeColumna) g.zonaDeColumna = true;
+      // el paquete es del artículo, igual en todas sus filas
+      if (!g.paquete && p.paquete) g.paquete = p.paquete;
       g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
       g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
       if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
@@ -590,6 +596,7 @@ VLM.parser = (function () {
         maxPos:        cfgVigente ? (cfgPos.max || 0) : 0,
         stockMin:      cfgVigente && cfgPos.min ? cfgPos.min : (U.toNum(get(fila, 'stockMin')) || 0),
         stockMax:      cfgVigente && cfgPos.max ? cfgPos.max : (U.toNum(get(fila, 'stockMax')) || 0),
+        paquete:       String(get(fila, 'paquete') || '').trim(),
         lote:          String(get(fila, 'lote') || '').trim(),
         lote2:         String(get(fila, 'lote2') || '').trim(),
         vencimiento:   U.toDate(get(fila, 'vencimiento'), fmtFecha)

@@ -956,6 +956,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .pos-inp:focus { border-color: var(--accent); background: var(--surface); }
 .pos-inp::placeholder { color: var(--muted); }
 #posTable td { padding: 6px 12px; }
+/* Paquete: el código como lo lee la gente de la caja, y debajo qué significan
+   sus dos números. Es informativo, así que no compite con el stock. */
+.t-paq { white-space: nowrap; }
+.paq-cod { display: block; font-family: var(--mono); font-size: 11.5px; color: var(--text-2); }
+.paq-desglose { display: block; font-size: 10.5px; color: var(--muted); }
 .pos-ok { width: 24px; height: 24px; margin-left: 6px; vertical-align: middle; color: var(--ok); }
 .pos-ok:hover { background: var(--ok-dim); border-color: var(--ok); }
 .pos-pct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
@@ -963,6 +968,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* ---------- detalle de artículo ---------- */
 .art-head { display: flex; flex-direction: column; gap: 6px; }
 .art-head .t-code { font-size: 15px; font-weight: 700; }
+.art-paq { margin-top: 2px; }
+.art-paq .paq-cod, .art-paq .paq-desglose { display: inline; }
+.art-paq .paq-desglose::before { content: ' · '; }
 /* barra físico vs disponible: lo lleno es lo que queda libre de verdad */
 .art-barra {
   height: 10px; border-radius: 5px; overflow: hidden;
