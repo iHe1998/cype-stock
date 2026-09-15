@@ -992,6 +992,19 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .row-link { cursor: pointer; }
 .row-link:hover { background: var(--surface-2); }
 
+/* ---------- máximos compartidos (nube) ---------- */
+.nube-estado {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px; padding: 8px 11px;
+  font-size: 12.5px; color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft); border-left: 3px solid var(--muted);
+  border-radius: var(--r-sm);
+}
+.nube-estado.es-ok      { border-left-color: var(--ok); }
+.nube-estado.es-lectura { border-left-color: var(--warn); }
+.btn-sm { height: 26px; padding: 0 9px; font-size: 12px; margin-left: auto; }
+
 </style>
 </head>
 <body>
@@ -1237,6 +1250,40 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
         <span>Mostrar también los laboratorios que no están en la lista</span>
       </label>
 
+      <h3 class="section-title">Máximos compartidos</h3>
+      <p class="muted small">Los máximos por artículo viven en el navegador, así que son de
+        <strong>esta</strong> PC. Conectando una base se guardan una sola vez y los ve cualquiera
+        que abra el panel. Sin conectar, todo sigue funcionando igual, sólo que local.</p>
+      <div class="cfg-grid">
+        <label class="field">
+          <span>URL del proyecto</span>
+          <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Clave anónima (anon)</span>
+          <input type="text" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false">
+        </label>
+      </div>
+      <div class="cfg-actions" style="margin-top:10px">
+        <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
+        <button class="btn" id="btnNubeBajar">Traer máximos</button>
+        <button class="btn" id="btnNubeSubir">Subir máximos</button>
+      </div>
+      <div class="nube-estado" id="nubeEstado"></div>
+      <div class="cfg-grid" id="nubeLogin" hidden>
+        <label class="field">
+          <span>Correo</span>
+          <input type="email" id="cfgNubeMail" spellcheck="false" autocomplete="username">
+        </label>
+        <label class="field">
+          <span>Contraseña</span>
+          <input type="password" id="cfgNubePass" autocomplete="current-password">
+        </label>
+      </div>
+      <div class="cfg-actions" id="nubeLoginBtns" hidden>
+        <button class="btn" id="btnNubeEntrar">Iniciar sesión</button>
+      </div>
+
       <h3 class="section-title">Datos</h3>
       <div class="cfg-actions">
         <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>
@@ -1244,7 +1291,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 15/09/2026 15:08 - 06b3cd6</span>
+      <span class="muted small" id="appVersion">compilado 15/09/2026 15:16 - d7828d4</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1525,6 +1572,178 @@ VLM.util = (function () {
     $, $$, esc, norm, toNum, fmt, fmtCompact, fmtDias,
     toDate, fmtFecha, fmtFechaCorta, addDias, hace,
     colorDe, PALETA, debounce, download, toCsv, toast, cssVar
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
+   nube.js · máximos compartidos entre PCs (Supabase)
+
+   El problema que resuelve: los máximos por SKU viven en el
+   localStorage del navegador, así que son de UNA máquina. Cargarlos en
+   la PC de la oficina y abrir el panel en la del depósito daba la tabla
+   vacía. Acá se guardan en una base y los ve cualquiera que abra la web.
+
+   Va contra la API REST de Supabase con fetch pelado, sin su librería:
+   este proyecto no tiene build ni dependencias y no vale la pena sumar
+   50 KB para cuatro llamadas.
+
+   Quién puede qué:
+     - leer    cualquiera que abra la página (clave anónima, es pública
+               a propósito: Supabase la publica en el cliente y lo que
+               protege de verdad son las políticas RLS de la tabla)
+     - escribir sólo con sesión iniciada
+   Así el panel del depósito muestra los máximos sin poder tocarlos, y
+   quien los configura entra con su usuario.
+
+   Sin configurar, todo esto no existe: la app sigue funcionando con el
+   localStorage como hasta ahora. Es lo que permite que el archivo
+   suelto ande sin internet.
+   ============================================================ */
+window.VLM = window.VLM || {};
+
+VLM.nube = (function () {
+  const KEY_CFG  = 'vlm.nube.v1';
+  const KEY_SESS = 'vlm.nube.sesion.v1';
+  const TABLA    = 'maximos';
+
+  let cfg = null;      // { url, anonKey }
+  let sesion = null;   // { access_token, refresh_token, email }
+
+  function cargar() {
+    try { cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null'); } catch (e) { cfg = null; }
+    try { sesion = JSON.parse(localStorage.getItem(KEY_SESS) || 'null'); } catch (e) { sesion = null; }
+    return cfg;
+  }
+
+  function configurada() { return !!(cfg && cfg.url && cfg.anonKey); }
+  function conSesion()   { return !!(sesion && sesion.access_token); }
+  function email()       { return sesion ? sesion.email : null; }
+  function datos()       { return cfg ? { url: cfg.url, anonKey: cfg.anonKey } : null; }
+
+  function setConfig(url, anonKey) {
+    url = String(url || '').trim().replace(/\/+$/, '');
+    anonKey = String(anonKey || '').trim();
+    if (!url || !anonKey) { cfg = null; try { localStorage.removeItem(KEY_CFG); } catch (e) {} return; }
+    cfg = { url, anonKey };
+    try { localStorage.setItem(KEY_CFG, JSON.stringify(cfg)); } catch (e) {}
+  }
+
+  function guardarSesion(s) {
+    sesion = s;
+    try {
+      if (s) localStorage.setItem(KEY_SESS, JSON.stringify(s));
+      else localStorage.removeItem(KEY_SESS);
+    } catch (e) {}
+  }
+
+  /* ---------------- llamadas ---------------- */
+
+  function cabeceras(conToken) {
+    const h = {
+      'apikey': cfg.anonKey,
+      'Content-Type': 'application/json'
+    };
+    h['Authorization'] = 'Bearer ' + ((conToken && sesion && sesion.access_token) || cfg.anonKey);
+    return h;
+  }
+
+  async function pedir(ruta, opciones, conToken) {
+    if (!configurada()) throw new Error('La nube no está configurada');
+    const r = await fetch(cfg.url + ruta, Object.assign({
+      headers: cabeceras(conToken)
+    }, opciones || {}));
+    if (r.status === 401 && conToken && sesion && sesion.refresh_token) {
+      // el token dura una hora: se renueva y se reintenta una sola vez
+      const ok = await renovar();
+      if (ok) return pedir(ruta, opciones, conToken);
+    }
+    const txt = await r.text();
+    if (!r.ok) throw new Error('Supabase ' + r.status + ': ' + txt.slice(0, 200));
+    // Un upsert con Prefer: return=minimal contesta 201 SIN cuerpo, así que no
+    // se puede llamar a .json() a ciegas: revienta con "Unexpected end of JSON".
+    if (!txt) return null;
+    try { return JSON.parse(txt); } catch (e) { return null; }
+  }
+
+  async function renovar() {
+    try {
+      const r = await fetch(cfg.url + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'apikey': cfg.anonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: sesion.refresh_token })
+      });
+      if (!r.ok) { guardarSesion(null); return false; }
+      const j = await r.json();
+      guardarSesion({ access_token: j.access_token, refresh_token: j.refresh_token,
+                      email: (j.user && j.user.email) || (sesion && sesion.email) });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  async function entrar(correo, clave) {
+    if (!configurada()) throw new Error('Falta configurar la nube');
+    const r = await fetch(cfg.url + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'apikey': cfg.anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: correo, password: clave })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error_description || j.msg || j.message || ('error ' + r.status));
+    guardarSesion({ access_token: j.access_token, refresh_token: j.refresh_token,
+                    email: (j.user && j.user.email) || correo });
+    return sesion.email;
+  }
+
+  function salir() { guardarSesion(null); }
+
+  /* ---------------- máximos ---------------- */
+
+  /** Baja todos los máximos. Devuelve el mapa con la forma de store.posiciones. */
+  async function bajarMaximos() {
+    const filas = await pedir('/rest/v1/' + TABLA + '?select=clave,ubicacion,articulo,min,max', { method: 'GET' });
+    const mapa = {};
+    (filas || []).forEach(f => {
+      if (!f.clave) return;
+      mapa[f.clave] = { min: f.min || 0, max: f.max || 0,
+                        ubicacion: f.ubicacion, articulo: f.articulo };
+    });
+    return mapa;
+  }
+
+  /**
+   * Sube el mapa entero. Usa upsert (Prefer: resolution=merge-duplicates),
+   * que inserta lo nuevo y pisa lo que ya estaba, en una sola llamada.
+   */
+  async function subirMaximos(mapa) {
+    const filas = Object.keys(mapa || {}).map(k => ({
+      clave: k,
+      ubicacion: mapa[k].ubicacion || k.split('|')[0] || '',
+      articulo: mapa[k].articulo || k.split('|')[1] || '',
+      min: mapa[k].min || 0,
+      max: mapa[k].max || 0
+    })).filter(f => f.min || f.max);
+    if (!filas.length) return 0;
+    await pedir('/rest/v1/' + TABLA + '?on_conflict=clave', {
+      method: 'POST',
+      headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(filas)
+    }, true);
+    return filas.length;
+  }
+
+  /** Borra de la base las claves que ya no están en el mapa local. */
+  async function borrarMaximo(clave) {
+    await pedir('/rest/v1/' + TABLA + '?clave=eq.' + encodeURIComponent(clave),
+      { method: 'DELETE' }, true);
+  }
+
+  cargar();
+
+  return {
+    cargar, configurada, conSesion, email, datos, setConfig,
+    entrar, salir, bajarMaximos, subirMaximos, borrarMaximo
   };
 })();
 
@@ -4784,6 +5003,7 @@ VLM.app = (function () {
     wireZonebar();
     wireImport();
     wireSettings();
+    wireNube();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       if (motivo === 'posiciones') reaplicarPosiciones();
@@ -4796,6 +5016,9 @@ VLM.app = (function () {
     // los productos guardados traen la clasificación de ese momento.
     if (S.hayDatos()) reaplicarReglas(true);
     render();
+    // los máximos compartidos se traen al abrir, sin bloquear el dibujado:
+    // si la base no responde, el panel igual muestra lo que hay guardado
+    if (VLM.nube.configurada()) bajarDeNube(true);
     setInterval(actualizarEstado, 60000);
   }
 
@@ -5381,6 +5604,83 @@ VLM.app = (function () {
   /* ============================================================
      CONFIGURACIÓN
      ============================================================ */
+  /* ---------- máximos compartidos ---------- */
+
+  function pintarNube() {
+    const N = VLM.nube;
+    const est = $('#nubeEstado');
+    const d = N.datos();
+    if (d) { $('#cfgNubeUrl').value = d.url; $('#cfgNubeKey').value = d.anonKey; }
+
+    const hayLogin = N.configurada() && !N.conSesion();
+    $('#nubeLogin').hidden = !hayLogin;
+    $('#nubeLoginBtns').hidden = !hayLogin;
+    $('#btnNubeSubir').disabled = !N.conSesion();
+
+    if (!N.configurada()) {
+      est.className = 'nube-estado';
+      est.innerHTML = '<span class="dot"></span>Sin conectar · los máximos quedan sólo en esta PC';
+    } else if (N.conSesion()) {
+      est.className = 'nube-estado es-ok';
+      est.innerHTML = '<span class="dot live"></span>Conectado como <strong>' +
+        U.esc(N.email() || '') + '</strong> · podés subir cambios' +
+        ' <button class="btn btn-sm" id="btnNubeSalir">Cerrar sesión</button>';
+      $('#btnNubeSalir').addEventListener('click', () => { N.salir(); pintarNube(); });
+    } else {
+      est.className = 'nube-estado es-lectura';
+      est.innerHTML = '<span class="dot stale"></span>Conectado en modo lectura · ' +
+        'iniciá sesión para poder subir cambios';
+    }
+  }
+
+  /** Trae los máximos de la base y los aplica sobre lo que hay cargado. */
+  async function bajarDeNube(silencioso) {
+    const N = VLM.nube;
+    if (!N.configurada()) return;
+    try {
+      const mapa = await N.bajarMaximos();
+      const n = Object.keys(mapa).length;
+      S.setPosiciones(mapa);
+      if (!silencioso) U.toast('Traídos ' + n + ' máximos de la base', 'ok');
+      return n;
+    } catch (e) {
+      // sin internet o con la base caída, el panel tiene que seguir andando
+      // con lo último que haya quedado guardado en el navegador
+      if (!silencioso) U.toast('No se pudieron traer los máximos: ' + e.message, 'err');
+      else console.warn('nube:', e.message);
+    }
+  }
+
+  function wireNube() {
+    const N = VLM.nube;
+
+    $('#btnNubeGuardar').addEventListener('click', async () => {
+      N.setConfig($('#cfgNubeUrl').value, $('#cfgNubeKey').value);
+      pintarNube();
+      if (!N.configurada()) { U.toast('Conexión borrada: los máximos vuelven a ser locales'); return; }
+      U.toast('Conexión guardada');
+      await bajarDeNube();
+    });
+
+    $('#btnNubeBajar').addEventListener('click', () => bajarDeNube());
+
+    $('#btnNubeSubir').addEventListener('click', async () => {
+      try {
+        const n = await N.subirMaximos(S.state.posiciones);
+        U.toast('Subidos ' + n + ' máximos', 'ok');
+      } catch (e) { U.toast('No se pudieron subir: ' + e.message, 'err'); }
+    });
+
+    $('#btnNubeEntrar').addEventListener('click', async () => {
+      try {
+        await N.entrar($('#cfgNubeMail').value.trim(), $('#cfgNubePass').value);
+        $('#cfgNubePass').value = '';
+        pintarNube();
+        U.toast('Sesión iniciada', 'ok');
+      } catch (e) { U.toast('No se pudo entrar: ' + e.message, 'err'); }
+    });
+  }
+
   const CAMPOS_CFG = [
     ['cfgPctCritico', 'pctCritico', 'int'],
     ['cfgPctBajo', 'pctBajo', 'int'],
@@ -5397,6 +5697,7 @@ VLM.app = (function () {
     $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
     pintarReglasEditor();
     pintarLabsEditor();
+    pintarNube();
     $('#modalSettings').hidden = false;
   }
 

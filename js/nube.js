@@ -1,0 +1,169 @@
+/* ============================================================
+   nube.js · máximos compartidos entre PCs (Supabase)
+
+   El problema que resuelve: los máximos por SKU viven en el
+   localStorage del navegador, así que son de UNA máquina. Cargarlos en
+   la PC de la oficina y abrir el panel en la del depósito daba la tabla
+   vacía. Acá se guardan en una base y los ve cualquiera que abra la web.
+
+   Va contra la API REST de Supabase con fetch pelado, sin su librería:
+   este proyecto no tiene build ni dependencias y no vale la pena sumar
+   50 KB para cuatro llamadas.
+
+   Quién puede qué:
+     - leer    cualquiera que abra la página (clave anónima, es pública
+               a propósito: Supabase la publica en el cliente y lo que
+               protege de verdad son las políticas RLS de la tabla)
+     - escribir sólo con sesión iniciada
+   Así el panel del depósito muestra los máximos sin poder tocarlos, y
+   quien los configura entra con su usuario.
+
+   Sin configurar, todo esto no existe: la app sigue funcionando con el
+   localStorage como hasta ahora. Es lo que permite que el archivo
+   suelto ande sin internet.
+   ============================================================ */
+window.VLM = window.VLM || {};
+
+VLM.nube = (function () {
+  const KEY_CFG  = 'vlm.nube.v1';
+  const KEY_SESS = 'vlm.nube.sesion.v1';
+  const TABLA    = 'maximos';
+
+  let cfg = null;      // { url, anonKey }
+  let sesion = null;   // { access_token, refresh_token, email }
+
+  function cargar() {
+    try { cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null'); } catch (e) { cfg = null; }
+    try { sesion = JSON.parse(localStorage.getItem(KEY_SESS) || 'null'); } catch (e) { sesion = null; }
+    return cfg;
+  }
+
+  function configurada() { return !!(cfg && cfg.url && cfg.anonKey); }
+  function conSesion()   { return !!(sesion && sesion.access_token); }
+  function email()       { return sesion ? sesion.email : null; }
+  function datos()       { return cfg ? { url: cfg.url, anonKey: cfg.anonKey } : null; }
+
+  function setConfig(url, anonKey) {
+    url = String(url || '').trim().replace(/\/+$/, '');
+    anonKey = String(anonKey || '').trim();
+    if (!url || !anonKey) { cfg = null; try { localStorage.removeItem(KEY_CFG); } catch (e) {} return; }
+    cfg = { url, anonKey };
+    try { localStorage.setItem(KEY_CFG, JSON.stringify(cfg)); } catch (e) {}
+  }
+
+  function guardarSesion(s) {
+    sesion = s;
+    try {
+      if (s) localStorage.setItem(KEY_SESS, JSON.stringify(s));
+      else localStorage.removeItem(KEY_SESS);
+    } catch (e) {}
+  }
+
+  /* ---------------- llamadas ---------------- */
+
+  function cabeceras(conToken) {
+    const h = {
+      'apikey': cfg.anonKey,
+      'Content-Type': 'application/json'
+    };
+    h['Authorization'] = 'Bearer ' + ((conToken && sesion && sesion.access_token) || cfg.anonKey);
+    return h;
+  }
+
+  async function pedir(ruta, opciones, conToken) {
+    if (!configurada()) throw new Error('La nube no está configurada');
+    const r = await fetch(cfg.url + ruta, Object.assign({
+      headers: cabeceras(conToken)
+    }, opciones || {}));
+    if (r.status === 401 && conToken && sesion && sesion.refresh_token) {
+      // el token dura una hora: se renueva y se reintenta una sola vez
+      const ok = await renovar();
+      if (ok) return pedir(ruta, opciones, conToken);
+    }
+    const txt = await r.text();
+    if (!r.ok) throw new Error('Supabase ' + r.status + ': ' + txt.slice(0, 200));
+    // Un upsert con Prefer: return=minimal contesta 201 SIN cuerpo, así que no
+    // se puede llamar a .json() a ciegas: revienta con "Unexpected end of JSON".
+    if (!txt) return null;
+    try { return JSON.parse(txt); } catch (e) { return null; }
+  }
+
+  async function renovar() {
+    try {
+      const r = await fetch(cfg.url + '/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        headers: { 'apikey': cfg.anonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: sesion.refresh_token })
+      });
+      if (!r.ok) { guardarSesion(null); return false; }
+      const j = await r.json();
+      guardarSesion({ access_token: j.access_token, refresh_token: j.refresh_token,
+                      email: (j.user && j.user.email) || (sesion && sesion.email) });
+      return true;
+    } catch (e) { return false; }
+  }
+
+  async function entrar(correo, clave) {
+    if (!configurada()) throw new Error('Falta configurar la nube');
+    const r = await fetch(cfg.url + '/auth/v1/token?grant_type=password', {
+      method: 'POST',
+      headers: { 'apikey': cfg.anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: correo, password: clave })
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error_description || j.msg || j.message || ('error ' + r.status));
+    guardarSesion({ access_token: j.access_token, refresh_token: j.refresh_token,
+                    email: (j.user && j.user.email) || correo });
+    return sesion.email;
+  }
+
+  function salir() { guardarSesion(null); }
+
+  /* ---------------- máximos ---------------- */
+
+  /** Baja todos los máximos. Devuelve el mapa con la forma de store.posiciones. */
+  async function bajarMaximos() {
+    const filas = await pedir('/rest/v1/' + TABLA + '?select=clave,ubicacion,articulo,min,max', { method: 'GET' });
+    const mapa = {};
+    (filas || []).forEach(f => {
+      if (!f.clave) return;
+      mapa[f.clave] = { min: f.min || 0, max: f.max || 0,
+                        ubicacion: f.ubicacion, articulo: f.articulo };
+    });
+    return mapa;
+  }
+
+  /**
+   * Sube el mapa entero. Usa upsert (Prefer: resolution=merge-duplicates),
+   * que inserta lo nuevo y pisa lo que ya estaba, en una sola llamada.
+   */
+  async function subirMaximos(mapa) {
+    const filas = Object.keys(mapa || {}).map(k => ({
+      clave: k,
+      ubicacion: mapa[k].ubicacion || k.split('|')[0] || '',
+      articulo: mapa[k].articulo || k.split('|')[1] || '',
+      min: mapa[k].min || 0,
+      max: mapa[k].max || 0
+    })).filter(f => f.min || f.max);
+    if (!filas.length) return 0;
+    await pedir('/rest/v1/' + TABLA + '?on_conflict=clave', {
+      method: 'POST',
+      headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(filas)
+    }, true);
+    return filas.length;
+  }
+
+  /** Borra de la base las claves que ya no están en el mapa local. */
+  async function borrarMaximo(clave) {
+    await pedir('/rest/v1/' + TABLA + '?clave=eq.' + encodeURIComponent(clave),
+      { method: 'DELETE' }, true);
+  }
+
+  cargar();
+
+  return {
+    cargar, configurada, conSesion, email, datos, setConfig,
+    entrar, salir, bajarMaximos, subirMaximos, borrarMaximo
+  };
+})();

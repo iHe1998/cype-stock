@@ -374,7 +374,13 @@ Los porcentajes se cambian desde **⚙ Configuración**.
 
 ---
 
-## Publicar en GitHub Pages
+## Publicar la web
+
+El repo es **privado** y el sitio se publica desde **Cloudflare Pages**, que sirve repos
+privados en su plan gratuito (GitHub Pages, en cambio, sólo publica repos públicos salvo
+que se pague Pro).
+
+### 1. Subir el repo
 
 ```bash
 git remote add origin https://github.com/TU-USUARIO/vlm-stock.git
@@ -382,8 +388,77 @@ git branch -M main
 git push -u origin main
 ```
 
-Después, en el repo: **Settings → Pages → Source: `Deploy from a branch` → `main` / `/ (root)`**.
-En un par de minutos queda en `https://TU-USUARIO.github.io/vlm-stock/`.
+### 2. Conectar Cloudflare Pages
+
+En **dash.cloudflare.com → Workers & Pages → Create → Pages → Connect to Git**, se elige el
+repo y se deja todo vacío: **no hay build**. Directorio raíz `/`, sin comando de compilación.
+Cada `git push` republica el sitio en menos de un minuto.
+
+> El `.html` de `dist/` no se usa en la web: ahí se sirve `index.html` con sus `js/`, `css/`
+> y `lib/` sueltos. El archivo único sigue siendo para la copia offline, en un pendrive.
+
+---
+
+## Máximos compartidos (Supabase)
+
+Los máximos por artículo viven en el `localStorage` del navegador, así que son **de esa PC**.
+Publicar la web no lo cambia: cada máquina tiene su propio almacenamiento para el sitio.
+Para que los máximos sean los mismos en todas, se guardan en una base.
+
+La app va contra la **API REST de Supabase con `fetch`**, sin su librería: este proyecto no
+tiene build ni dependencias y no vale la pena sumar 50 KB para cuatro llamadas.
+
+**Sin configurar, nada de esto existe**: la app sigue andando con el `localStorage` como
+siempre. Es lo que permite que el archivo suelto funcione sin internet.
+
+### Quién puede qué
+
+| | Leer | Escribir |
+|---|---|---|
+| Cualquiera que abra el panel | ✅ | ❌ |
+| Con sesión iniciada | ✅ | ✅ |
+
+El panel del depósito muestra los máximos sin poder tocarlos; quien los configura entra con
+su usuario. La clave `anon` es pública a propósito —Supabase la publica en el cliente— y lo
+que protege de verdad son las políticas RLS de la tabla.
+
+### La tabla
+
+En **Supabase → SQL Editor**, una vez:
+
+```sql
+create table maximos (
+  clave       text primary key,          -- UBICACION|ARTICULO
+  ubicacion   text not null,
+  articulo    text not null,
+  min         integer not null default 0,
+  max         integer not null default 0,
+  actualizado timestamptz default now()
+);
+
+alter table maximos enable row level security;
+
+-- lectura para cualquiera que abra el panel
+create policy "leer" on maximos
+  for select to anon, authenticated using (true);
+
+-- escritura sólo con sesión
+create policy "escribir" on maximos
+  for all to authenticated using (true) with check (true);
+```
+
+Después, en **Authentication → Users → Add user**, se crea el usuario que va a configurar.
+
+### Conectar la app
+
+En **⚙ Configuración → Máximos compartidos** se pegan la **URL del proyecto** y la **clave
+anon** (Supabase → Project Settings → API), y listo. Los botones:
+
+- **Traer máximos** — baja lo que hay en la base y pisa lo local.
+- **Subir máximos** — manda lo local a la base. Necesita sesión iniciada.
+
+Al abrir la app, si hay conexión configurada, los máximos se traen solos. Si la base no
+responde, el panel arranca igual con lo último guardado en el navegador.
 
 ---
 
@@ -394,6 +469,7 @@ index.html            estructura y modales
 build.ps1             arma la versión de un solo archivo (dist/)
 css/styles.css        sistema de diseño (tema oscuro/claro, modo TV)
 js/util.js            formateo de números y fechas, colores, helpers
+js/nube.js            máximos compartidos contra Supabase (REST, sin librería)
 js/labs.js            catálogo de laboratorios, ámbito y conservación
 js/ubicaciones.js     reglas de posición (ignorar / picking / altura)
 js/store.js           estado global, configuración y persistencia

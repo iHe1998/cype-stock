@@ -28,6 +28,7 @@ VLM.app = (function () {
     wireZonebar();
     wireImport();
     wireSettings();
+    wireNube();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       if (motivo === 'posiciones') reaplicarPosiciones();
@@ -40,6 +41,9 @@ VLM.app = (function () {
     // los productos guardados traen la clasificación de ese momento.
     if (S.hayDatos()) reaplicarReglas(true);
     render();
+    // los máximos compartidos se traen al abrir, sin bloquear el dibujado:
+    // si la base no responde, el panel igual muestra lo que hay guardado
+    if (VLM.nube.configurada()) bajarDeNube(true);
     setInterval(actualizarEstado, 60000);
   }
 
@@ -625,6 +629,83 @@ VLM.app = (function () {
   /* ============================================================
      CONFIGURACIÓN
      ============================================================ */
+  /* ---------- máximos compartidos ---------- */
+
+  function pintarNube() {
+    const N = VLM.nube;
+    const est = $('#nubeEstado');
+    const d = N.datos();
+    if (d) { $('#cfgNubeUrl').value = d.url; $('#cfgNubeKey').value = d.anonKey; }
+
+    const hayLogin = N.configurada() && !N.conSesion();
+    $('#nubeLogin').hidden = !hayLogin;
+    $('#nubeLoginBtns').hidden = !hayLogin;
+    $('#btnNubeSubir').disabled = !N.conSesion();
+
+    if (!N.configurada()) {
+      est.className = 'nube-estado';
+      est.innerHTML = '<span class="dot"></span>Sin conectar · los máximos quedan sólo en esta PC';
+    } else if (N.conSesion()) {
+      est.className = 'nube-estado es-ok';
+      est.innerHTML = '<span class="dot live"></span>Conectado como <strong>' +
+        U.esc(N.email() || '') + '</strong> · podés subir cambios' +
+        ' <button class="btn btn-sm" id="btnNubeSalir">Cerrar sesión</button>';
+      $('#btnNubeSalir').addEventListener('click', () => { N.salir(); pintarNube(); });
+    } else {
+      est.className = 'nube-estado es-lectura';
+      est.innerHTML = '<span class="dot stale"></span>Conectado en modo lectura · ' +
+        'iniciá sesión para poder subir cambios';
+    }
+  }
+
+  /** Trae los máximos de la base y los aplica sobre lo que hay cargado. */
+  async function bajarDeNube(silencioso) {
+    const N = VLM.nube;
+    if (!N.configurada()) return;
+    try {
+      const mapa = await N.bajarMaximos();
+      const n = Object.keys(mapa).length;
+      S.setPosiciones(mapa);
+      if (!silencioso) U.toast('Traídos ' + n + ' máximos de la base', 'ok');
+      return n;
+    } catch (e) {
+      // sin internet o con la base caída, el panel tiene que seguir andando
+      // con lo último que haya quedado guardado en el navegador
+      if (!silencioso) U.toast('No se pudieron traer los máximos: ' + e.message, 'err');
+      else console.warn('nube:', e.message);
+    }
+  }
+
+  function wireNube() {
+    const N = VLM.nube;
+
+    $('#btnNubeGuardar').addEventListener('click', async () => {
+      N.setConfig($('#cfgNubeUrl').value, $('#cfgNubeKey').value);
+      pintarNube();
+      if (!N.configurada()) { U.toast('Conexión borrada: los máximos vuelven a ser locales'); return; }
+      U.toast('Conexión guardada');
+      await bajarDeNube();
+    });
+
+    $('#btnNubeBajar').addEventListener('click', () => bajarDeNube());
+
+    $('#btnNubeSubir').addEventListener('click', async () => {
+      try {
+        const n = await N.subirMaximos(S.state.posiciones);
+        U.toast('Subidos ' + n + ' máximos', 'ok');
+      } catch (e) { U.toast('No se pudieron subir: ' + e.message, 'err'); }
+    });
+
+    $('#btnNubeEntrar').addEventListener('click', async () => {
+      try {
+        await N.entrar($('#cfgNubeMail').value.trim(), $('#cfgNubePass').value);
+        $('#cfgNubePass').value = '';
+        pintarNube();
+        U.toast('Sesión iniciada', 'ok');
+      } catch (e) { U.toast('No se pudo entrar: ' + e.message, 'err'); }
+    });
+  }
+
   const CAMPOS_CFG = [
     ['cfgPctCritico', 'pctCritico', 'int'],
     ['cfgPctBajo', 'pctBajo', 'int'],
@@ -641,6 +722,7 @@ VLM.app = (function () {
     $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
     pintarReglasEditor();
     pintarLabsEditor();
+    pintarNube();
     $('#modalSettings').hidden = false;
   }
 

@@ -251,6 +251,40 @@
         <span>Mostrar también los laboratorios que no están en la lista</span>
       </label>
 
+      <h3 class="section-title">Máximos compartidos</h3>
+      <p class="muted small">Los máximos por artículo viven en el navegador, así que son de
+        <strong>esta</strong> PC. Conectando una base se guardan una sola vez y los ve cualquiera
+        que abra el panel. Sin conectar, todo sigue funcionando igual, sólo que local.</p>
+      <div class="cfg-grid">
+        <label class="field">
+          <span>URL del proyecto</span>
+          <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Clave anónima (anon)</span>
+          <input type="text" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false">
+        </label>
+      </div>
+      <div class="cfg-actions" style="margin-top:10px">
+        <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
+        <button class="btn" id="btnNubeBajar">Traer máximos</button>
+        <button class="btn" id="btnNubeSubir">Subir máximos</button>
+      </div>
+      <div class="nube-estado" id="nubeEstado"></div>
+      <div class="cfg-grid" id="nubeLogin" hidden>
+        <label class="field">
+          <span>Correo</span>
+          <input type="email" id="cfgNubeMail" spellcheck="false" autocomplete="username">
+        </label>
+        <label class="field">
+          <span>Contraseña</span>
+          <input type="password" id="cfgNubePass" autocomplete="current-password">
+        </label>
+      </div>
+      <div class="cfg-actions" id="nubeLoginBtns" hidden>
+        <button class="btn" id="btnNubeEntrar">Iniciar sesión</button>
+      </div>
+
       <h3 class="section-title">Datos</h3>
       <div class="cfg-actions">
         <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>
@@ -287,6 +321,7 @@
 <script src="lib/xlsx.full.min.js"></script>
 <script src="lib/chart.umd.min.js"></script>
 <script src="js/util.js"></script>
+<script src="js/nube.js"></script>
 <script src="js/labs.js"></script>
 <script src="js/ubicaciones.js"></script>
 <script src="js/store.js"></script>
