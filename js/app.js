@@ -305,11 +305,7 @@ VLM.app = (function () {
     const edad = Date.now() - (meta.importadoEn || 0);
     dot.className = 'dot ' + (edad > 12 * 3600e3 ? 'stale' : 'live');
     txt.innerHTML = U.esc(meta.archivo || 'datos') + ' · ' +
-      S.state.productos.length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>' +
-      // de dónde salió lo que se está viendo: en la PC del depósito nadie
-      // cargó nada, así que conviene decir que vino de la base y quién la subió
-      (meta.deNube ? ' · <span class="muted">de la base' +
-        (meta.subidoPor ? ', por ' + U.esc(meta.subidoPor) : '') + '</span>' : '');
+      S.state.productos.length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
   }
 
   function irA(vista) {

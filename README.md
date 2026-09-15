@@ -521,8 +521,8 @@ Al abrir la app, si hay conexión configurada, **el stock y los máximos se trae
 al importar un Excel se sube solo, sin que haya que acordarse. Si la base no responde, el
 panel arranca igual con lo último guardado en el navegador.
 
-La barra de arriba dice de dónde salió lo que se está viendo: *"de la base, por
-fulano@…"*. En la PC del depósito nadie cargó nada, así que conviene que quede claro.
+Quién subió la última foto del stock queda igual registrado en la columna `por` de la
+tabla, aunque el panel no lo muestre.
 
 ---
 
