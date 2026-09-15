@@ -34,9 +34,20 @@ VLM.nube = (function () {
 
   function cargar() {
     try { cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null'); } catch (e) { cfg = null; }
+    /* Sin nada guardado en este navegador se usa lo que venga en
+       config.js, que es lo que hace que una PC nueva funcione sin que
+       nadie le cargue nada. Lo del navegador manda por si alguien
+       necesita apuntar a otra base. */
+    if (!cfg || !cfg.url || !cfg.anonKey) {
+      const d = (VLM.config && VLM.config.supabase) || {};
+      if (d.url && d.anonKey) cfg = { url: String(d.url).replace(/\/+$/, ''), anonKey: d.anonKey, porDefecto: true };
+    }
     try { sesion = JSON.parse(localStorage.getItem(KEY_SESS) || 'null'); } catch (e) { sesion = null; }
     return cfg;
   }
+
+  /** ¿La conexión vino de config.js y no de esta PC? */
+  function esPorDefecto() { return !!(cfg && cfg.porDefecto); }
 
   function configurada() { return !!(cfg && cfg.url && cfg.anonKey); }
   function conSesion()   { return !!(sesion && sesion.access_token); }
@@ -163,7 +174,7 @@ VLM.nube = (function () {
   cargar();
 
   return {
-    cargar, configurada, conSesion, email, datos, setConfig,
+    cargar, configurada, conSesion, esPorDefecto, email, datos, setConfig,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo
   };
 })();

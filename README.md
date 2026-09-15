@@ -453,7 +453,31 @@ create policy "escribir" on maximos
 
 Después, en **Authentication → Users → Add user**, se crea el usuario que va a configurar.
 
-### Conectar la app
+### Que todas las PCs se conecten solas
+
+Si cada máquina tuviera que cargar la conexión a mano, la de la tele y la del depósito
+quedarían siempre pendientes. Para evitarlo se completa [`js/config.js`](js/config.js) una
+sola vez y se commitea: cualquier navegador que abra la web toma esos datos sin que nadie
+haga nada.
+
+```js
+VLM.config = {
+  supabase: {
+    url:     'https://xxxxxxxxxxxx.supabase.co',
+    anonKey: 'la clave anon del proyecto'
+  }
+};
+```
+
+Lo que se cargue a mano en ⚙ Configuración manda sobre eso, por si alguna PC necesita
+apuntar a otra base.
+
+> Va la clave **anon**, que Supabase publica en el cliente a propósito: con ella sólo se
+> puede hacer lo que permitan las políticas RLS, o sea leer. **Nunca** la `service_role`,
+> que saltea todas las políticas. Y tener presente que el sitio es público: quien lo abra
+> podrá leer los máximos. Escribir sigue necesitando sesión.
+
+### Conectar una sola PC
 
 En **⚙ Configuración → Máximos compartidos** se pegan la **URL del proyecto** y la **clave
 anon** (Supabase → Project Settings → API), y listo. Los botones:
@@ -473,6 +497,7 @@ index.html            estructura y modales
 build.ps1             arma la versión de un solo archivo (dist/)
 css/styles.css        sistema de diseño (tema oscuro/claro, modo TV)
 js/util.js            formateo de números y fechas, colores, helpers
+js/config.js          conexión por defecto a la base (se completa una vez)
 js/nube.js            máximos compartidos contra Supabase (REST, sin librería)
 js/labs.js            catálogo de laboratorios, ámbito y conservación
 js/ubicaciones.js     reglas de posición (ignorar / picking / altura)

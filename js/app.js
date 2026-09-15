@@ -654,7 +654,8 @@ VLM.app = (function () {
     } else {
       est.className = 'nube-estado es-lectura';
       est.innerHTML = '<span class="dot stale"></span>Conectado en modo lectura · ' +
-        'iniciá sesión para poder subir cambios';
+        'iniciá sesión para poder subir cambios' +
+        (N.esPorDefecto() ? ' <span class="muted">(conexión del repositorio)</span>' : '');
     }
   }
 
