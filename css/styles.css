@@ -995,3 +995,48 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .nube-estado.es-ok      { border-left-color: var(--ok); }
 .nube-estado.es-lectura { border-left-color: var(--warn); }
 .btn-sm { height: 26px; padding: 0 9px; font-size: 12px; margin-left: auto; }
+
+/* ============================================================
+   CONFIGURACIÓN A PANTALLA COMPLETA
+
+   Creció hasta cinco bloques —umbrales, TV, base compartida, reglas y
+   laboratorios— y en una caja de 560px eran cinco pantallas de scroll
+   una atrás de otra. A pantalla completa entran en columnas y se ve de
+   una qué hay para tocar.
+   ============================================================ */
+.modal-pantalla { padding: 0; }
+.modal-full {
+  max-width: none; width: 100vw; height: 100vh;
+  border: 0; border-radius: 0;
+}
+.modal-full .modal-body { padding: 20px clamp(16px, 4vw, 48px); }
+
+.cfg-layout {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  align-items: start;
+  max-width: 1500px; margin: 0 auto;
+}
+/* Las reglas y los laboratorios son listas largas de filas anchas: en una
+   columna angosta se les apretaban los campos. */
+.cfg-ancha { grid-column: 1 / -1; }
+
+.cfg-card {
+  padding: 16px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r);
+}
+.cfg-card > h3 {
+  font-size: 13px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-2);
+  padding-bottom: 8px; margin-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.cfg-card > p.muted { margin: 0 0 12px; }
+.cfg-card .cfg-actions { margin-top: 12px; }
+
+@media (max-width: 760px) {
+  .cfg-layout { grid-template-columns: 1fr; }
+}

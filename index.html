@@ -187,16 +187,19 @@
   </div>
 </div>
 
-<!-- ============ SETTINGS MODAL ============ -->
-<div class="modal" id="modalSettings" hidden>
-  <div class="modal-box">
+<!-- ============ CONFIGURACIÓN (pantalla completa) ============ -->
+<div class="modal modal-pantalla" id="modalSettings" hidden>
+  <div class="modal-box modal-full">
     <header class="modal-head">
       <h2>Configuración</h2>
-      <button class="btn btn-icon" data-close><svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      <button class="btn btn-icon" data-close title="Cerrar"><svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </header>
     <div class="modal-body">
-      <h3 class="section-title">Umbrales de alerta</h3>
-      <p class="muted small" style="margin:0 0 10px">Sobre la capacidad (máximo) de la posición.</p>
+      <div class="cfg-layout">
+
+      <section class="cfg-card">
+      <h3>Umbrales de alerta</h3>
+      <p class="muted small">Sobre la capacidad (máximo) de la posición.</p>
       <div class="cfg-grid">
         <label class="field">
           <span>% del máximo · CRÍTICO ≤</span>
@@ -206,13 +209,12 @@
           <span>% del máximo · BAJO ≤</span>
           <input type="number" id="cfgPctBajo" min="1" max="99" step="1">
         </label>
-        <label class="field">
-          <span>Días objetivo de stock (si no hay máximo)</span>
-          <input type="number" id="cfgDiasObjetivo" min="1" step="1">
-        </label>
       </div>
+      </section>
 
-      <h3 class="section-title">Modo TV</h3>
+      <section class="cfg-card">
+      <h3>Modo TV</h3>
+      <p class="muted small">Cómo rota la pantalla del depósito.</p>
       <div class="cfg-grid">
         <label class="field">
           <span>Segundos por pantalla</span>
@@ -223,38 +225,12 @@
           <span>Priorizar sólo productos críticos</span>
         </label>
       </div>
+      </section>
 
-      <h3 class="section-title">Reglas de posición</h3>
-      <p class="muted small">Se evalúan <strong>en orden</strong> y gana la primera que coincide, así
-        que las de ignorar van arriba: <code>PACK</code> tiene que resolverse antes que <code>P*</code>.
-        Comodín <code>*</code> al principio, al final o solo (<code>*</code> = todas).
-        Los cambios se aplican al instante sobre el stock cargado, salvo las filas
-        que una regla de ignorar ya descartó: esas vuelven al reimportar.</p>
-      <div class="reglas-editor" id="reglasEditor"></div>
-      <div class="cfg-actions" style="margin-top:10px">
-        <button class="btn" id="btnAddRegla">+ Agregar regla</button>
-        <button class="btn" id="btnResetReglas">Restaurar reglas originales</button>
-      </div>
-
-      <h3 class="section-title">Laboratorios</h3>
-      <p class="muted small">Sólo se procesan los laboratorios de esta lista. Acá se define
-        <strong>cuáles</strong> entran y cómo se llaman, nada más: si el artículo está dentro del
-        VLM o fuera, y si es frío o ambiente, lo decide <strong>cada SKU según sus ubicaciones</strong>.
-        Un mismo laboratorio tiene artículos de los dos tipos.</p>
-      <div class="labs-editor" id="labsEditor"></div>
-      <div class="cfg-actions" style="margin-top:10px">
-        <button class="btn" id="btnAddLab">+ Agregar laboratorio</button>
-        <button class="btn" id="btnResetLabs">Restaurar catálogo original</button>
-      </div>
-      <label class="field field-check" style="margin-top:14px">
-        <input type="checkbox" id="cfgIncluirNoListados">
-        <span>Mostrar también los laboratorios que no están en la lista</span>
-      </label>
-
-      <h3 class="section-title">Máximos compartidos</h3>
-      <p class="muted small">Los máximos por artículo viven en el navegador, así que son de
-        <strong>esta</strong> PC. Conectando una base se guardan una sola vez y los ve cualquiera
-        que abra el panel. Sin conectar, todo sigue funcionando igual, sólo que local.</p>
+      <section class="cfg-card">
+      <h3>Stock y máximos compartidos</h3>
+      <p class="muted small">Sin conectar, todo vive en <strong>esta</strong> PC y cada máquina
+        necesita su propia carga. Conectada, se carga una vez y lo ven todas.</p>
       <div class="cfg-grid">
         <label class="field">
           <span>URL del proyecto</span>
@@ -264,12 +240,6 @@
           <span>Clave anónima (anon)</span>
           <input type="text" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false">
         </label>
-      </div>
-      <div class="cfg-actions" style="margin-top:10px">
-        <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
-        <button class="btn" id="btnNubeBajar">Traer de la base</button>
-        <button class="btn" id="btnNubeSubir">Subir máximos</button>
-        <button class="btn" id="btnNubeSubirStock">Subir stock</button>
       </div>
       <div class="nube-estado" id="nubeEstado"></div>
       <div class="cfg-grid" id="nubeLogin" hidden>
@@ -283,13 +253,56 @@
         </label>
       </div>
       <div class="cfg-actions" id="nubeLoginBtns" hidden>
-        <button class="btn" id="btnNubeEntrar">Iniciar sesión</button>
+        <button class="btn btn-primary" id="btnNubeEntrar">Iniciar sesión</button>
       </div>
+      <div class="cfg-actions">
+        <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
+        <button class="btn" id="btnNubeBajar">Traer de la base</button>
+        <button class="btn" id="btnNubeSubir">Subir máximos</button>
+        <button class="btn" id="btnNubeSubirStock">Subir stock</button>
+      </div>
+      </section>
 
-      <h3 class="section-title">Datos</h3>
+      <section class="cfg-card">
+      <h3>Datos</h3>
+      <p class="muted small">La configuración y los máximos no se tocan.</p>
       <div class="cfg-actions">
         <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>
         <button class="btn btn-danger" id="btnClearData">Borrar datos cargados</button>
+      </div>
+      </section>
+
+      <section class="cfg-card cfg-ancha">
+      <h3>Reglas de posición</h3>
+      <p class="muted small">Se evalúan <strong>en orden</strong> y gana la primera que coincide, así
+        que las de ignorar van arriba: <code>PACK</code> tiene que resolverse antes que <code>P*</code>.
+        Comodín <code>*</code> al principio, al final o solo (<code>*</code> = todas).
+        Los cambios se aplican al instante sobre el stock cargado, salvo las filas
+        que una regla de ignorar ya descartó: esas vuelven al reimportar.</p>
+      <div class="reglas-editor" id="reglasEditor"></div>
+      <div class="cfg-actions">
+        <button class="btn" id="btnAddRegla">+ Agregar regla</button>
+        <button class="btn" id="btnResetReglas">Restaurar reglas originales</button>
+      </div>
+      </section>
+
+      <section class="cfg-card cfg-ancha">
+      <h3>Laboratorios</h3>
+      <p class="muted small">Sólo se procesan los laboratorios de esta lista. Acá se define
+        <strong>cuáles</strong> entran y cómo se llaman, nada más: si el artículo está dentro del
+        VLM o fuera, y si es frío o ambiente, lo decide <strong>cada SKU según sus ubicaciones</strong>.
+        Un mismo laboratorio tiene artículos de los dos tipos.</p>
+      <div class="labs-editor" id="labsEditor"></div>
+      <div class="cfg-actions">
+        <button class="btn" id="btnAddLab">+ Agregar laboratorio</button>
+        <button class="btn" id="btnResetLabs">Restaurar catálogo original</button>
+      </div>
+      <label class="field field-check" style="margin-top:12px">
+        <input type="checkbox" id="cfgIncluirNoListados">
+        <span>Mostrar también los laboratorios que no están en la lista</span>
+      </label>
+      </section>
+
       </div>
     </div>
     <footer class="modal-foot">
