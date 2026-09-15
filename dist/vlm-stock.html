@@ -965,6 +965,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .pos-inp:focus { border-color: var(--accent); background: var(--surface); }
 .pos-inp::placeholder { color: var(--muted); }
 #posTable td { padding: 6px 12px; }
+/* Paquete: el código como lo lee la gente de la caja, y debajo qué significan
+   sus dos números. Es informativo, así que no compite con el stock. */
+.t-paq { white-space: nowrap; }
+.paq-cod { display: block; font-family: var(--mono); font-size: 11.5px; color: var(--text-2); }
+.paq-desglose { display: block; font-size: 10.5px; color: var(--muted); }
 .pos-ok { width: 24px; height: 24px; margin-left: 6px; vertical-align: middle; color: var(--ok); }
 .pos-ok:hover { background: var(--ok-dim); border-color: var(--ok); }
 .pos-pct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
@@ -972,6 +977,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* ---------- detalle de artículo ---------- */
 .art-head { display: flex; flex-direction: column; gap: 6px; }
 .art-head .t-code { font-size: 15px; font-weight: 700; }
+.art-paq { margin-top: 2px; }
+.art-paq .paq-cod, .art-paq .paq-desglose { display: inline; }
+.art-paq .paq-desglose::before { content: ' · '; }
 /* barra físico vs disponible: lo lleno es lo que queda libre de verdad */
 .art-barra {
   height: 10px; border-radius: 5px; overflow: hidden;
@@ -1236,7 +1244,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 14/09/2026 12:01 - 640dba5</span>
+      <span class="muted small" id="appVersion">compilado 15/09/2026 14:48 - 8e6740a</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -2236,6 +2244,10 @@ VLM.parser = (function () {
       hint: 'Segundo identificador de partida, si la planilla lo trae',
       alias: ['atributo02', 'atributo 02', 'atributo2', 'lote proveedor', 'lote secundario', 'partida proveedor', 'lote fabricante'] },
 
+    { id: 'paquete', label: 'Paquete', req: false, tipo: 'texto',
+      hint: 'Código de empaque. Sólo se muestra; no filtra ni se edita.',
+      alias: ['paquete', 'package', 'empaque', 'envase', 'codigo de paquete'] },
+
     { id: 'vencimiento', label: 'Vencimiento', req: false, tipo: 'fecha',
       hint: 'Fecha de caducidad',
       alias: ['vencimiento', 'vto', 'vence', 'caducidad', 'fecha vencimiento', 'fecha vto', 'expira', 'expiry'] },
@@ -2625,6 +2637,8 @@ VLM.parser = (function () {
       // ubicaciones del artículo juntas, y eso lo hace reaplicarReglas() sobre
       // la lista ya agrupada. Acá sólo se junta el stock.
       if (p.zonaDeColumna) g.zonaDeColumna = true;
+      // el paquete es del artículo, igual en todas sus filas
+      if (!g.paquete && p.paquete) g.paquete = p.paquete;
       g.stockMin       = Math.max(g.stockMin || 0, p.stockMin || 0);
       g.stockMax       = Math.max(g.stockMax || 0, p.stockMax || 0);
       if (p.vencimiento && (!g.vencimiento || p.vencimiento < g.vencimiento)) g.vencimiento = p.vencimiento;
@@ -2763,6 +2777,7 @@ VLM.parser = (function () {
         maxPos:        cfgVigente ? (cfgPos.max || 0) : 0,
         stockMin:      cfgVigente && cfgPos.min ? cfgPos.min : (U.toNum(get(fila, 'stockMin')) || 0),
         stockMax:      cfgVigente && cfgPos.max ? cfgPos.max : (U.toNum(get(fila, 'stockMax')) || 0),
+        paquete:       String(get(fila, 'paquete') || '').trim(),
         lote:          String(get(fila, 'lote') || '').trim(),
         lote2:         String(get(fila, 'lote2') || '').trim(),
         vencimiento:   U.toDate(get(fila, 'vencimiento'), fmtFecha)
@@ -3737,6 +3752,41 @@ VLM.views = (function () {
     return '<button class="chip' + (activo ? ' is-active' : '') + '" data-val="' + val + '">' + label + '</button>';
   }
 
+  /* ---------- paquete ----------
+     El código de empaque que trae la planilla. Es informativo: no filtra, no
+     se edita y no entra en ningún cálculo. La gente lo lee de la caja.
+
+     La forma habitual es PREFIJO-...-UNIDADES-PALLET-ARTICULO, por ejemplo
+     E-1-0-024-1152-110027286: 24 por caja y 1.152 por pallet. El artículo
+     siempre cierra el código, así que los dos números se cuentan desde el
+     final, que es lo único estable.
+
+     No todos siguen esa forma: los hay con un solo número (E-1-0-1000-ART) y
+     los hay que ni son códigos (LITERATURA, STD). Ahí se muestra el código
+     tal cual y no se inventa una lectura: mejor sin desglose que con uno
+     equivocado. */
+  function parsearPaquete(cod) {
+    const s = String(cod || '').trim();
+    if (!s) return null;
+    const p = s.split('-');
+    if (p.length < 6) return { codigo: s };
+    const caja   = U.toNum(p[p.length - 3]);
+    const pallet = U.toNum(p[p.length - 2]);
+    if (!(caja > 0) || !(pallet > 0)) return { codigo: s };
+    return { codigo: s, porCaja: caja, porPallet: pallet };
+  }
+
+  /** Celda de paquete: el código, y debajo el desglose si se pudo leer. */
+  function celdaPaquete(cod) {
+    const q = parsearPaquete(cod);
+    if (!q) return '<td class="t-paq">—</td>';
+    return '<td class="t-paq"><span class="paq-cod">' + U.esc(q.codigo) + '</span>' +
+      (q.porCaja
+        ? '<span class="paq-desglose">' + U.fmt(q.porCaja) + ' por caja · ' +
+          U.fmt(q.porPallet) + ' por pallet</span>'
+        : '') + '</td>';
+  }
+
   /** Aviso de que el lote que está en la posición no se puede continuar. */
   function chipFinDeLote() {
     return '<span class="alt-fin" title="En la reserva no queda el lote que ' +
@@ -3918,6 +3968,13 @@ VLM.views = (function () {
         badge(p.estado) + ' ' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</div>' +
       '<div class="muted small">' + U.esc(p.labNombre || p.laboratorio) +
         (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</div>' +
+      (function () {
+        const q = parsearPaquete(p.paquete);
+        if (!q) return '';
+        return '<div class="art-paq"><span class="paq-cod">' + U.esc(q.codigo) + '</span>' +
+          (q.porCaja ? '<span class="paq-desglose">' + U.fmt(q.porCaja) + ' por caja · ' +
+            U.fmt(q.porPallet) + ' por pallet</span>' : '') + '</div>';
+      })() +
       '</div>';
 
     html += '<div class="kpi-grid" style="margin:14px 0">' +
@@ -4176,7 +4233,7 @@ VLM.views = (function () {
           porSlot[k] = {
             clave: k, ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
             arts: [{ codigo: p.codigo, descripcion: p.descripcion }],
-            codigo: p.codigo, descripcion: p.descripcion,
+            codigo: p.codigo, descripcion: p.descripcion, paquete: p.paquete,
             stock: 0, min: c.min || 0, max: c.max || 0,
             artConfig: c.articulo || null
           };
@@ -4242,13 +4299,14 @@ VLM.views = (function () {
     html += '<div class="table-wrap"><table class="table" id="posTable">' +
       '<thead><tr>' +
         '<th class="no-sort">Posición</th><th class="no-sort">Zona</th>' +
-        '<th class="no-sort">Artículo</th><th class="no-sort t-num">Stock</th>' +
+        '<th class="no-sort">Artículo</th><th class="no-sort">Paquete</th>' +
+        '<th class="no-sort t-num">Stock</th>' +
         '<th class="no-sort t-num">Mínimo</th><th class="no-sort t-num">Máximo</th>' +
         '<th class="no-sort">Estado</th>' +
       '</tr></thead><tbody>';
 
     if (!vis.length) {
-      html += '<tr><td colspan="7"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
+      html += '<tr><td colspan="8"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
     } else {
       vis.forEach(f => {
         let est = '', clase = '';
@@ -4275,6 +4333,7 @@ VLM.views = (function () {
           '<td>' + zchip(f.zona) + '</td>' +
           '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
             (f.descripcion && f.descripcion !== f.codigo ? ' ' + U.esc(f.descripcion) : '') + '</td>' +
+          celdaPaquete(f.paquete) +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
           celdaInp(f, 'min') + celdaInp(f, 'max') +
           '<td>' + est + '</td>' +
@@ -4338,10 +4397,11 @@ VLM.views = (function () {
    * al reimportarlo la configuración no matchearía ninguna posición.
    */
   function exportarPosiciones(filas) {
-    const out = [['Posicion', 'Zona', 'Articulo', 'Descripcion', 'Stock', 'Minimo', 'Maximo']];
+    const out = [['Posicion', 'Zona', 'Articulo', 'Descripcion', 'Paquete', 'Stock', 'Minimo', 'Maximo']];
     filas.forEach(f => out.push([
       f.ubicacion, f.zona || '',
       f.codigo, f.descripcion === f.codigo ? '' : f.descripcion,
+      f.paquete || '',
       f.stock, f.min || '', f.max || ''
     ]));
 
