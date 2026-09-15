@@ -1,4 +1,4 @@
-# VLM Stock · Panel de control
+# CYPE Stock · Panel de control
 
 Panel web para visualizar el **stock de una torre de picking vertical (VLM)** a partir de una
 planilla Excel. Pensado para quedar proyectado en un televisor del depósito y que el equipo
@@ -26,14 +26,14 @@ Abrí `index.html` con doble clic. Listo.
 ```powershell
 .\build.ps1 -Demo
 ```
-Genera `dist\vlm-stock.html`: **un solo archivo** con todo adentro (CSS, librerías y código).
+Genera `dist\cype-stock.html`: **un solo archivo** con todo adentro (CSS, librerías y código).
 Lo copiás a un pendrive, doble clic y funciona en cualquier PC con Windows, sin internet,
 sin instalar nada y sin permisos de sistemas.
 
-`-Demo` genera además `dist\vlm-stock-demo.html`, que arranca con datos de ejemplo cargados.
+`-Demo` genera además `dist\cype-stock-demo.html`, que arranca con datos de ejemplo cargados.
 
 ### En la tele del trabajo
-1. Publicalo en GitHub Pages (ver más abajo).
+1. Publicalo en la web (ver más abajo).
 2. Abrí la URL en el navegador de la TV o de la PC conectada a la TV.
 3. Botón **Modo TV** → `F11` para pantalla completa.
 
@@ -389,7 +389,7 @@ git push -u origin main
 ```
 
 > El nombre del repo no lo usa el código para nada: todas las rutas son relativas, así que
-> renombrarlo no rompe nada. `dist/vlm-stock.html` es el nombre del archivo offline y va
+> renombrarlo no rompe nada. `dist/cype-stock.html` es el nombre del archivo offline y va
 > por su cuenta.
 
 ### 2. Conectar Cloudflare Pages

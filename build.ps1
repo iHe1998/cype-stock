@@ -8,7 +8,7 @@
   desde un pendrive y sin conexion a internet.
 
 .PARAMETER Demo
-  Genera ademas dist/vlm-stock-demo.html, que arranca con los datos de ejemplo
+  Genera ademas dist/cype-stock-demo.html, que arranca con los datos de ejemplo
   ya cargados (util para mostrarlo sin tener que subir una planilla).
 
 .EXAMPLE
@@ -87,10 +87,10 @@ if ($html -match '<script src=' -or $html -match '<link rel="stylesheet"') {
 
 New-Item -ItemType Directory -Force $dist | Out-Null
 
-$salida = Join-Path $dist 'vlm-stock.html'
+$salida = Join-Path $dist 'cype-stock.html'
 Write-Utf8 $salida $html
 $kb = [math]::Round((Get-Item $salida).Length / 1KB)
-Write-Host "`n  -> dist\vlm-stock.html  ($kb KB)" -ForegroundColor Green
+Write-Host "`n  -> dist\cype-stock.html  ($kb KB)" -ForegroundColor Green
 
 if ($Demo) {
   $auto = @'
@@ -119,10 +119,10 @@ window.addEventListener('load', function () {
   if ($i -lt 0) { throw "No se encontro </body> en index.html" }
   $htmlDemo = $html.Substring(0, $i) + $auto + $html.Substring($i + $cierre.Length)
 
-  $salidaDemo = Join-Path $dist 'vlm-stock-demo.html'
+  $salidaDemo = Join-Path $dist 'cype-stock-demo.html'
   Write-Utf8 $salidaDemo $htmlDemo
   $kbd = [math]::Round((Get-Item $salidaDemo).Length / 1KB)
-  Write-Host "  -> dist\vlm-stock-demo.html  ($kbd KB)" -ForegroundColor Green
+  Write-Host "  -> dist\cype-stock-demo.html  ($kbd KB)" -ForegroundColor Green
 }
 
 Write-Host "`nListo. Copia el archivo a un pendrive y abrilo con doble clic." -ForegroundColor Cyan
