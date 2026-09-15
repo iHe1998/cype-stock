@@ -383,10 +383,14 @@ que se pague Pro).
 ### 1. Subir el repo
 
 ```bash
-git remote add origin https://github.com/TU-USUARIO/vlm-stock.git
+git remote add origin https://github.com/TU-USUARIO/cype-stock.git
 git branch -M main
 git push -u origin main
 ```
+
+> El nombre del repo no lo usa el código para nada: todas las rutas son relativas, así que
+> renombrarlo no rompe nada. `dist/vlm-stock.html` es el nombre del archivo offline y va
+> por su cuenta.
 
 ### 2. Conectar Cloudflare Pages
 
