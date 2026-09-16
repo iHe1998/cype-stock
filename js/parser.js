@@ -697,9 +697,26 @@ VLM.parser = (function () {
     XLSX.writeFile(wb, 'plantilla_vlm.xlsx');
   }
 
+  /**
+   * ¿Esta posición de un artículo acepta mínimo y máximo?
+   *
+   * La reserva no. Un mínimo y un máximo dicen cuándo rellenar una posición y
+   * cuánto entra, y en altura —o en el pasillo que abastece al VLM— no se
+   * rellena nada: se saca. Cargarles un número sería inventar una alerta que
+   * nadie va a atender.
+   *
+   * Vive acá, y no adentro de quien la usa, porque la usan dos: la tabla de
+   * Posiciones y el asistente. Si se separaran, el asistente podría ofrecer
+   * cargar un máximo en una posición que la tabla no muestra y el número no
+   * aparecería en ningún lado.
+   */
+  function esConfigurable(det) {
+    return !!det && det.tipo !== 'altura';
+  }
+
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
-    autoMapear, normalizar, generarPlantilla,
+    autoMapear, normalizar, generarPlantilla, esConfigurable,
     detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, reaplicarReglas
   };
 })();

@@ -1234,3 +1234,116 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   .cfg-login { grid-template-columns: 1fr; }
   .cfg-permisos li { grid-template-columns: 1fr; gap: 5px; }
 }
+
+/* ============================================================
+   ASISTENTE · buscar y cambiar escribiendo
+
+   Paleta de comandos: caja arriba, no centrada. Se abre, se escribe y
+   se cierra; centrada obliga a bajar la vista para leer lo que salió.
+   ============================================================ */
+.modal-arriba { align-items: flex-start; padding-top: 8vh; }
+.ia-box { max-width: 760px; }
+
+.ia-barra {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.ia-barra > .ico { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.ia-barra input {
+  flex: 1; min-width: 0;
+  height: 32px; padding: 0;
+  font: inherit; font-size: 15px; color: var(--text);
+  background: none; border: 0; outline: none;
+}
+.ia-barra input::placeholder { color: var(--muted); }
+
+.ia-cuerpo { max-height: 62vh; overflow: auto; padding: 12px 14px 14px; }
+
+/* lo que entendió, antes de los resultados: si se equivocó, se ve por qué */
+.ia-entendido {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px; font-size: 12.5px; color: var(--text-2);
+}
+.ia-entendido strong { color: var(--text); font-weight: 650; }
+.ia-cuenta { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+.ia-fila {
+  display: grid; grid-template-columns: 74px minmax(0, 1fr) auto;
+  gap: 10px; align-items: center;
+  width: 100%; padding: 9px 10px; margin-bottom: 4px;
+  text-align: left; font: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.ia-fila:hover, .ia-fila:focus-visible { border-color: var(--accent); outline: none; }
+.ia-fila-txt { min-width: 0; }
+.ia-fila-txt strong { display: block; font-size: 13px; font-weight: 600; }
+.ia-fila-sub {
+  display: block; margin-top: 2px;
+  font-size: 11.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ia-fila-num {
+  text-align: right; font-size: 13px; font-weight: 650;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ia-fila-num span { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+
+/* tarjeta de confirmación: nada se cambia sin que se vea qué va a pasar */
+.ia-cambio {
+  padding: 14px 16px; margin-bottom: 10px;
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r);
+}
+.ia-cambio h4 { font-size: 14px; margin-bottom: 4px; }
+.ia-cambio p { font-size: 12.5px; color: var(--text-2); margin: 0; }
+.ia-flecha {
+  display: flex; align-items: baseline; gap: 10px;
+  margin: 10px 0 12px; font-variant-numeric: tabular-nums;
+}
+.ia-flecha b { font-size: 24px; font-weight: 750; }
+.ia-flecha .ia-antes { color: var(--muted); text-decoration: line-through; }
+.ia-flecha .ia-despues { color: var(--accent); }
+.ia-flecha small { font-size: 12px; color: var(--muted); }
+.ia-cambio .cfg-actions { margin-top: 0; }
+
+.ia-aviso {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 14px; margin-bottom: 10px; border-radius: var(--r);
+  font-size: 12.5px; color: var(--text);
+  background: var(--warn-dim);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-left: 3px solid var(--warn);
+}
+.ia-aviso .ico { width: 16px; height: 16px; flex: none; color: var(--warn); margin-top: 1px; }
+
+/* los ejemplos son la ayuda y la documentación: es lo que entiende */
+.ia-ejemplos { display: flex; flex-direction: column; gap: 3px; }
+.ia-ej-tit {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+}
+.ia-ej {
+  display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: 12px; align-items: baseline;
+  width: 100%; padding: 7px 9px; text-align: left; font: inherit;
+  background: none; border: 0; border-radius: var(--r-sm); cursor: pointer;
+}
+.ia-ej:hover { background: var(--surface-2); }
+.ia-ej code {
+  font-family: var(--mono); font-size: 12.5px; color: var(--accent);
+  background: none; padding: 0;
+}
+.ia-ej span { font-size: 12px; color: var(--muted); }
+.ia-nada { padding: 22px 6px; text-align: center; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 620px) {
+  .modal-arriba { padding-top: 0; }
+  .ia-fila { grid-template-columns: 62px minmax(0, 1fr); }
+  .ia-fila-num { grid-column: 2; text-align: left; }
+  .ia-ej { grid-template-columns: 1fr; gap: 2px; }
+}

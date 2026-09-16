@@ -777,12 +777,9 @@ VLM.views = (function () {
     items.forEach(p => {
       (p.detalle || []).forEach(d => {
         if (!d.ubicacion) return;
-        // La reserva no se configura. Un mínimo y un máximo dicen cuándo
-        // rellenar una posición y cuánto entra; en altura —o en el pasillo que
-        // abastece al VLM— no se rellena nada, se saca. Cargarles un número
-        // sería inventar una alerta que nadie va a atender, y son la mayoría
-        // de las filas: taparían las que sí importan.
-        if (d.tipo === 'altura') { enReserva++; return; }
+        // La reserva no se configura (ver parser.esConfigurable): son la
+        // mayoría de las filas y taparían las que sí importan.
+        if (!VLM.parser.esConfigurable(d)) { enReserva++; return; }
         const u = d.ubicacion.toUpperCase();
         const k = u + '|' + String(p.codigo).toUpperCase();
         if (!artsPorUbic[u]) artsPorUbic[u] = {};

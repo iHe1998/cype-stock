@@ -30,6 +30,7 @@ VLM.app = (function () {
     wireSettings();
     wireNube();
     wireCfgNav();
+    wireAsistente();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       if (motivo === 'posiciones') reaplicarPosiciones();
@@ -81,6 +82,16 @@ VLM.app = (function () {
   }
 
   /**
+   * Todos los artículos con sus métricas, SIN los filtros de la barra.
+   * El asistente busca sobre esto: pedirle un SKU y que no aparezca porque
+   * la pantalla estaba filtrada por frío sería desconcertante.
+   */
+  function itemsCalculados() {
+    if (!calculados) calculados = A.calcular(S.state.productos, S.state.cfg);
+    return calculados;
+  }
+
+  /**
    * Productos que se muestran: calculados, sin los laboratorios fuera del
    * catálogo (si así está configurado) y filtrados por ámbito, conservación
    * y laboratorio.
@@ -90,11 +101,9 @@ VLM.app = (function () {
    *   habría cómo volver.
    */
   function itemsVisibles(sinLab) {
-    const cfg = S.state.cfg, ui = S.state.ui;
-    if (!calculados) {
-      calculados = A.calcular(S.state.productos, cfg);
-    }
-    let items = calculados;
+    const ui = S.state.ui;
+    let items = itemsCalculados();
+    const cfg = S.state.cfg;
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
     items = A.filtrarPorZona(items, ui);
     // el laboratorio es un filtro global como los otros dos: afecta al resumen
@@ -340,6 +349,178 @@ VLM.app = (function () {
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && !VLM.tv.activo) $$('.modal').forEach(m => m.hidden = true);
     });
+  }
+
+  /* ============================================================
+     ASISTENTE · buscar y cambiar datos escribiendo
+
+     La interpretación de la frase vive en asistente.js; acá está sólo
+     lo que se ve y lo que se aplica. Nada se cambia sin que antes se
+     muestre qué va a pasar y alguien lo confirme: una frase mal
+     entendida no puede pisar un máximo de callado.
+     ============================================================ */
+  function wireAsistente() {
+    const inp = $('#iaInput');
+    $('#btnAsistente').addEventListener('click', abrirAsistente);
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault(); abrirAsistente();
+      }
+    });
+    inp.addEventListener('input', U.debounce(pintarAsistente, 110));
+    // escribir y dar Enter: lo normal es aceptar lo primero que salió
+    inp.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const primero = $('#iaCuerpo .ia-fila, #iaCuerpo .ia-aplicar');
+      if (primero) primero.click();
+    });
+  }
+
+  function abrirAsistente() {
+    if (!S.hayDatos()) { U.toast('Cargá el stock antes de usar el buscador', 'err'); return; }
+    $('#modalIA').hidden = false;
+    $('#iaInput').value = '';
+    pintarAsistente();
+    $('#iaInput').focus();
+  }
+
+  function pintarAsistente() {
+    const cuerpo = $('#iaCuerpo');
+    const r = VLM.asistente.interpretar($('#iaInput').value, itemsCalculados());
+    if (r.accion === 'ayuda')  return iaEjemplos(cuerpo);
+    if (r.accion === 'ir')     return iaIr(cuerpo, r);
+    if (r.accion === 'cambio') return iaCambio(cuerpo, r);
+    iaResultados(cuerpo, r);
+  }
+
+  function iaEntendido(txt, cuenta) {
+    return '<div class="ia-entendido">Entendí: <strong>' + U.esc(txt) + '</strong>' +
+      (cuenta === undefined ? '' :
+        '<span class="ia-cuenta">' + U.fmt(cuenta) + (cuenta === 1 ? ' resultado' : ' resultados') + '</span>') +
+      '</div>';
+  }
+
+  function iaAviso(txt) {
+    return '<div class="ia-aviso"><svg viewBox="0 0 24 24" class="ico">' +
+      '<path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 16.5h.01"/></svg>' +
+      '<div>' + U.esc(txt) + '</div></div>';
+  }
+
+  /**
+   * @param mostrarTodas para "dónde está X": las ubicaciones, no sólo la primera
+   * @param campo 'min'|'max' si la frase pidió ese dato: se muestra ese
+   */
+  function iaFila(p, mostrarTodas, campo) {
+    const ub = mostrarTodas ? (p.ubicaciones || []).join(' · ') : p.ubicacion;
+    const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
+    const hayMax = p.stockMax > 0;
+    const num = campo === 'min'
+      ? U.fmt(p.stockMin || 0) + '<span>de mínimo</span>'
+      : U.fmt(ref) + (hayMax ? ' / ' + U.fmt(p.stockMax) : '') +
+        '<span>' + (hayMax ? 'de su máximo' : 'sin máximo') + '</span>';
+    return '<button class="ia-fila" data-cod="' + U.esc(p.codigo) + '">' +
+      V.badge(p.estado) +
+      '<span class="ia-fila-txt"><strong>' + U.esc(p.descripcion || p.codigo) + '</strong>' +
+      '<span class="ia-fila-sub">' + U.esc(p.codigo) + ' · ' +
+        U.esc(p.labNombre || p.laboratorio) + (ub ? ' · 📍 ' + U.esc(ub) : '') + '</span></span>' +
+      '<span class="ia-fila-num">' + num + '</span>' +
+      '</button>';
+  }
+
+  /** Clic en un resultado: abre el detalle del artículo. */
+  function iaAlDetalle(cuerpo) {
+    $$('.ia-fila', cuerpo).forEach(b => b.addEventListener('click', () => {
+      $('#modalIA').hidden = true;
+      abrirArticulo(b.dataset.cod, itemsCalculados(), S.state.cfg);
+    }));
+  }
+
+  function iaEjemplos(cuerpo) {
+    cuerpo.innerHTML = '<div class="ia-ej-tit">Probá con</div><div class="ia-ejemplos">' +
+      VLM.asistente.ejemplos(itemsCalculados()).map(e =>
+        '<button class="ia-ej" data-ej="' + U.esc(e.txt) + '"><code>' + U.esc(e.txt) +
+        '</code><span>' + U.esc(e.que) + '</span></button>').join('') + '</div>';
+    $$('.ia-ej', cuerpo).forEach(b => b.addEventListener('click', () => {
+      $('#iaInput').value = b.dataset.ej;
+      pintarAsistente();
+      $('#iaInput').focus();
+    }));
+  }
+
+  function iaResultados(cuerpo, r) {
+    if (!r.items.length) {
+      cuerpo.innerHTML = iaEntendido(r.entendido, 0) +
+        '<div class="ia-nada">Ningún artículo coincide.</div>';
+      return;
+    }
+    const TOPE = 40;
+    const lista = r.items.slice(0, TOPE);
+    cuerpo.innerHTML = iaEntendido(r.entendido, r.items.length) +
+      lista.map(p => iaFila(p, !!r.filtros.donde, r.filtros.campo)).join('') +
+      (r.items.length > TOPE
+        ? '<div class="ia-nada">y ' + U.fmt(r.items.length - TOPE) + ' más · afiná la búsqueda</div>' : '');
+    iaAlDetalle(cuerpo);
+  }
+
+  function iaIr(cuerpo, r) {
+    cuerpo.innerHTML = '<div class="ia-cambio"><h4>' + U.esc(r.entendido) + '</h4>' +
+      '<div class="cfg-actions" style="margin-top:12px">' +
+      '<button class="btn btn-primary ia-aplicar" id="iaIr">Ir</button></div></div>';
+    $('#iaIr').addEventListener('click', () => {
+      $('#modalIA').hidden = true;
+      if (r.destino === 'tv') VLM.tv.entrar(itemsVisibles(), S.state.cfg, S.state.ui.filtroLab);
+      else if (r.destino === 'config') abrirSettings();
+      else irA(r.vista);
+    });
+  }
+
+  function iaCambio(cuerpo, r) {
+    const etiqueta = r.campo === 'max' ? 'máximo' : 'mínimo';
+
+    // varios artículos coinciden: elegir uno reescribe la frase con su código
+    if (r.candidatos) {
+      cuerpo.innerHTML = iaEntendido(r.entendido) + iaAviso(r.problema) +
+        r.candidatos.map(p => iaFila(p)).join('') +
+        (r.total > r.candidatos.length
+          ? '<div class="ia-nada">y ' + U.fmt(r.total - r.candidatos.length) + ' más</div>' : '');
+      $$('.ia-fila', cuerpo).forEach(b => b.addEventListener('click', () => {
+        $('#iaInput').value = etiqueta + ' ' + r.valor + ' ' + b.dataset.cod;
+        pintarAsistente();
+        $('#iaInput').focus();
+      }));
+      return;
+    }
+
+    if (r.problema) {
+      cuerpo.innerHTML = iaEntendido(r.entendido) + iaAviso(r.problema);
+      return;
+    }
+
+    const trabado = !VLM.nube.puedeEditar();
+    cuerpo.innerHTML = iaEntendido(r.entendido) +
+      (trabado ? iaAviso('Hace falta iniciar sesión con una cuenta autorizada para cambiar valores.') : '') +
+      r.posiciones.map((pos, i) =>
+        '<div class="ia-cambio">' +
+          '<h4>' + U.esc(r.producto.descripcion || r.producto.codigo) + '</h4>' +
+          '<p>' + U.esc(r.producto.codigo) + ' · 📍 ' + U.esc(pos.ubicacion) +
+            ' · ' + U.fmt(pos.stock) + ' en esa posición</p>' +
+          '<div class="ia-flecha">' +
+            '<b class="ia-antes">' + U.fmt(pos[r.campo] || 0) + '</b><span>→</span>' +
+            '<b class="ia-despues">' + U.fmt(r.valor) + '</b>' +
+            '<small>' + etiqueta + '</small>' +
+          '</div>' +
+          '<div class="cfg-actions"><button class="btn btn-primary ia-aplicar" data-i="' + i + '"' +
+            (trabado ? ' disabled' : '') + '>Aplicar</button></div>' +
+        '</div>').join('');
+
+    $$('.ia-aplicar', cuerpo).forEach(b => b.addEventListener('click', () => {
+      const pos = r.posiciones[+b.dataset.i];
+      const cambio = {}; cambio[r.campo] = r.valor;
+      S.setPosicion(pos.ubicacion, cambio, r.producto.codigo);
+      U.toast(etiqueta + ' de ' + (r.producto.descripcion || r.producto.codigo) +
+              ' en ' + pos.ubicacion + ': ' + U.fmt(r.valor), 'ok');
+      $('#modalIA').hidden = true;
+    }));
   }
 
   function wireTabs() {

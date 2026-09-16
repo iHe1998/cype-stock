@@ -1244,6 +1244,119 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   .cfg-permisos li { grid-template-columns: 1fr; gap: 5px; }
 }
 
+/* ============================================================
+   ASISTENTE · buscar y cambiar escribiendo
+
+   Paleta de comandos: caja arriba, no centrada. Se abre, se escribe y
+   se cierra; centrada obliga a bajar la vista para leer lo que salió.
+   ============================================================ */
+.modal-arriba { align-items: flex-start; padding-top: 8vh; }
+.ia-box { max-width: 760px; }
+
+.ia-barra {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.ia-barra > .ico { width: 18px; height: 18px; color: var(--muted); flex: none; }
+.ia-barra input {
+  flex: 1; min-width: 0;
+  height: 32px; padding: 0;
+  font: inherit; font-size: 15px; color: var(--text);
+  background: none; border: 0; outline: none;
+}
+.ia-barra input::placeholder { color: var(--muted); }
+
+.ia-cuerpo { max-height: 62vh; overflow: auto; padding: 12px 14px 14px; }
+
+/* lo que entendió, antes de los resultados: si se equivocó, se ve por qué */
+.ia-entendido {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px; font-size: 12.5px; color: var(--text-2);
+}
+.ia-entendido strong { color: var(--text); font-weight: 650; }
+.ia-cuenta { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+.ia-fila {
+  display: grid; grid-template-columns: 74px minmax(0, 1fr) auto;
+  gap: 10px; align-items: center;
+  width: 100%; padding: 9px 10px; margin-bottom: 4px;
+  text-align: left; font: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.ia-fila:hover, .ia-fila:focus-visible { border-color: var(--accent); outline: none; }
+.ia-fila-txt { min-width: 0; }
+.ia-fila-txt strong { display: block; font-size: 13px; font-weight: 600; }
+.ia-fila-sub {
+  display: block; margin-top: 2px;
+  font-size: 11.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ia-fila-num {
+  text-align: right; font-size: 13px; font-weight: 650;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ia-fila-num span { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+
+/* tarjeta de confirmación: nada se cambia sin que se vea qué va a pasar */
+.ia-cambio {
+  padding: 14px 16px; margin-bottom: 10px;
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r);
+}
+.ia-cambio h4 { font-size: 14px; margin-bottom: 4px; }
+.ia-cambio p { font-size: 12.5px; color: var(--text-2); margin: 0; }
+.ia-flecha {
+  display: flex; align-items: baseline; gap: 10px;
+  margin: 10px 0 12px; font-variant-numeric: tabular-nums;
+}
+.ia-flecha b { font-size: 24px; font-weight: 750; }
+.ia-flecha .ia-antes { color: var(--muted); text-decoration: line-through; }
+.ia-flecha .ia-despues { color: var(--accent); }
+.ia-flecha small { font-size: 12px; color: var(--muted); }
+.ia-cambio .cfg-actions { margin-top: 0; }
+
+.ia-aviso {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 14px; margin-bottom: 10px; border-radius: var(--r);
+  font-size: 12.5px; color: var(--text);
+  background: var(--warn-dim);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-left: 3px solid var(--warn);
+}
+.ia-aviso .ico { width: 16px; height: 16px; flex: none; color: var(--warn); margin-top: 1px; }
+
+/* los ejemplos son la ayuda y la documentación: es lo que entiende */
+.ia-ejemplos { display: flex; flex-direction: column; gap: 3px; }
+.ia-ej-tit {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+}
+.ia-ej {
+  display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: 12px; align-items: baseline;
+  width: 100%; padding: 7px 9px; text-align: left; font: inherit;
+  background: none; border: 0; border-radius: var(--r-sm); cursor: pointer;
+}
+.ia-ej:hover { background: var(--surface-2); }
+.ia-ej code {
+  font-family: var(--mono); font-size: 12.5px; color: var(--accent);
+  background: none; padding: 0;
+}
+.ia-ej span { font-size: 12px; color: var(--muted); }
+.ia-nada { padding: 22px 6px; text-align: center; color: var(--muted); font-size: 13px; }
+
+@media (max-width: 620px) {
+  .modal-arriba { padding-top: 0; }
+  .ia-fila { grid-template-columns: 62px minmax(0, 1fr); }
+  .ia-fila-num { grid-column: 2; text-align: left; }
+  .ia-ej { grid-template-columns: 1fr; gap: 2px; }
+}
+
 </style>
 </head>
 <body>
@@ -1276,6 +1389,10 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     <button class="btn" id="btnTV" title="Modo televisor">
       <svg viewBox="0 0 24 24" class="ico"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/></svg>
       Modo TV
+    </button>
+    <button class="btn" id="btnAsistente" title="Buscar o cambiar datos escribiendo (Ctrl+K)">
+      <svg viewBox="0 0 24 24" class="ico"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      Buscar
     </button>
     <button class="btn btn-icon" id="btnSettings" title="Configuración">
       <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="3"/><path d="M19.9 14.6a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.8 1.1v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-2.8-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.8h-.2a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 2.8-1.1V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 2.8 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.8h.2a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
@@ -1679,10 +1796,25 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 16/09/2026 02:03 - 93dfe26</span>
+      <span class="muted small" id="appVersion">compilado 16/09/2026 18:25 - 7c70ce8</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
+  </div>
+</div>
+
+<!-- ============ ASISTENTE ============ -->
+<div class="modal modal-arriba" id="modalIA" hidden>
+  <div class="modal-box ia-box">
+    <div class="ia-barra">
+      <svg viewBox="0 0 24 24" class="ico"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="text" id="iaInput" autocomplete="off" spellcheck="false"
+             placeholder="Pedí lo que necesites: qué hay que reponer · críticos de frío · sin máximo">
+      <button class="btn btn-icon" data-close title="Cerrar (Esc)">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="ia-cuerpo" id="iaCuerpo"></div>
   </div>
 </div>
 
@@ -3616,11 +3748,401 @@ VLM.parser = (function () {
     XLSX.writeFile(wb, 'plantilla_vlm.xlsx');
   }
 
+  /**
+   * ¿Esta posición de un artículo acepta mínimo y máximo?
+   *
+   * La reserva no. Un mínimo y un máximo dicen cuándo rellenar una posición y
+   * cuánto entra, y en altura —o en el pasillo que abastece al VLM— no se
+   * rellena nada: se saca. Cargarles un número sería inventar una alerta que
+   * nadie va a atender.
+   *
+   * Vive acá, y no adentro de quien la usa, porque la usan dos: la tabla de
+   * Posiciones y el asistente. Si se separaran, el asistente podría ofrecer
+   * cargar un máximo en una posición que la tabla no muestra y el número no
+   * aparecería en ningún lado.
+   */
+  function esConfigurable(det) {
+    return !!det && det.tipo !== 'altura';
+  }
+
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
-    autoMapear, normalizar, generarPlantilla,
+    autoMapear, normalizar, generarPlantilla, esConfigurable,
     detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, reaplicarReglas
   };
+})();
+
+</script>
+<script>
+/* ============================================================
+   asistente.js · pedirle cosas al panel escribiendo en español
+
+   No es un modelo de lenguaje: es un intérprete de frases sobre un
+   vocabulario cerrado —SKU, laboratorio, ubicación, lote, mínimo,
+   máximo, frío/ambiente, VLM/fuera—, que es todo lo que se le puede
+   pedir a este panel.
+
+   Por qué así y no una IA de las que se conectan a internet:
+     - anda sin conexión y adentro del archivo suelto del pendrive;
+     - no tiene tope de uso ni clave que se pueda robar de un sitio
+       público, que es lo que pasa con una clave de API en el navegador;
+     - contesta al instante, sin esperar a un servidor;
+     - y lo que más importa acá: NO INVENTA. Si no entiende, lo dice.
+       Un modelo que improvisa una ubicación manda a una persona al
+       pasillo equivocado, y eso es peor que no contestar.
+
+   El precio es que sólo entiende lo que está en este archivo. Agregar
+   una forma nueva de decir algo es sumarla a las listas de abajo.
+
+   Las frases van SIN TILDES y en minúscula: se comparan contra el texto
+   ya normalizado por util.norm, que saca acentos y puntuación.
+   ============================================================ */
+window.VLM = window.VLM || {};
+
+VLM.asistente = (function () {
+  const U = VLM.util;
+
+  /* ------------------------------------------------------------
+     Vocabulario
+     ------------------------------------------------------------ */
+  const ESTADO = {
+    agotado: ['agotado', 'agotados', 'sin stock', 'vacio', 'vacios', 'en cero'],
+    critico: ['critico', 'criticos', 'en rojo', 'rojo', 'rojos', 'urgente', 'urgentes'],
+    bajo:    ['bajo', 'bajos', 'en amarillo', 'amarillo', 'amarillos'],
+    ok:      ['ok', 'en verde', 'verde', 'verdes'],
+    exceso:  ['exceso', 'excedido', 'excedidos', 'de mas', 'sobrante', 'sobrantes']
+  };
+
+  const ZONA = {
+    frio:     ['frio', 'frios', 'refrigerado', 'refrigerados', 'cadena de frio', 'heladera', 'termolabil'],
+    ambiente: ['ambiente', 'temperatura ambiente', 'seco', 'secos']
+  };
+
+  const AMBITO = {
+    vlm:     ['vlm', 'torre', 'en la torre', 'modula'],
+    externo: ['externo', 'externos', 'fuera del vlm', 'fuera de la torre', 'afuera', 'fuera', 'pasillo']
+  };
+
+  const CAMPO = {
+    max: ['maximo', 'maximos', 'max', 'capacidad', 'tope'],
+    min: ['minimo', 'minimos', 'min', 'punto de pedido']
+  };
+
+  const VISTA = {
+    dashboard: ['resumen', 'tablero'],
+    labs:      ['laboratorios'],
+    repo:      ['reposicion', 'reposiciones'],
+    inv:       ['inventario'],
+    pos:       ['posiciones']
+  };
+
+  /* Sólo con uno de estos adelante una frase es "andá a tal lado". Sin
+     verbo, "reposicion" es una búsqueda de lo que hay que reponer. */
+  const VERBO_IR    = ['ir a', 'anda a', 'andate a', 'llevame a', 'abrir', 'abri', 'abrime', 'mostrar', 'mostrame'];
+  const VERBO_SACAR = ['sacar', 'saca', 'sacale', 'borrar', 'borra', 'borrale',
+                       'quitar', 'quita', 'quitale', 'eliminar', 'elimina'];
+  const REPONER     = ['que hay que reponer', 'que tengo que reponer', 'que reponer',
+                       'que repongo', 'a reponer', 'para reponer', 'reponer', 'faltantes'];
+  const SIN_MAXIMO  = ['sin maximo', 'sin maximos', 'sin configurar', 'sin capacidad',
+                       'no configurados', 'falta configurar'];
+  const DONDE       = ['donde esta', 'donde estan', 'donde hay', 'donde queda', 'ubicacion de', 'donde'];
+
+  /* Palabras que no dicen nada sobre QUÉ se busca: sobran tanto para
+     entender la frase como para comparar contra los artículos. */
+  const RELLENO = ['pone', 'poner', 'ponele', 'poneles', 'cambiar', 'cambia', 'cambiale',
+                   'fijar', 'fija', 'fijale', 'setear', 'dejar', 'deja', 'dejale',
+                   'buscar', 'busca', 'buscame', 'ver', 'dame', 'decime', 'mostrar',
+                   'de', 'del', 'a', 'al', 'en', 'el', 'la', 'lo', 'los', 'las',
+                   'un', 'una', 'unos', 'unas', 'para', 'con', 'que', 'es', 'sea',
+                   'articulo', 'articulos', 'sku', 'skus', 'producto', 'productos',
+                   'item', 'items', 'codigo', 'y', 'e', 'o', 'u', 'me', 'se', 'su', 'sus',
+                   /* "el lote 5J012A" busca 5J012A: la palabra "lote" no está
+                      escrita en ningún dato, así que dejarla daba cero
+                      resultados. Ojo con sumar acá "posicion": es una vista y
+                      rompería "ir a posiciones". */
+                   'lote', 'lotes', 'partida', 'batch', 'nro', 'numero', 'ubicacion',
+                   'todos', 'todas', 'todo', 'toda', 'hay', 'tiene', 'tienen', 'esta', 'estan'];
+
+  /* ------------------------------------------------------------
+     Herramientas de texto
+     ------------------------------------------------------------ */
+
+  /**
+   * Saca una frase del texto, pero sólo si está como palabras enteras:
+   * "min" no tiene que picar dentro de "administracion". Devuelve el
+   * texto sin la frase, o null si no estaba.
+   */
+  function quitarFrase(texto, frase) {
+    const t = ' ' + texto + ' ';
+    const i = t.indexOf(' ' + frase + ' ');
+    if (i < 0) return null;
+    return (t.slice(0, i) + ' ' + t.slice(i + frase.length + 2)).replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Busca en la tabla de sinónimos la frase MÁS LARGA que aparezca.
+   * El largo importa: "cadena de frio" tiene que ganarle a "frio", y
+   * "fuera del vlm" a "vlm", o se entiende al revés.
+   */
+  function extraer(texto, tabla) {
+    let mejorValor = null, mejorFrase = '';
+    Object.keys(tabla).forEach(valor => tabla[valor].forEach(frase => {
+      if (frase.length <= mejorFrase.length) return;
+      if (quitarFrase(texto, frase) === null) return;
+      mejorValor = valor; mejorFrase = frase;
+    }));
+    if (!mejorValor) return null;
+    return { valor: mejorValor, frase: mejorFrase, resto: quitarFrase(texto, mejorFrase) };
+  }
+
+  /** Igual que extraer pero con una lista suelta: devuelve el resto o null. */
+  function quitarAlguna(texto, lista) {
+    let mejor = '';
+    lista.forEach(frase => {
+      if (frase.length > mejor.length && quitarFrase(texto, frase) !== null) mejor = frase;
+    });
+    return mejor ? { frase: mejor, resto: quitarFrase(texto, mejor) } : null;
+  }
+
+  /** ¿Arranca con alguna de estas frases? Devuelve el resto o null. */
+  function empiezaCon(texto, lista) {
+    let mejor = '';
+    lista.forEach(f => {
+      if (f.length > mejor.length && (texto === f || texto.indexOf(f + ' ') === 0)) mejor = f;
+    });
+    return mejor ? texto.slice(mejor.length).trim() : null;
+  }
+
+  function limpiarRelleno(texto) {
+    return texto.split(' ').filter(w => w && RELLENO.indexOf(w) === -1).join(' ').trim();
+  }
+
+  /* ------------------------------------------------------------
+     Búsqueda sobre los artículos
+     ------------------------------------------------------------ */
+
+  /** Todo lo que de un artículo se puede escribir en el buscador. */
+  function textoDe(p) {
+    return U.norm([
+      p.codigo, p.descripcion, p.laboratorio, p.labNombre, p.lote, p.lote2,
+      p.paquete, p.ubicacion,
+      (p.detalle || []).map(d => (d.ubicacion || '') + ' ' + (d.lote || '')).join(' ')
+    ].join(' '));
+  }
+
+  /** Todas las palabras tienen que aparecer: así "lantus 100" afina. */
+  function porTexto(consulta, items) {
+    const palabras = consulta.split(' ').filter(Boolean);
+    if (!palabras.length) return items.slice();
+    return items.filter(p => {
+      const t = textoDe(p);
+      return palabras.every(w => t.indexOf(w) > -1);
+    });
+  }
+
+  /**
+   * Posiciones del artículo que aceptan mínimo y máximo.
+   *
+   * Es la MISMA regla que usa la tabla de Posiciones (parser.esConfigurable):
+   * la reserva no se configura. Tienen que coincidir o el asistente ofrecería
+   * cargar un número en una posición que la tabla no muestra, y el valor no
+   * aparecería en ningún lado.
+   */
+  function posicionesDe(p) {
+    const cfg = VLM.store.state.posiciones;
+    const vistas = {};
+    (p.detalle || []).forEach(d => {
+      if (!d.ubicacion || !VLM.parser.esConfigurable(d)) return;
+      const u = String(d.ubicacion).toUpperCase();
+      if (!vistas[u]) {
+        const c = cfg[u + '|' + String(p.codigo).toUpperCase()] || cfg[u] || {};
+        vistas[u] = { ubicacion: d.ubicacion, stock: 0, min: c.min || 0, max: c.max || 0 };
+      }
+      vistas[u].stock += d.stock || 0;
+    });
+    return Object.keys(vistas).map(k => vistas[k]);
+  }
+
+  /* ------------------------------------------------------------
+     Interpretación
+     ------------------------------------------------------------ */
+
+  /**
+   * Convierte una frase en algo que el panel pueda hacer.
+   *
+   * @param texto lo que escribió la persona
+   * @param items artículos ya calculados (con estado, ocupación, etc.)
+   * @returns { accion: 'ayuda' | 'ir' | 'cambio' | 'buscar', ... }
+   */
+  function interpretar(texto, items) {
+    const t = U.norm(texto);
+    if (!t) return { accion: 'ayuda' };
+    items = items || [];
+
+    return interpretarIr(t)
+        || interpretarCambio(t, items)
+        || interpretarBusqueda(t, items);
+  }
+
+  /* ---------- "ir a ..." ---------- */
+  function interpretarIr(t) {
+    if (quitarFrase(t, 'modo tv') !== null || t === 'tv') {
+      return { accion: 'ir', destino: 'tv', entendido: 'Entrar al modo TV' };
+    }
+    const sinVerbo = empiezaCon(t, VERBO_IR);
+    const objetivo = sinVerbo === null ? t : limpiarRelleno(sinVerbo);
+    if (objetivo === 'configuracion' || objetivo === 'ajustes') {
+      return { accion: 'ir', destino: 'config', entendido: 'Abrir la configuración' };
+    }
+    // sin verbo adelante, "reposicion" es "qué hay que reponer", no "andá ahí"
+    if (sinVerbo === null) return null;
+    const v = extraer(objetivo, VISTA);
+    if (!v || v.resto) return null;
+    return { accion: 'ir', destino: 'vista', vista: v.valor,
+             entendido: 'Ir a ' + v.frase };
+  }
+
+  /* ---------- "poné 120 de máximo a ..." ---------- */
+  function interpretarCambio(t, items) {
+    const c = extraer(t, CAMPO);
+    if (!c) return null;
+
+    const sacar = quitarAlguna(t, VERBO_SACAR);
+    /* Hasta 5 dígitos: una cantidad de picking nunca llega a 99.999, y los
+       códigos de artículo son de 9. Así "mínimo 30 al 110027286" sabe que 30
+       es el valor y 110027286 el artículo, sin tener que adivinar. */
+    const num = c.resto.match(/(?:^|\s)(\d{1,5})(?:\s|$)/);
+
+    // "máximos de Roche" no es un cambio: es una búsqueda. Hace falta un
+    // número, o decir explícitamente que se saca.
+    if (!num && !sacar) return null;
+
+    const campo = c.valor;
+    const valor = num ? parseInt(num[1], 10) : 0;
+    let resto = num ? quitarFrase(c.resto, num[1]) : c.resto;
+    if (sacar) resto = quitarAlguna(resto, VERBO_SACAR) ? quitarAlguna(resto, VERBO_SACAR).resto : resto;
+    resto = limpiarRelleno(resto || '');
+
+    const etiqueta = campo === 'max' ? 'máximo' : 'mínimo';
+    const base = num ? 'Poner ' + valor + ' de ' + etiqueta : 'Sacar el ' + etiqueta;
+
+    if (!resto) {
+      return { accion: 'cambio', campo, valor, entendido: base,
+               problema: 'Falta decir de qué artículo. Probá con el código o parte del nombre.' };
+    }
+
+    const encontrados = porTexto(resto, items);
+    if (!encontrados.length) {
+      return { accion: 'cambio', campo, valor, entendido: base + ' a «' + resto + '»',
+               problema: 'No hay ningún artículo que coincida con «' + resto + '».' };
+    }
+    if (encontrados.length > 1) {
+      return { accion: 'cambio', campo, valor, entendido: base,
+               candidatos: encontrados.slice(0, 12), total: encontrados.length,
+               problema: 'Coinciden ' + encontrados.length + ' artículos. Elegí cuál:' };
+    }
+
+    const p = encontrados[0];
+    const posiciones = posicionesDe(p);
+    if (!posiciones.length) {
+      return { accion: 'cambio', campo, valor, producto: p,
+               entendido: base + ' a ' + (p.descripcion || p.codigo),
+               problema: 'Ese artículo no tiene posiciones de picking: todo su stock es reserva, ' +
+                         'y la reserva no lleva mínimo ni máximo.' };
+    }
+    return { accion: 'cambio', campo, valor, producto: p, posiciones,
+             entendido: base + ' a ' + (p.descripcion || p.codigo) };
+  }
+
+  /* ---------- todo lo demás es buscar ---------- */
+  function interpretarBusqueda(t, items) {
+    const filtros = {};
+    const partes = [];
+    let resto = t;
+
+    const donde = empiezaCon(resto, DONDE);
+    if (donde !== null) { filtros.donde = true; resto = donde; }
+
+    const rep = quitarAlguna(resto, REPONER);
+    if (rep) { filtros.reponer = true; resto = rep.resto; partes.push('a reponer'); }
+
+    const sinMax = quitarAlguna(resto, SIN_MAXIMO);
+    if (sinMax) { filtros.sinMaximo = true; resto = sinMax.resto; partes.push('sin máximo cargado'); }
+
+    const e = extraer(resto, ESTADO);
+    if (e) { filtros.estado = e.valor; resto = e.resto; partes.push('en ' + e.valor.toUpperCase()); }
+
+    const z = extraer(resto, ZONA);
+    if (z) { filtros.zona = z.valor; resto = z.resto; partes.push(z.valor === 'frio' ? 'de frío' : 'de ambiente'); }
+
+    const a = extraer(resto, AMBITO);
+    if (a) { filtros.ambito = a.valor; resto = a.resto; partes.push(a.valor === 'vlm' ? 'dentro del VLM' : 'fuera del VLM'); }
+
+    /* Un campo suelto sin número —"máximos de Roche"— no cambia nada: es una
+       búsqueda que además dice qué columna mirar. */
+    const campo = extraer(resto, CAMPO);
+    if (campo) {
+      filtros.campo = campo.valor; resto = campo.resto;
+      partes.push(campo.valor === 'max' ? 'con su máximo' : 'con su mínimo');
+    }
+
+    const texto = limpiarRelleno(resto);
+    if (texto) partes.unshift('«' + texto + '»');
+
+    let res = items;
+    if (filtros.reponer)   res = res.filter(p => ['agotado', 'critico', 'bajo'].indexOf(p.estado) > -1);
+    if (filtros.estado)    res = res.filter(p => p.estado === filtros.estado);
+    if (filtros.zona)      res = res.filter(p => p.conservacion === filtros.zona);
+    if (filtros.ambito)    res = res.filter(p => p.ambito === filtros.ambito);
+    if (filtros.sinMaximo) res = res.filter(p => !p.tieneConfigPos);
+    if (texto)             res = porTexto(texto, res);
+
+    // lo más urgente primero, que es lo que se suele estar buscando
+    res = res.slice().sort((x, y) => {
+      const ux = x.urgencia === null || x.urgencia === undefined ? 99 : x.urgencia;
+      const uy = y.urgencia === null || y.urgencia === undefined ? 99 : y.urgencia;
+      return ux - uy;
+    });
+
+    return {
+      accion: 'buscar', filtros, texto, items: res,
+      entendido: partes.length ? 'Artículos ' + partes.join(', ') : 'Todos los artículos'
+    };
+  }
+
+  /**
+   * Lo que se muestra con la caja vacía. Además de ayudar es la documentación
+   * de lo que entiende.
+   *
+   * Los ejemplos salen del stock que está cargado, no inventados: un ejemplo
+   * con un artículo que no existe contesta "no coincide" en el primer intento
+   * y parece roto justo cuando la persona está probando si sirve.
+   */
+  function ejemplos(items) {
+    items = items || [];
+    const conNombre = items.filter(p => p.descripcion && p.descripcion !== p.codigo);
+    const p = conNombre[0] || items[0];
+    const nombre = p ? (p.descripcion || p.codigo).split(' ')[0] : 'Lantus';
+    const codigo = p ? p.codigo : '110027286';
+
+    let lote = '';
+    items.some(x => (x.detalle || []).some(d => { if (d.lote) { lote = d.lote; return true; } }));
+
+    const lista = [
+      { txt: 'qué hay que reponer',  que: 'lo que está agotado, crítico o bajo' },
+      { txt: 'críticos de frío',     que: 'cruza estado y conservación' },
+      { txt: nombre.toLowerCase(),   que: 'por laboratorio, código, nombre, lote o ubicación' }
+    ];
+    if (lote) lista.push({ txt: 'dónde está el lote ' + lote, que: 'en qué posiciones hay ese lote' });
+    return lista.concat([
+      { txt: 'sin máximo',                        que: 'los que faltan configurar' },
+      { txt: 'poné 120 de máximo a ' + nombre,    que: 'cambia el máximo (pide confirmar)' },
+      { txt: 'mínimo 30 al ' + codigo,            que: 'lo mismo por código' },
+      { txt: 'ir a posiciones',                   que: 'cambia de pantalla' }
+    ]);
+  }
+
+  return { interpretar, posicionesDe, ejemplos };
 })();
 
 </script>
@@ -4956,12 +5478,9 @@ VLM.views = (function () {
     items.forEach(p => {
       (p.detalle || []).forEach(d => {
         if (!d.ubicacion) return;
-        // La reserva no se configura. Un mínimo y un máximo dicen cuándo
-        // rellenar una posición y cuánto entra; en altura —o en el pasillo que
-        // abastece al VLM— no se rellena nada, se saca. Cargarles un número
-        // sería inventar una alerta que nadie va a atender, y son la mayoría
-        // de las filas: taparían las que sí importan.
-        if (d.tipo === 'altura') { enReserva++; return; }
+        // La reserva no se configura (ver parser.esConfigurable): son la
+        // mayoría de las filas y taparían las que sí importan.
+        if (!VLM.parser.esConfigurable(d)) { enReserva++; return; }
         const u = d.ubicacion.toUpperCase();
         const k = u + '|' + String(p.codigo).toUpperCase();
         if (!artsPorUbic[u]) artsPorUbic[u] = {};
@@ -5524,6 +6043,7 @@ VLM.app = (function () {
     wireSettings();
     wireNube();
     wireCfgNav();
+    wireAsistente();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       if (motivo === 'posiciones') reaplicarPosiciones();
@@ -5575,6 +6095,16 @@ VLM.app = (function () {
   }
 
   /**
+   * Todos los artículos con sus métricas, SIN los filtros de la barra.
+   * El asistente busca sobre esto: pedirle un SKU y que no aparezca porque
+   * la pantalla estaba filtrada por frío sería desconcertante.
+   */
+  function itemsCalculados() {
+    if (!calculados) calculados = A.calcular(S.state.productos, S.state.cfg);
+    return calculados;
+  }
+
+  /**
    * Productos que se muestran: calculados, sin los laboratorios fuera del
    * catálogo (si así está configurado) y filtrados por ámbito, conservación
    * y laboratorio.
@@ -5584,11 +6114,9 @@ VLM.app = (function () {
    *   habría cómo volver.
    */
   function itemsVisibles(sinLab) {
-    const cfg = S.state.cfg, ui = S.state.ui;
-    if (!calculados) {
-      calculados = A.calcular(S.state.productos, cfg);
-    }
-    let items = calculados;
+    const ui = S.state.ui;
+    let items = itemsCalculados();
+    const cfg = S.state.cfg;
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
     items = A.filtrarPorZona(items, ui);
     // el laboratorio es un filtro global como los otros dos: afecta al resumen
@@ -5834,6 +6362,178 @@ VLM.app = (function () {
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && !VLM.tv.activo) $$('.modal').forEach(m => m.hidden = true);
     });
+  }
+
+  /* ============================================================
+     ASISTENTE · buscar y cambiar datos escribiendo
+
+     La interpretación de la frase vive en asistente.js; acá está sólo
+     lo que se ve y lo que se aplica. Nada se cambia sin que antes se
+     muestre qué va a pasar y alguien lo confirme: una frase mal
+     entendida no puede pisar un máximo de callado.
+     ============================================================ */
+  function wireAsistente() {
+    const inp = $('#iaInput');
+    $('#btnAsistente').addEventListener('click', abrirAsistente);
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault(); abrirAsistente();
+      }
+    });
+    inp.addEventListener('input', U.debounce(pintarAsistente, 110));
+    // escribir y dar Enter: lo normal es aceptar lo primero que salió
+    inp.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const primero = $('#iaCuerpo .ia-fila, #iaCuerpo .ia-aplicar');
+      if (primero) primero.click();
+    });
+  }
+
+  function abrirAsistente() {
+    if (!S.hayDatos()) { U.toast('Cargá el stock antes de usar el buscador', 'err'); return; }
+    $('#modalIA').hidden = false;
+    $('#iaInput').value = '';
+    pintarAsistente();
+    $('#iaInput').focus();
+  }
+
+  function pintarAsistente() {
+    const cuerpo = $('#iaCuerpo');
+    const r = VLM.asistente.interpretar($('#iaInput').value, itemsCalculados());
+    if (r.accion === 'ayuda')  return iaEjemplos(cuerpo);
+    if (r.accion === 'ir')     return iaIr(cuerpo, r);
+    if (r.accion === 'cambio') return iaCambio(cuerpo, r);
+    iaResultados(cuerpo, r);
+  }
+
+  function iaEntendido(txt, cuenta) {
+    return '<div class="ia-entendido">Entendí: <strong>' + U.esc(txt) + '</strong>' +
+      (cuenta === undefined ? '' :
+        '<span class="ia-cuenta">' + U.fmt(cuenta) + (cuenta === 1 ? ' resultado' : ' resultados') + '</span>') +
+      '</div>';
+  }
+
+  function iaAviso(txt) {
+    return '<div class="ia-aviso"><svg viewBox="0 0 24 24" class="ico">' +
+      '<path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 16.5h.01"/></svg>' +
+      '<div>' + U.esc(txt) + '</div></div>';
+  }
+
+  /**
+   * @param mostrarTodas para "dónde está X": las ubicaciones, no sólo la primera
+   * @param campo 'min'|'max' si la frase pidió ese dato: se muestra ese
+   */
+  function iaFila(p, mostrarTodas, campo) {
+    const ub = mostrarTodas ? (p.ubicaciones || []).join(' · ') : p.ubicacion;
+    const ref = p.stockRef !== undefined ? p.stockRef : p.stock;
+    const hayMax = p.stockMax > 0;
+    const num = campo === 'min'
+      ? U.fmt(p.stockMin || 0) + '<span>de mínimo</span>'
+      : U.fmt(ref) + (hayMax ? ' / ' + U.fmt(p.stockMax) : '') +
+        '<span>' + (hayMax ? 'de su máximo' : 'sin máximo') + '</span>';
+    return '<button class="ia-fila" data-cod="' + U.esc(p.codigo) + '">' +
+      V.badge(p.estado) +
+      '<span class="ia-fila-txt"><strong>' + U.esc(p.descripcion || p.codigo) + '</strong>' +
+      '<span class="ia-fila-sub">' + U.esc(p.codigo) + ' · ' +
+        U.esc(p.labNombre || p.laboratorio) + (ub ? ' · 📍 ' + U.esc(ub) : '') + '</span></span>' +
+      '<span class="ia-fila-num">' + num + '</span>' +
+      '</button>';
+  }
+
+  /** Clic en un resultado: abre el detalle del artículo. */
+  function iaAlDetalle(cuerpo) {
+    $$('.ia-fila', cuerpo).forEach(b => b.addEventListener('click', () => {
+      $('#modalIA').hidden = true;
+      abrirArticulo(b.dataset.cod, itemsCalculados(), S.state.cfg);
+    }));
+  }
+
+  function iaEjemplos(cuerpo) {
+    cuerpo.innerHTML = '<div class="ia-ej-tit">Probá con</div><div class="ia-ejemplos">' +
+      VLM.asistente.ejemplos(itemsCalculados()).map(e =>
+        '<button class="ia-ej" data-ej="' + U.esc(e.txt) + '"><code>' + U.esc(e.txt) +
+        '</code><span>' + U.esc(e.que) + '</span></button>').join('') + '</div>';
+    $$('.ia-ej', cuerpo).forEach(b => b.addEventListener('click', () => {
+      $('#iaInput').value = b.dataset.ej;
+      pintarAsistente();
+      $('#iaInput').focus();
+    }));
+  }
+
+  function iaResultados(cuerpo, r) {
+    if (!r.items.length) {
+      cuerpo.innerHTML = iaEntendido(r.entendido, 0) +
+        '<div class="ia-nada">Ningún artículo coincide.</div>';
+      return;
+    }
+    const TOPE = 40;
+    const lista = r.items.slice(0, TOPE);
+    cuerpo.innerHTML = iaEntendido(r.entendido, r.items.length) +
+      lista.map(p => iaFila(p, !!r.filtros.donde, r.filtros.campo)).join('') +
+      (r.items.length > TOPE
+        ? '<div class="ia-nada">y ' + U.fmt(r.items.length - TOPE) + ' más · afiná la búsqueda</div>' : '');
+    iaAlDetalle(cuerpo);
+  }
+
+  function iaIr(cuerpo, r) {
+    cuerpo.innerHTML = '<div class="ia-cambio"><h4>' + U.esc(r.entendido) + '</h4>' +
+      '<div class="cfg-actions" style="margin-top:12px">' +
+      '<button class="btn btn-primary ia-aplicar" id="iaIr">Ir</button></div></div>';
+    $('#iaIr').addEventListener('click', () => {
+      $('#modalIA').hidden = true;
+      if (r.destino === 'tv') VLM.tv.entrar(itemsVisibles(), S.state.cfg, S.state.ui.filtroLab);
+      else if (r.destino === 'config') abrirSettings();
+      else irA(r.vista);
+    });
+  }
+
+  function iaCambio(cuerpo, r) {
+    const etiqueta = r.campo === 'max' ? 'máximo' : 'mínimo';
+
+    // varios artículos coinciden: elegir uno reescribe la frase con su código
+    if (r.candidatos) {
+      cuerpo.innerHTML = iaEntendido(r.entendido) + iaAviso(r.problema) +
+        r.candidatos.map(p => iaFila(p)).join('') +
+        (r.total > r.candidatos.length
+          ? '<div class="ia-nada">y ' + U.fmt(r.total - r.candidatos.length) + ' más</div>' : '');
+      $$('.ia-fila', cuerpo).forEach(b => b.addEventListener('click', () => {
+        $('#iaInput').value = etiqueta + ' ' + r.valor + ' ' + b.dataset.cod;
+        pintarAsistente();
+        $('#iaInput').focus();
+      }));
+      return;
+    }
+
+    if (r.problema) {
+      cuerpo.innerHTML = iaEntendido(r.entendido) + iaAviso(r.problema);
+      return;
+    }
+
+    const trabado = !VLM.nube.puedeEditar();
+    cuerpo.innerHTML = iaEntendido(r.entendido) +
+      (trabado ? iaAviso('Hace falta iniciar sesión con una cuenta autorizada para cambiar valores.') : '') +
+      r.posiciones.map((pos, i) =>
+        '<div class="ia-cambio">' +
+          '<h4>' + U.esc(r.producto.descripcion || r.producto.codigo) + '</h4>' +
+          '<p>' + U.esc(r.producto.codigo) + ' · 📍 ' + U.esc(pos.ubicacion) +
+            ' · ' + U.fmt(pos.stock) + ' en esa posición</p>' +
+          '<div class="ia-flecha">' +
+            '<b class="ia-antes">' + U.fmt(pos[r.campo] || 0) + '</b><span>→</span>' +
+            '<b class="ia-despues">' + U.fmt(r.valor) + '</b>' +
+            '<small>' + etiqueta + '</small>' +
+          '</div>' +
+          '<div class="cfg-actions"><button class="btn btn-primary ia-aplicar" data-i="' + i + '"' +
+            (trabado ? ' disabled' : '') + '>Aplicar</button></div>' +
+        '</div>').join('');
+
+    $$('.ia-aplicar', cuerpo).forEach(b => b.addEventListener('click', () => {
+      const pos = r.posiciones[+b.dataset.i];
+      const cambio = {}; cambio[r.campo] = r.valor;
+      S.setPosicion(pos.ubicacion, cambio, r.producto.codigo);
+      U.toast(etiqueta + ' de ' + (r.producto.descripcion || r.producto.codigo) +
+              ' en ' + pos.ubicacion + ': ' + U.fmt(r.valor), 'ok');
+      $('#modalIA').hidden = true;
+    }));
   }
 
   function wireTabs() {
