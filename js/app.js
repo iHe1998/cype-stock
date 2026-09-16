@@ -944,11 +944,43 @@ VLM.app = (function () {
     }
 
     try {
-      const mapa = await N.bajarMaximos();
-      const n = Object.keys(mapa).length;
+      const deLaBase = await N.bajarMaximos();
+      const locales = S.state.posiciones || {};
+      const nBase = Object.keys(deLaBase).length;
+
+      /* Fusionar, nunca reemplazar.
+
+         Esto era un reemplazo entero, y la bajada es automática al abrir
+         mientras que la subida es a mano: alcanzaba con cargar máximos,
+         no subirlos y recargar la página para perderlos. Con la tabla de
+         la base vacía —el día que se estrena, sin ir más lejos— se
+         borraban todos de una.
+
+         En los choques manda distinto según quién pidió la bajada:
+           - al abrir, gana lo de esta PC: puede ser trabajo recién hecho
+             y todavía sin subir, y nadie pidió que se pisara;
+           - con el botón "Traer de la base" gana la base, que es
+             exactamente lo que la persona fue a buscar.
+         En los dos casos se conservan las claves que sólo están acá: nada
+         desaparece salvo que alguien lo borre a propósito. */
+      const mapa = silencioso
+        ? Object.assign({}, deLaBase, locales)
+        : Object.assign({}, locales, deLaBase);
       S.setPosiciones(mapa);
-      if (!silencioso) U.toast('Traídos ' + n + ' máximos de la base', 'ok');
-      return n;
+
+      // lo que quedó distinto de la base es lo que falta subir
+      const igual = (a, b) => !!a && !!b &&
+        (a.min || 0) === (b.min || 0) && (a.max || 0) === (b.max || 0);
+      const sinSubir = Object.keys(mapa).filter(k => !igual(deLaBase[k], mapa[k])).length;
+
+      if (!silencioso) U.toast('Traídos ' + nBase + ' máximos de la base', 'ok');
+      if (sinSubir) {
+        U.toast(sinSubir === 1
+          ? 'Hay 1 máximo de esta PC que todavía no está en la base. Subilo desde Configuración.'
+          : 'Hay ' + sinSubir + ' máximos de esta PC que todavía no están en la base. ' +
+            'Subilos desde Configuración.', 'warn');
+      }
+      return nBase;
     } catch (e) {
       // sin internet o con la base caída, el panel tiene que seguir andando
       // con lo último que haya quedado guardado en el navegador

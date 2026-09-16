@@ -805,6 +805,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .toast.t-ok { border-left-color: var(--ok); }
 .toast.t-err { border-left-color: var(--crit); }
+/* algo que hay que mirar pero que no salió mal: máximos sin subir */
+.toast.t-warn { border-left-color: var(--warn); }
 @keyframes slidein { from { opacity: 0; transform: translateX(20px); } }
 
 /* ============================================================
