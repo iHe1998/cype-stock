@@ -33,7 +33,8 @@ VLM.app = (function () {
     wireAsistente();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
-      if (motivo === 'posiciones') reaplicarPosiciones();
+      // lo que acaba de bajar de la base no se vuelve a subir
+      if (motivo === 'posiciones') { reaplicarPosiciones(); if (!aplicandoDeNube) sincronizarMaximosPronto(); }
       if (motivo === 'ubicaciones') reaplicarReglas();
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
       render();
@@ -43,10 +44,33 @@ VLM.app = (function () {
     // los productos guardados traen la clasificación de ese momento.
     if (S.hayDatos()) reaplicarReglas(true);
     render();
+    // sin esto, el botón de importar queda habilitado hasta que alguien abra
+    // Configuración por primera vez
+    aplicarBloqueo();
     // los máximos compartidos se traen al abrir, sin bloquear el dibujado:
     // si la base no responde, el panel igual muestra lo que hay guardado
     if (VLM.nube.configurada()) bajarDeNube(true);
     setInterval(actualizarEstado, 60000);
+    setInterval(refrescoPeriodico, REFRESCO_MS);
+  }
+
+  /* ------------------------------------------------------------
+     Refresco periódico
+
+     La pantalla del depósito queda prendida todo el día y nadie la va a
+     recargar. Sin esto mostraría lo de la hora en que se abrió, y dos
+     pantallas abiertas en momentos distintos dirían cosas distintas.
+     ------------------------------------------------------------ */
+  const REFRESCO_MS = 150000;   // 2 min y medio
+
+  function refrescoPeriodico() {
+    if (!VLM.nube.configurada()) return;
+    // no mientras alguien está cargando un número: le cambiaría la tabla debajo
+    const act = document.activeElement;
+    if (act && act.classList && act.classList.contains('pos-inp')) return;
+    // ni con una pantalla abierta encima, que se redibuja de atrás
+    if (!$('#modalSettings').hidden || !$('#modalImport').hidden || !$('#modalIA').hidden) return;
+    bajarDeNube(true);
   }
 
   /**
@@ -866,6 +890,18 @@ VLM.app = (function () {
     $('#cfgChipLectura').hidden = !trabado;
     // en Cuenta el cartel sobra: ahí abajo está el recuadro que dice lo mismo
     $('#cfgBloqueo').hidden = !trabado || seccionCfg === 'cuenta';
+
+    /* Importar es el cambio más grande de todos: cambia el stock que ven
+       todos. Sin sesión el archivo quedaría sólo en esta PC y el refresco
+       de la base lo reemplazaría al rato, sin que nadie entienda por qué. */
+    ['#btnImport', '#btnImport2'].forEach(sel => {
+      const el = $(sel);
+      if (!el) return;
+      el.disabled = trabado;
+      el.title = trabado
+        ? 'Hace falta iniciar sesión con una cuenta autorizada'
+        : 'Cargar el Excel de saldos';
+    });
   }
 
   function pintarNube() {
@@ -917,6 +953,69 @@ VLM.app = (function () {
     render();
   }
 
+  /* ------------------------------------------------------------
+     Máximos compartidos: la base es la única verdad
+
+     El panel tiene que mostrar lo mismo en la oficina y en el depósito,
+     así que un máximo cambiado acá viaja solo. Antes había que acordarse
+     de apretar "Subir máximos" y, si no, el cambio no salía de esta PC.
+
+     `maxSinSubir` se prende cuando una subida falla —sin internet, base
+     caída— y es lo único que hace que una bajada NO pise lo local.
+     Mientras esté prendido se reintenta en cada bajada.
+     ------------------------------------------------------------ */
+  const KEY_PEND = 'vlm.maxpend.v1';
+  let maxSinSubir = false;
+  let clavesEnBase = [];      // qué tenía la base en la última bajada
+  let aplicandoDeNube = false; // para no devolverle a la base lo que vino de ella
+
+  try { maxSinSubir = localStorage.getItem(KEY_PEND) === '1'; } catch (e) {}
+
+  function marcarSinSubir(v) {
+    maxSinSubir = v;
+    try {
+      if (v) localStorage.setItem(KEY_PEND, '1');
+      else localStorage.removeItem(KEY_PEND);
+    } catch (e) {}
+  }
+
+  /**
+   * Manda los máximos a la base. Sube el mapa entero en una sola llamada:
+   * son unos cientos de filas y así no hay estados a medio camino.
+   *
+   * Los borrados van aparte: subirMaximos() sólo manda lo que tiene algún
+   * valor, así que un máximo borrado acá seguiría en la base y volvería en
+   * la próxima bajada como si nada.
+   */
+  async function sincronizarMaximos() {
+    const N = VLM.nube;
+    if (!N.configurada() || !N.conSesion()) return;
+    const locales = S.state.posiciones || {};
+    try {
+      await N.subirMaximos(locales);
+      const borradas = clavesEnBase.filter(k => !locales[k]);
+      for (let i = 0; i < borradas.length; i++) await N.borrarMaximo(borradas[i]);
+      clavesEnBase = Object.keys(locales);
+      if (maxSinSubir) {
+        marcarSinSubir(false);
+        U.toast('Máximos guardados en la base', 'ok');
+      }
+    } catch (e) {
+      marcarSinSubir(true);
+      U.toast('No se pudo guardar en la base: ' + e.message + '. Queda en esta PC.', 'err');
+    }
+  }
+
+  /* Al cargar máximos de corrido se toca una celda atrás de otra: sin
+     esperar un poco sería una subida por tecla. */
+  const sincronizarMaximosPronto = U.debounce(sincronizarMaximos, 900);
+
+  /** Guarda un mapa que vino de la base, sin dispararle una subida de vuelta. */
+  function aplicarDeNube(mapa) {
+    aplicandoDeNube = true;
+    try { S.setPosiciones(mapa); } finally { aplicandoDeNube = false; }
+  }
+
   /**
    * Trae de la base lo compartido: el stock y los máximos.
    *
@@ -946,41 +1045,35 @@ VLM.app = (function () {
     try {
       const deLaBase = await N.bajarMaximos();
       const locales = S.state.posiciones || {};
-      const nBase = Object.keys(deLaBase).length;
+      clavesEnBase = Object.keys(deLaBase);
 
-      /* Fusionar, nunca reemplazar.
+      /* La base manda. Es lo que hace que todos vean lo mismo abran desde
+         donde abran: si cada PC conservara lo suyo, cada una mostraría una
+         mezcla distinta y el panel del depósito diría algo que el de la
+         oficina no.
 
-         Esto era un reemplazo entero, y la bajada es automática al abrir
-         mientras que la subida es a mano: alcanzaba con cargar máximos,
-         no subirlos y recargar la página para perderlos. Con la tabla de
-         la base vacía —el día que se estrena, sin ir más lejos— se
-         borraban todos de una.
+         Dos excepciones, las dos para no borrar trabajo:
 
-         En los choques manda distinto según quién pidió la bajada:
-           - al abrir, gana lo de esta PC: puede ser trabajo recién hecho
-             y todavía sin subir, y nadie pidió que se pisara;
-           - con el botón "Traer de la base" gana la base, que es
-             exactamente lo que la persona fue a buscar.
-         En los dos casos se conservan las claves que sólo están acá: nada
-         desaparece salvo que alguien lo borre a propósito. */
-      const mapa = silencioso
-        ? Object.assign({}, deLaBase, locales)
-        : Object.assign({}, locales, deLaBase);
-      S.setPosiciones(mapa);
-
-      // lo que quedó distinto de la base es lo que falta subir
-      const igual = (a, b) => !!a && !!b &&
-        (a.min || 0) === (b.min || 0) && (a.max || 0) === (b.max || 0);
-      const sinSubir = Object.keys(mapa).filter(k => !igual(deLaBase[k], mapa[k])).length;
-
-      if (!silencioso) U.toast('Traídos ' + nBase + ' máximos de la base', 'ok');
-      if (sinSubir) {
-        U.toast(sinSubir === 1
-          ? 'Hay 1 máximo de esta PC que todavía no está en la base. Subilo desde Configuración.'
-          : 'Hay ' + sinSubir + ' máximos de esta PC que todavía no están en la base. ' +
-            'Subilos desde Configuración.', 'warn');
+         1. La base vacía no pisa nada. Es lo que pasa la primera vez que se
+            conecta una PC que venía trabajando sola, y también si la tabla
+            se vacía por error: en vez de perder los máximos, se conservan y
+            se suben.
+         2. Si quedó algo sin subir acá —falló la subida por falta de
+            internet o porque la base no contestaba—, se conserva lo local y
+            se reintenta. */
+      if (!clavesEnBase.length && Object.keys(locales).length) {
+        marcarSinSubir(true);
+        U.toast('La base no tiene máximos: se conservan los de esta PC y se suben', 'warn');
+        sincronizarMaximos();
+      } else if (maxSinSubir) {
+        aplicarDeNube(Object.assign({}, deLaBase, locales));
+        U.toast('Hay máximos de esta PC sin guardar en la base. Reintentando…', 'warn');
+        sincronizarMaximos();
+      } else {
+        aplicarDeNube(deLaBase);
+        if (!silencioso) U.toast('Traídos ' + clavesEnBase.length + ' máximos de la base', 'ok');
       }
-      return nBase;
+      return clavesEnBase.length;
     } catch (e) {
       // sin internet o con la base caída, el panel tiene que seguir andando
       // con lo último que haya quedado guardado en el navegador
