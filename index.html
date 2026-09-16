@@ -427,6 +427,20 @@
           </div>
 
           <div class="cfg-grupo">
+            <h4>Respaldo de los máximos</h4>
+            <p class="cfg-ayuda">El stock se recupera siempre del Excel de SCE, pero los máximos
+              se cargan a mano y viven sólo en la base. Guardate este archivo cada tanto. Sirve
+              también para cargarlos de a muchos: completás las columnas
+              <strong>Mínimo</strong> y <strong>Máximo</strong> en Excel y lo volvés a importar.
+              No toca el stock.</p>
+            <div class="cfg-actions">
+              <button class="btn" id="btnExportMax">Exportar máximos (Excel)</button>
+              <button class="btn" id="btnImportMax">Importar máximos</button>
+              <input type="file" id="fileMax" accept=".xlsx,.xls,.csv" hidden>
+            </div>
+          </div>
+
+          <div class="cfg-grupo">
             <h4>En esta PC</h4>
             <div class="cfg-actions">
               <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>

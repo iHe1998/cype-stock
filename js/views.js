@@ -593,6 +593,56 @@ VLM.views = (function () {
     return html;
   }
 
+  /**
+   * Exporta las posiciones de picking con su mínimo y su máximo.
+   *
+   * Es el respaldo de lo único que no se puede recuperar del Excel de SCE:
+   * los máximos se cargan a mano, viven en la base y en el navegador, y el
+   * plan gratis de Supabase no hace copias. También sirve para cargarlos de
+   * a muchos: se completan las columnas en Excel y se vuelve a importar.
+   *
+   * Sólo las posiciones configurables (ver parser.esConfigurable): en la
+   * reserva no se rellena nada, así que no lleva número.
+   */
+  function exportarMaximos(items) {
+    const cfgPos = VLM.store.state.posiciones;
+    const filas = [];
+    const vistas = {};
+    items.forEach(p => {
+      (p.detalle || []).forEach(d => {
+        if (!d.ubicacion || !VLM.parser.esConfigurable(d)) return;
+        const u = String(d.ubicacion).toUpperCase();
+        const k = u + '|' + String(p.codigo).toUpperCase();
+        if (vistas[k]) { vistas[k].stock += d.stock || 0; return; }
+        const c = cfgPos[k] || cfgPos[u] || {};
+        vistas[k] = {
+          ubicacion: d.ubicacion, codigo: p.codigo,
+          descripcion: p.descripcion || '',
+          lab: p.labNombre || p.laboratorio || '',
+          stock: d.stock || 0, min: c.min || 0, max: c.max || 0
+        };
+        filas.push(vistas[k]);
+      });
+    });
+    if (!filas.length) { U.toast('No hay posiciones de picking para exportar', 'err'); return; }
+
+    filas.sort((a, b) => a.ubicacion.localeCompare(b.ubicacion, 'es') ||
+                         a.codigo.localeCompare(b.codigo, 'es'));
+
+    const aoa = [['Ubicacion', 'Codigo', 'Descripcion', 'Laboratorio', 'Stock', 'Minimo', 'Maximo']];
+    filas.forEach(f => aoa.push([f.ubicacion, f.codigo, f.descripcion, f.lab, f.stock, f.min, f.max]));
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [{ wch: 13 }, { wch: 12 }, { wch: 34 }, { wch: 20 },
+                   { wch: 8 }, { wch: 9 }, { wch: 9 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Maximos');
+    const hoy = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, 'maximos_cype_' + hoy + '.xlsx');
+    const conNumero = filas.filter(f => f.min || f.max).length;
+    U.toast('Exportadas ' + filas.length + ' posiciones (' + conNumero + ' con máximo cargado)', 'ok');
+  }
+
   function exportarRepo(lista, cfg) {
     if (!lista.length) { U.toast('No hay nada para exportar', 'err'); return; }
     const filas = [[
@@ -852,7 +902,8 @@ VLM.views = (function () {
       '(cuánto entra) de cada artículo en su posición de picking. Se guardan y se aplican al instante.<br>' +
       '<span class="small muted">La reserva —altura y el pasillo que abastece al VLM— no se ' +
       'configura: de ahí se saca, no se rellena. Se ve en el detalle del artículo y en la reposición.</span><br>' +
-      '<span class="small muted">Si son muchas, exportá la plantilla, completá las columnas Mínimo y Máximo en Excel y volvé a importarla.</span>' +
+      '<span class="small muted">Si son muchas: Configuración › Stock y máximos › <strong>Exportar máximos</strong>, ' +
+      'completás las columnas en Excel y lo volvés a importar desde ahí. Ese mismo archivo es tu respaldo.</span>' +
       '</div></div>';
 
     html += '<div class="table-wrap"><table class="table" id="posTable">' +
@@ -1025,6 +1076,7 @@ VLM.views = (function () {
 
   return {
     dashboard, laboratorios, reposicion, inventario, posiciones, detalleArticulo,
-    badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem, exportarRepo
+    badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem,
+    exportarRepo, exportarMaximos
   };
 })();

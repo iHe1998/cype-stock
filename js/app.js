@@ -751,6 +751,70 @@ VLM.app = (function () {
   }
 
   /* ============================================================
+     MÁXIMOS: RESPALDO Y CARGA MASIVA
+     ============================================================ */
+
+  /**
+   * Carga máximos desde el Excel que genera "Exportar máximos".
+   *
+   * No toca el stock, y eso es lo que lo hace seguro. Pasar los máximos por
+   * la importación normal significaría que el mismo archivo reemplaza el
+   * stock, y como sólo tiene posiciones de picking se perderían todas las de
+   * reserva sin que nadie lo hubiera pedido.
+   *
+   * Manda lo que diga el archivo para las filas que trae: una fila con las
+   * dos columnas en blanco borra ese máximo. Las posiciones que no están en
+   * el archivo no se tocan.
+   */
+  async function importarMaximos(file) {
+    try {
+      const r = await P.leerArchivo(file);
+      const matriz = P.hojaAMatriz(r.wb, r.hojas[0]);
+      if (!matriz.length) throw new Error('la hoja está vacía');
+
+      const cab = (matriz[0] || []).map(c => U.norm(c));
+      const iUbic = cab.indexOf('ubicacion');
+      const iCod  = cab.indexOf('codigo');
+      const iMin  = cab.indexOf('minimo');
+      const iMax  = cab.indexOf('maximo');
+      if (iUbic < 0 || iCod < 0 || (iMin < 0 && iMax < 0)) {
+        throw new Error('faltan columnas. Se esperan Ubicacion, Codigo, Minimo y Maximo, ' +
+                        'como las que salen de «Exportar máximos»');
+      }
+
+      const mapa = Object.assign({}, S.state.posiciones);
+      let puestos = 0, borrados = 0, ignoradas = 0;
+      for (let i = 1; i < matriz.length; i++) {
+        const f = matriz[i] || [];
+        const ubic = String(f[iUbic] == null ? '' : f[iUbic]).trim();
+        const cod  = String(f[iCod]  == null ? '' : f[iCod]).trim();
+        if (!ubic || !cod) { ignoradas++; continue; }
+        const min = iMin < 0 ? 0 : (U.toNum(f[iMin]) || 0);
+        const max = iMax < 0 ? 0 : (U.toNum(f[iMax]) || 0);
+        const k = S.clavePos(ubic, cod);
+        if (!min && !max) {
+          if (mapa[k]) { delete mapa[k]; borrados++; }
+          continue;
+        }
+        mapa[k] = { ubicacion: ubic.toUpperCase(), articulo: cod, min: min, max: max };
+        puestos++;
+      }
+
+      if (!puestos && !borrados) { U.toast('El archivo no trae ningún máximo', 'err'); return; }
+      // Lo que borra no se ve hasta que pasó: mejor decirlo antes.
+      if (borrados && !confirm('Se van a cargar ' + puestos + ' máximos y borrar ' + borrados +
+            ' que en el archivo quedaron en blanco. ¿Seguir?')) return;
+
+      S.setPosiciones(mapa);
+      U.toast('Cargados ' + puestos + ' máximos' +
+              (borrados ? ' · ' + borrados + ' borrados' : '') +
+              (ignoradas ? ' · ' + ignoradas + ' filas sin ubicación o código' : ''), 'ok');
+    } catch (e) {
+      U.toast('No se pudieron cargar los máximos: ' + e.message, 'err');
+    }
+  }
+
+  /* ============================================================
      DATOS DE EJEMPLO
      ============================================================ */
   /* Datos de ejemplo. Las ubicaciones son las de verdad: adentro del VLM todo
@@ -848,7 +912,8 @@ VLM.app = (function () {
   const SIN_BLOQUEO = ['cfgNubeMail', 'cfgNubePass', 'btnNubeEntrar', 'btnNubeSalir',
                        'btnIrCuenta',
                        'cfgNubeUrl', 'cfgNubeKey', 'btnNubeGuardar',
-                       'btnNubeBajar', 'btnExportCsv'];
+                       // sacar una copia no cambia nada: que pueda cualquiera
+                       'btnNubeBajar', 'btnExportCsv', 'btnExportMax'];
 
   /* Sección abierta de Configuración. Se mantiene entre aperturas: quien
      está cargando laboratorios abre y cierra varias veces seguidas. */
@@ -1365,6 +1430,19 @@ VLM.app = (function () {
              .sort((a, b) => a.urgencia - b.urgencia),
         S.state.cfg
       );
+    });
+
+    $('#btnExportMax').addEventListener('click', () => {
+      if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
+      V.exportarMaximos(itemsCalculados());
+    });
+
+    $('#btnImportMax').addEventListener('click', () => $('#fileMax').click());
+    $('#fileMax').addEventListener('change', e => {
+      const f = e.target.files[0];
+      // se limpia para que elegir el mismo archivo otra vez vuelva a disparar
+      e.target.value = '';
+      if (f) importarMaximos(f);
     });
 
     $('#btnClearData').addEventListener('click', () => {
