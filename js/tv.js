@@ -26,7 +26,8 @@ VLM.tv = (function () {
       saltarSi: d => A.topUrgentes(d.items, 1).length === 0 },
     { nombre: 'Cadena de frío',  render: slideFrio,
       saltarSi: d => d.items.filter(p => p.conservacion === 'frio').length === 0 },
-    { nombre: 'Zonas de almacenamiento', render: slideZonas },
+    { nombre: 'Ambiente',        render: slideAmbiente,
+      saltarSi: d => d.items.filter(p => p.conservacion === 'ambiente').length === 0 },
     { nombre: 'Laboratorios',    render: slideLabs }
   ];
 
@@ -184,21 +185,43 @@ VLM.tv = (function () {
   }
 
   /* ------------------------------------------------------------
-     Pantalla · Cadena de frío (2-8 °C)
+     Pantallas · Reposición por conservación
+
+     Frío y ambiente son la misma pantalla: cambia qué se filtra y cómo
+     se titula. Una sola función y dos llamadas, así no se separan con
+     el tiempo — la de ambiente nació de copiar la de frío.
      ------------------------------------------------------------ */
   function slideFrio(el, items, cfg) {
-    const frio = items.filter(p => p.conservacion === 'frio');
-    const res = A.resumen(frio, cfg);
-    const urgentes = A.topUrgentes(frio, 6);
+    slideConservacion(el, items, cfg, {
+      conservacion: 'frio',
+      titulo: '❄ Cadena de frío · 2 a 8 °C',
+      kpiSkus: 'SKU refrigerados',
+      sinAlertas: 'Sin alertas en cadena de frío'
+    });
+  }
+
+  function slideAmbiente(el, items, cfg) {
+    slideConservacion(el, items, cfg, {
+      conservacion: 'ambiente',
+      titulo: '🌡 Ambiente · 15 a 25 °C',
+      kpiSkus: 'SKU en ambiente',
+      sinAlertas: 'Sin alertas en ambiente'
+    });
+  }
+
+  function slideConservacion(el, items, cfg, o) {
+    const sel = items.filter(p => p.conservacion === o.conservacion);
+    const res = A.resumen(sel, cfg);
+    const urgentes = A.topUrgentes(sel, 6);
 
     el.innerHTML =
-      '<h2>❄ Cadena de frío · 2 a 8 °C</h2>' +
+      '<h2>' + o.titulo + '</h2>' +
       '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
-        tvKpi('SKU refrigerados', U.fmt(res.skus), U.fmtCompact(res.unidades) + ' u. en picking') +
+        tvKpi(o.kpiSkus, U.fmt(res.skus), U.fmtCompact(res.unidades) + ' u. en picking') +
         tvKpi('En alerta', U.fmt(res.enAlerta),
               res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
               res.enAlerta ? 'k-crit' : 'k-ok') +
-        tvKpi('Unidades a reponer', U.fmtCompact(frio.reduce((s, p) => s + p.sugerido, 0)),
+        tvKpi('Unidades a reponer', U.fmtCompact(sel.reduce((s, p) => s + p.sugerido, 0)),
               'hasta llenar las posiciones') +
       '</div>' +
       (urgentes.length
@@ -215,28 +238,7 @@ VLM.tv = (function () {
               '</div>';
           }).join('') + '</div>'
         : '<div class="tv-panel" style="margin-top:1.6vh;align-items:center;justify-content:center">' +
-          '<h3 style="color:var(--ok)">Sin alertas en cadena de frío</h3></div>');
-  }
-
-  /* ------------------------------------------------------------
-     Pantalla · Zonas (ámbito × conservación)
-     ------------------------------------------------------------ */
-  function slideZonas(el, items, cfg) {
-    const grupos = A.porGrupo(items, cfg);
-    el.innerHTML =
-      '<h2>Stock en picking por zona</h2>' +
-      '<div class="tv-labs">' + grupos.map(g => {
-        const r = g.resumen;
-        return '<div class="tv-lab">' +
-          '<div class="tv-lab-name">' + g.icono + ' ' + U.esc(g.label) + '</div>' +
-          '<div class="tv-lab-num">' + U.fmtCompact(r.unidades) + '</div>' +
-          '<div class="tv-lab-sub">' + r.skus + ' SKU · ' +
-            (g.alerta ? '<strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : 'sin alertas') +
-          '</div>' + V.stackbar(r) +
-          '<div class="tv-lab-sub" style="margin-top:.8vh">' +
-            g.labs.map(l => U.esc(l.nombre)).join(' · ') + '</div>' +
-          '</div>';
-      }).join('') + '</div>';
+          '<h3 style="color:var(--ok)">' + o.sinAlertas + '</h3></div>');
   }
 
   /* ------------------------------------------------------------
