@@ -824,6 +824,21 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 }
 .tv-brand { display: flex; align-items: center; gap: 12px; font-size: clamp(16px, 1.6vw, 30px); }
 .tv-dot { width: .9em; height: .9em; border-radius: 50%; background: var(--ok); animation: pulse 2.4s infinite; }
+/* Desde el otro lado del depósito, lo primero que hay que poder contestar es
+   si lo que está en pantalla es de todos o de un laboratorio solo. General va
+   en gris —es lo normal— y el laboratorio filtrado resaltado, que es el caso
+   que hay que notar. */
+.tv-filtro {
+  padding: .22em .75em; border-radius: 999px;
+  font-size: clamp(12px, 1.05vw, 21px); font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.tv-filtro.es-general {
+  color: var(--muted); background: var(--surface-2); border-color: var(--border);
+}
 .tv-meta { display: flex; align-items: center; gap: 14px; font-size: clamp(14px, 1.3vw, 26px); color: var(--muted); font-variant-numeric: tabular-nums; }
 .tv-sep { opacity: .5; }
 .tv-exit { opacity: .35; }

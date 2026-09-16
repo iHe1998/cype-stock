@@ -34,9 +34,9 @@ VLM.tv = (function () {
   /* ------------------------------------------------------------
      Ciclo de vida
      ------------------------------------------------------------ */
-  function entrar(items, cfg) {
+  function entrar(items, cfg, filtroLab) {
     if (!items.length) { U.toast('Cargá datos antes de usar el modo TV', 'err'); return; }
-    datos = { items, cfg };
+    datos = { items, cfg, filtroLab: filtroLab || null };
     activo = true;
     idx = 0;
     C.destruirTodos();
@@ -122,13 +122,26 @@ VLM.tv = (function () {
     C.destruirTodos();
     const slide = SLIDES[idx];
     $('#tvSlideName').textContent = slide.nombre;
+    pintarFiltro();
     slide.render($('#tvBody'), datos.items, datos.cfg);
   }
 
+  /**
+   * Qué laboratorio se está mirando. Los números de todas las pantallas salen
+   * de los items que llegan ya filtrados, así que sin este cartel el mismo
+   * panel muestra totales muy distintos sin decir por qué.
+   */
+  function pintarFiltro() {
+    const el = $('#tvFiltro');
+    const lab = datos.filtroLab;
+    el.textContent = lab || 'General';
+    el.classList.toggle('es-general', !lab);
+  }
+
   /** Redibuja con datos nuevos sin cortar la rotación. */
-  function refrescar(items, cfg) {
+  function refrescar(items, cfg, filtroLab) {
     if (!activo) return;
-    datos = { items, cfg };
+    datos = { items, cfg, filtroLab: filtroLab || null };
     pintar();
   }
 

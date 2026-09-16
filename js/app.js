@@ -184,7 +184,7 @@ VLM.app = (function () {
     } else if (vistaPrev !== null) window.scrollTo(0, 0);
     vistaDibujada = vista;
 
-    if (VLM.tv.activo) VLM.tv.refrescar(items, cfg);
+    if (VLM.tv.activo) VLM.tv.refrescar(items, cfg, S.state.ui.filtroLab);
   }
 
   /* Las tablas de Inventario y Posiciones tienen su propio scroll, aparte del
@@ -327,7 +327,7 @@ VLM.app = (function () {
       render();
     });
     $('#btnTV').addEventListener('click', () => {
-      VLM.tv.entrar(itemsVisibles(), S.state.cfg);
+      VLM.tv.entrar(itemsVisibles(), S.state.cfg, S.state.ui.filtroLab);
     });
     $('#tvExit').addEventListener('click', () => VLM.tv.salir());
 
