@@ -22,6 +22,13 @@ VLM.ubicaciones = (function () {
      export de Biosidus. Se editan en Configuración; el archivo bueno
      va a traer las posiciones del VLM, que todavía no aparecen acá.
      ------------------------------------------------------------ */
+  /* Versión de las reglas de fábrica. Se sube SÓLO cuando cambia
+     REGLAS_DEFAULT, y es lo que decide si a una lista guardada hay que
+     sumarle reglas nuevas o hay que dejarla en paz. Sin esto no había forma
+     de distinguir "esta regla no la tenés porque es nueva" de "esta regla la
+     borraste a propósito". */
+  const REGLAS_V = 2;
+
   const REGLAS_DEFAULT = [
     // --- tránsito, acondicionado y faltantes: no son stock ubicado ---
     { patron: 'SPP',     accion: 'ignorar', nota: 'tránsito' },
@@ -92,14 +99,27 @@ VLM.ubicaciones = (function () {
    * la red de seguridad. Las reglas propias (patrones que no están en las de
    * fábrica) se conservan, antes del `*` final para que sigan teniendo efecto.
    */
-  function migrarReglas(guardadas) {
-    const def = reglasDefault();
-    const patrones = def.map(r => String(r.patron).toUpperCase());
-    const propias = (guardadas || []).filter(r =>
-      r && r.patron && patrones.indexOf(String(r.patron).toUpperCase()) === -1);
-    if (!propias.length) return def;
-    const i = def.length - 1;              // antes del comodín `*`
-    return def.slice(0, i).concat(propias, def.slice(i));
+  function migrarReglas(guardadas, version) {
+    const lista = (guardadas || [])
+      .filter(r => r && r.patron)
+      .map(r => Object.assign({}, r));
+    if (!lista.length) return reglasDefault();
+
+    /* Ya vio las reglas de esta versión: manda lo guardado, tal cual. Es lo
+       que la persona editó, ordenó y —si quiso— borró. */
+    if (version >= REGLAS_V) return lista;
+
+    /* Viene de una versión anterior: se suman las reglas nuevas que falten,
+       en el lugar que ocupan en la lista de fábrica. El lugar importa: una
+       regla de nivel (1*100) tiene que quedar arriba de la del pasillo (1*)
+       o no gana nunca. */
+    const tiene = {};
+    lista.forEach(r => { tiene[String(r.patron).toUpperCase()] = true; });
+    reglasDefault().forEach((r, i) => {
+      if (tiene[String(r.patron).toUpperCase()]) return;
+      lista.splice(Math.min(i, lista.length), 0, r);
+    });
+    return lista;
   }
 
   /* ------------------------------------------------------------
@@ -195,5 +215,6 @@ VLM.ubicaciones = (function () {
     return { conteo, sinRegla };
   }
 
-  return { TIPOS, REGLAS_DEFAULT, reglasDefault, migrarReglas, normalizar, coincide, evaluar, cobertura };
+  return { TIPOS, REGLAS_V, REGLAS_DEFAULT, reglasDefault, migrarReglas,
+           normalizar, coincide, evaluar, cobertura };
 })();

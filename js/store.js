@@ -95,8 +95,14 @@ VLM.store = (function () {
     try { localStorage.setItem(KEY_LABS, JSON.stringify(state.labs)); } catch (e) {}
   }
 
+  /* Con la versión adentro: es lo que permite saber si a una lista guardada
+     le faltan reglas porque son nuevas, o porque las borraron a propósito. */
   function guardarReglasUbic() {
-    try { localStorage.setItem(KEY_UBIC, JSON.stringify(state.reglasUbic)); } catch (e) {}
+    try {
+      localStorage.setItem(KEY_UBIC, JSON.stringify({
+        v: VLM.ubicaciones.REGLAS_V, lista: state.reglasUbic
+      }));
+    } catch (e) {}
   }
 
   function guardarPosiciones() {
@@ -130,9 +136,12 @@ VLM.store = (function () {
       state.labs = VLM.labs.catalogoDefault();
     }
     try {
+      // las versiones viejas guardaban el arreglo pelado, sin versión
       const ru = JSON.parse(localStorage.getItem(KEY_UBIC) || 'null');
-      state.reglasUbic = (ru && ru.length)
-        ? VLM.ubicaciones.migrarReglas(ru) : VLM.ubicaciones.reglasDefault();
+      const lista = Array.isArray(ru) ? ru : (ru && ru.lista);
+      const vru = Array.isArray(ru) ? 1 : ((ru && ru.v) || 1);
+      state.reglasUbic = (lista && lista.length)
+        ? VLM.ubicaciones.migrarReglas(lista, vru) : VLM.ubicaciones.reglasDefault();
     } catch (e) {
       state.reglasUbic = VLM.ubicaciones.reglasDefault();
     }

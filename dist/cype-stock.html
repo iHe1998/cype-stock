@@ -1390,6 +1390,24 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .regla-row.r-tapada { opacity: .6; border-left-color: var(--warn); }
 .regla-row.r-tapada .regla-nota { color: var(--warn); }
 
+/* la descripción de la regla: parece texto, se edita al hacer clic */
+.regla-pie { display: flex; align-items: baseline; gap: 6px; margin-top: 3px; min-width: 0; }
+.regla-desc {
+  flex: 1 1 auto; min-width: 60px; width: auto;
+  height: 18px !important; padding: 0 3px !important;
+  font-size: 10.5px !important; font-family: inherit !important;
+  color: var(--text-2) !important;
+  background: none !important; border: 1px solid transparent !important;
+  border-radius: 3px;
+}
+.regla-desc::placeholder { color: var(--muted); opacity: .55; font-style: italic; }
+.regla-desc:hover { border-color: var(--border) !important; }
+.regla-desc:focus {
+  background: var(--surface) !important;
+  border-color: var(--accent) !important; color: var(--text) !important;
+}
+.regla-pie .regla-nota { margin-top: 0; flex: none; white-space: nowrap; }
+
 </style>
 </head>
 <body>
@@ -1840,7 +1858,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 16/09/2026 20:25 - b8b8036</span>
+      <span class="muted small" id="appVersion">compilado 16/09/2026 20:41 - 985dfa0</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -2655,6 +2673,13 @@ VLM.ubicaciones = (function () {
      export de Biosidus. Se editan en Configuración; el archivo bueno
      va a traer las posiciones del VLM, que todavía no aparecen acá.
      ------------------------------------------------------------ */
+  /* Versión de las reglas de fábrica. Se sube SÓLO cuando cambia
+     REGLAS_DEFAULT, y es lo que decide si a una lista guardada hay que
+     sumarle reglas nuevas o hay que dejarla en paz. Sin esto no había forma
+     de distinguir "esta regla no la tenés porque es nueva" de "esta regla la
+     borraste a propósito". */
+  const REGLAS_V = 2;
+
   const REGLAS_DEFAULT = [
     // --- tránsito, acondicionado y faltantes: no son stock ubicado ---
     { patron: 'SPP',     accion: 'ignorar', nota: 'tránsito' },
@@ -2725,14 +2750,27 @@ VLM.ubicaciones = (function () {
    * la red de seguridad. Las reglas propias (patrones que no están en las de
    * fábrica) se conservan, antes del `*` final para que sigan teniendo efecto.
    */
-  function migrarReglas(guardadas) {
-    const def = reglasDefault();
-    const patrones = def.map(r => String(r.patron).toUpperCase());
-    const propias = (guardadas || []).filter(r =>
-      r && r.patron && patrones.indexOf(String(r.patron).toUpperCase()) === -1);
-    if (!propias.length) return def;
-    const i = def.length - 1;              // antes del comodín `*`
-    return def.slice(0, i).concat(propias, def.slice(i));
+  function migrarReglas(guardadas, version) {
+    const lista = (guardadas || [])
+      .filter(r => r && r.patron)
+      .map(r => Object.assign({}, r));
+    if (!lista.length) return reglasDefault();
+
+    /* Ya vio las reglas de esta versión: manda lo guardado, tal cual. Es lo
+       que la persona editó, ordenó y —si quiso— borró. */
+    if (version >= REGLAS_V) return lista;
+
+    /* Viene de una versión anterior: se suman las reglas nuevas que falten,
+       en el lugar que ocupan en la lista de fábrica. El lugar importa: una
+       regla de nivel (1*100) tiene que quedar arriba de la del pasillo (1*)
+       o no gana nunca. */
+    const tiene = {};
+    lista.forEach(r => { tiene[String(r.patron).toUpperCase()] = true; });
+    reglasDefault().forEach((r, i) => {
+      if (tiene[String(r.patron).toUpperCase()]) return;
+      lista.splice(Math.min(i, lista.length), 0, r);
+    });
+    return lista;
   }
 
   /* ------------------------------------------------------------
@@ -2828,7 +2866,8 @@ VLM.ubicaciones = (function () {
     return { conteo, sinRegla };
   }
 
-  return { TIPOS, REGLAS_DEFAULT, reglasDefault, migrarReglas, normalizar, coincide, evaluar, cobertura };
+  return { TIPOS, REGLAS_V, REGLAS_DEFAULT, reglasDefault, migrarReglas,
+           normalizar, coincide, evaluar, cobertura };
 })();
 
 </script>
@@ -2930,8 +2969,14 @@ VLM.store = (function () {
     try { localStorage.setItem(KEY_LABS, JSON.stringify(state.labs)); } catch (e) {}
   }
 
+  /* Con la versión adentro: es lo que permite saber si a una lista guardada
+     le faltan reglas porque son nuevas, o porque las borraron a propósito. */
   function guardarReglasUbic() {
-    try { localStorage.setItem(KEY_UBIC, JSON.stringify(state.reglasUbic)); } catch (e) {}
+    try {
+      localStorage.setItem(KEY_UBIC, JSON.stringify({
+        v: VLM.ubicaciones.REGLAS_V, lista: state.reglasUbic
+      }));
+    } catch (e) {}
   }
 
   function guardarPosiciones() {
@@ -2965,9 +3010,12 @@ VLM.store = (function () {
       state.labs = VLM.labs.catalogoDefault();
     }
     try {
+      // las versiones viejas guardaban el arreglo pelado, sin versión
       const ru = JSON.parse(localStorage.getItem(KEY_UBIC) || 'null');
-      state.reglasUbic = (ru && ru.length)
-        ? VLM.ubicaciones.migrarReglas(ru) : VLM.ubicaciones.reglasDefault();
+      const lista = Array.isArray(ru) ? ru : (ru && ru.lista);
+      const vru = Array.isArray(ru) ? 1 : ((ru && ru.v) || 1);
+      state.reglasUbic = (lista && lista.length)
+        ? VLM.ubicaciones.migrarReglas(lista, vru) : VLM.ubicaciones.reglasDefault();
     } catch (e) {
       state.reglasUbic = VLM.ubicaciones.reglasDefault();
     }
@@ -7482,13 +7530,18 @@ VLM.app = (function () {
         // una regla que no agarra nada porque otra de más arriba se le
         // adelanta no se distingue de una que no coincide con nada
         const tapada = cob && n === 0 ? cob.conteo[i].tapadaPor : null;
-        const nota = (r.nota || '') +
-          (n !== null ? (r.nota ? ' · ' : '') + n + ' ubic.' : '') +
+        const info = (n !== null ? n + ' ubic.' : '') +
           (tapada ? ' · sin efecto: «' + tapada + '» las agarra antes' : '');
         return '<div class="regla-row' + (ign ? ' r-ign' : '') +
             (tapada ? ' r-tapada' : '') + '" data-i="' + i + '">' +
           '<div><input type="text" data-campo="patron" value="' + U.esc(r.patron) + '">' +
-            (nota ? '<span class="regla-nota">' + U.esc(nota) + '</span>' : '') + '</div>' +
+            '<div class="regla-pie">' +
+              // se ve como texto hasta que le hacen clic: la descripción es
+              // para leerla de un vistazo, no un campo más para completar
+              '<input type="text" class="regla-desc" data-campo="nota" ' +
+                'placeholder="para qué es" value="' + U.esc(r.nota || '') + '">' +
+              (info ? '<span class="regla-nota">' + U.esc(info) + '</span>' : '') +
+            '</div></div>' +
           sel('accion', r.accion || 'usar', { usar: 'Usar', ignorar: 'Ignorar' }) +
           sel('tipo', r.tipo || '', { '': '—', picking: 'Picking', altura: 'Altura' }, ign) +
           sel('zona', r.zona || '', { '': '—', frio: '❄ Frío', ambiente: '🌡 Ambiente' }, ign) +

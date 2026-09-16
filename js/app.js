@@ -1331,13 +1331,18 @@ VLM.app = (function () {
         // una regla que no agarra nada porque otra de más arriba se le
         // adelanta no se distingue de una que no coincide con nada
         const tapada = cob && n === 0 ? cob.conteo[i].tapadaPor : null;
-        const nota = (r.nota || '') +
-          (n !== null ? (r.nota ? ' · ' : '') + n + ' ubic.' : '') +
+        const info = (n !== null ? n + ' ubic.' : '') +
           (tapada ? ' · sin efecto: «' + tapada + '» las agarra antes' : '');
         return '<div class="regla-row' + (ign ? ' r-ign' : '') +
             (tapada ? ' r-tapada' : '') + '" data-i="' + i + '">' +
           '<div><input type="text" data-campo="patron" value="' + U.esc(r.patron) + '">' +
-            (nota ? '<span class="regla-nota">' + U.esc(nota) + '</span>' : '') + '</div>' +
+            '<div class="regla-pie">' +
+              // se ve como texto hasta que le hacen clic: la descripción es
+              // para leerla de un vistazo, no un campo más para completar
+              '<input type="text" class="regla-desc" data-campo="nota" ' +
+                'placeholder="para qué es" value="' + U.esc(r.nota || '') + '">' +
+              (info ? '<span class="regla-nota">' + U.esc(info) + '</span>' : '') +
+            '</div></div>' +
           sel('accion', r.accion || 'usar', { usar: 'Usar', ignorar: 'Ignorar' }) +
           sel('tipo', r.tipo || '', { '': '—', picking: 'Picking', altura: 'Altura' }, ign) +
           sel('zona', r.zona || '', { '': '—', frio: '❄ Frío', ambiente: '🌡 Ambiente' }, ign) +

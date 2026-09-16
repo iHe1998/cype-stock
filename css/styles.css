@@ -1380,3 +1380,21 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* una regla que nunca llega a aplicarse: el problema es el orden, no ella */
 .regla-row.r-tapada { opacity: .6; border-left-color: var(--warn); }
 .regla-row.r-tapada .regla-nota { color: var(--warn); }
+
+/* la descripción de la regla: parece texto, se edita al hacer clic */
+.regla-pie { display: flex; align-items: baseline; gap: 6px; margin-top: 3px; min-width: 0; }
+.regla-desc {
+  flex: 1 1 auto; min-width: 60px; width: auto;
+  height: 18px !important; padding: 0 3px !important;
+  font-size: 10.5px !important; font-family: inherit !important;
+  color: var(--text-2) !important;
+  background: none !important; border: 1px solid transparent !important;
+  border-radius: 3px;
+}
+.regla-desc::placeholder { color: var(--muted); opacity: .55; font-style: italic; }
+.regla-desc:hover { border-color: var(--border) !important; }
+.regla-desc:focus {
+  background: var(--surface) !important;
+  border-color: var(--accent) !important; color: var(--text) !important;
+}
+.regla-pie .regla-nota { margin-top: 0; flex: none; white-space: nowrap; }
