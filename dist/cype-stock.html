@@ -1074,6 +1074,23 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    y los campos quedaban a la vista igual con el bloque cerrado. */
 .cfg-avanzado:not([open]) > *:not(summary) { display: none; }
 
+/* Aviso de modo lectura arriba de Configuración. */
+.cfg-bloqueo {
+  display: flex; align-items: flex-start; gap: 10px;
+  max-width: 1500px; margin: 0 auto 16px;
+  padding: 11px 14px; border-radius: var(--r);
+  background: var(--warn-dim);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-left: 3px solid var(--warn);
+  font-size: 13px; color: var(--text);
+}
+.cfg-bloqueo .ico { color: var(--warn); margin-top: 1px; }
+/* que se note que están trabados, no que parezcan rotos */
+.cfg-card input:disabled, .cfg-card select:disabled,
+.cfg-card button:disabled, .pos-inp:disabled {
+  opacity: .5; cursor: not-allowed;
+}
+
 </style>
 </head>
 <body>
@@ -1263,6 +1280,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <button class="btn btn-icon" data-close title="Cerrar"><svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </header>
     <div class="modal-body">
+      <div class="cfg-bloqueo" id="cfgBloqueo" hidden>
+        <svg viewBox="0 0 24 24" class="ico"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <div><strong>Modo lectura.</strong> Para cambiar cualquier configuración hace falta
+          iniciar sesión con una cuenta autorizada, en <em>Stock y máximos</em>.</div>
+      </div>
       <div class="cfg-layout">
 
       <section class="cfg-card">
@@ -1296,9 +1318,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </section>
 
       <section class="cfg-card">
-      <h3>Stock y máximos compartidos</h3>
-      <p class="muted small">Sin conectar, todo vive en <strong>esta</strong> PC y cada máquina
-        necesita su propia carga. Conectada, se carga una vez y lo ven todas.</p>
+      <h3>Stock y máximos</h3>
+      <p class="muted small">Se necesita una cuenta autorizada para cambiar configuraciones.</p>
       <div class="nube-estado" id="nubeEstado"></div>
       <div class="cfg-grid" id="nubeLogin" hidden>
         <label class="field">
@@ -1386,7 +1407,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       </div>
     </div>
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 15/09/2026 20:57 - c23800c</span>
+      <span class="muted small" id="appVersion">compilado 15/09/2026 21:13 - 8cc085a</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1763,6 +1784,22 @@ VLM.nube = (function () {
   /** ¿La conexión vino de config.js y no de esta PC? */
   function esPorDefecto() { return !!(cfg && cfg.porDefecto); }
 
+  /**
+   * ¿Se pueden tocar las configuraciones?
+   *
+   * Con una base conectada hace falta sesión: la pantalla del depósito y
+   * cualquiera que abra la web ven, pero no cambian nada. Sin base conectada
+   * —el archivo suelto en un pendrive— no hay contra qué autenticarse y sería
+   * absurdo trabarlo, así que ahí se puede todo.
+   *
+   * Esto traba la interfaz, que es lo que evita los accidentes: alguien
+   * apoyando el codo en la PC del depósito. No es una barrera de seguridad —
+   * quien sepa abrir la consola del navegador la saltea—. Lo que de verdad
+   * protege lo que ven los demás son las políticas de la base, que rechazan
+   * cualquier escritura sin sesión.
+   */
+  function puedeEditar() { return !configurada() || conSesion(); }
+
   function configurada() { return !!(cfg && cfg.url && cfg.anonKey); }
   function conSesion()   { return !!(sesion && sesion.access_token); }
   function email()       { return sesion ? sesion.email : null; }
@@ -1924,7 +1961,7 @@ VLM.nube = (function () {
   cargar();
 
   return {
-    cargar, configurada, conSesion, esPorDefecto, email, datos, setConfig,
+    cargar, configurada, conSesion, esPorDefecto, puedeEditar, email, datos, setConfig,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
     bajarStock, subirStock
   };
@@ -4718,7 +4755,10 @@ VLM.views = (function () {
     html += '<div class="notice" style="margin-bottom:12px">' +
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
-      '<div>Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
+      '<div>' +
+      (VLM.nube.puedeEditar() ? '' : '<strong>Modo lectura:</strong> hace falta iniciar sesión ' +
+        'con una cuenta autorizada para cambiar los valores. ') +
+      'Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
       '(cuánto entra) de cada artículo en su posición de picking. Se guardan y se aplican al instante.<br>' +
       '<span class="small muted">La reserva —altura y el pasillo que abastece al VLM— no se ' +
       'configura: de ahí se saca, no se rellena. Se ve en el detalle del artículo y en la reposición.</span><br>' +
@@ -4805,8 +4845,10 @@ VLM.views = (function () {
    * cada número cargado (ver restaurarFoco en app.js).
    */
   function celdaInp(f, campo) {
+    // el mínimo y el máximo son configuración: sin sesión se ven pero no se tocan
+    const trabado = !VLM.nube.puedeEditar();
     return '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-      'inputmode="numeric" ' +
+      'inputmode="numeric" ' + (trabado ? 'disabled title="Iniciá sesión para cambiarlo" ' : '') +
       'data-k="' + U.esc(f.ubicacion + '|' + f.codigo + '|' + campo) + '" ' +
       'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" ' +
       'data-campo="' + campo + '" value="' + (f[campo] || '') + '"></td>';
@@ -5798,6 +5840,33 @@ VLM.app = (function () {
      ============================================================ */
   /* ---------- máximos compartidos ---------- */
 
+  /* Controles que siguen activos aunque no haya sesión.
+     - los de entrar, porque son justamente cómo se desbloquea;
+     - los de conexión, que son la salida de emergencia si la base a la que
+       apunta esta PC está mal o caída: son locales y no cambian nada de lo
+       que ven los demás;
+     - los de sólo lectura: traer de la base y exportar el CSV. */
+  const SIN_BLOQUEO = ['cfgNubeMail', 'cfgNubePass', 'btnNubeEntrar', 'btnNubeSalir',
+                       'cfgNubeUrl', 'cfgNubeKey', 'btnNubeGuardar',
+                       'btnNubeBajar', 'btnExportCsv'];
+
+  /**
+   * Traba la pantalla de Configuración entera cuando no hay sesión.
+   *
+   * Es una traba de interfaz: evita el accidente —alguien tocando la PC del
+   * depósito— no al que sepa abrir la consola. Lo que de verdad protege lo
+   * que ven los demás son las políticas de la base.
+   */
+  function aplicarBloqueo() {
+    const trabado = !VLM.nube.puedeEditar();
+    $$('#modalSettings input, #modalSettings select, #modalSettings button').forEach(el => {
+      if (el.hasAttribute('data-close')) return;
+      if (SIN_BLOQUEO.indexOf(el.id) > -1) return;
+      el.disabled = trabado;
+    });
+    $('#cfgBloqueo').hidden = !trabado;
+  }
+
   function pintarNube() {
     const N = VLM.nube;
     const est = $('#nubeEstado');
@@ -5821,10 +5890,11 @@ VLM.app = (function () {
       $('#btnNubeSalir').addEventListener('click', () => { N.salir(); pintarNube(); });
     } else {
       est.className = 'nube-estado es-lectura';
-      est.innerHTML = '<span class="dot stale"></span>Conectado en modo lectura · ' +
-        'iniciá sesión para poder subir cambios' +
-        (N.esPorDefecto() ? ' <span class="muted">(conexión del repositorio)</span>' : '');
+      est.innerHTML = '<span class="dot stale"></span>Modo lectura · ' +
+        'iniciá sesión con una cuenta autorizada para poder cambiar algo';
     }
+    // el estado de la sesión define qué se puede tocar en toda la pantalla
+    aplicarBloqueo();
   }
 
   /**

@@ -848,7 +848,10 @@ VLM.views = (function () {
     html += '<div class="notice" style="margin-bottom:12px">' +
       '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
         '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
-      '<div>Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
+      '<div>' +
+      (VLM.nube.puedeEditar() ? '' : '<strong>Modo lectura:</strong> hace falta iniciar sesión ' +
+        'con una cuenta autorizada para cambiar los valores. ') +
+      'Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
       '(cuánto entra) de cada artículo en su posición de picking. Se guardan y se aplican al instante.<br>' +
       '<span class="small muted">La reserva —altura y el pasillo que abastece al VLM— no se ' +
       'configura: de ahí se saca, no se rellena. Se ve en el detalle del artículo y en la reposición.</span><br>' +
@@ -935,8 +938,10 @@ VLM.views = (function () {
    * cada número cargado (ver restaurarFoco en app.js).
    */
   function celdaInp(f, campo) {
+    // el mínimo y el máximo son configuración: sin sesión se ven pero no se tocan
+    const trabado = !VLM.nube.puedeEditar();
     return '<td class="t-num"><input class="pos-inp" type="number" min="0" step="1" ' +
-      'inputmode="numeric" ' +
+      'inputmode="numeric" ' + (trabado ? 'disabled title="Iniciá sesión para cambiarlo" ' : '') +
       'data-k="' + U.esc(f.ubicacion + '|' + f.codigo + '|' + campo) + '" ' +
       'data-ubic="' + U.esc(f.ubicacion) + '" data-art="' + U.esc(f.codigo) + '" ' +
       'data-campo="' + campo + '" value="' + (f[campo] || '') + '"></td>';

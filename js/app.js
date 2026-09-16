@@ -633,6 +633,33 @@ VLM.app = (function () {
      ============================================================ */
   /* ---------- máximos compartidos ---------- */
 
+  /* Controles que siguen activos aunque no haya sesión.
+     - los de entrar, porque son justamente cómo se desbloquea;
+     - los de conexión, que son la salida de emergencia si la base a la que
+       apunta esta PC está mal o caída: son locales y no cambian nada de lo
+       que ven los demás;
+     - los de sólo lectura: traer de la base y exportar el CSV. */
+  const SIN_BLOQUEO = ['cfgNubeMail', 'cfgNubePass', 'btnNubeEntrar', 'btnNubeSalir',
+                       'cfgNubeUrl', 'cfgNubeKey', 'btnNubeGuardar',
+                       'btnNubeBajar', 'btnExportCsv'];
+
+  /**
+   * Traba la pantalla de Configuración entera cuando no hay sesión.
+   *
+   * Es una traba de interfaz: evita el accidente —alguien tocando la PC del
+   * depósito— no al que sepa abrir la consola. Lo que de verdad protege lo
+   * que ven los demás son las políticas de la base.
+   */
+  function aplicarBloqueo() {
+    const trabado = !VLM.nube.puedeEditar();
+    $$('#modalSettings input, #modalSettings select, #modalSettings button').forEach(el => {
+      if (el.hasAttribute('data-close')) return;
+      if (SIN_BLOQUEO.indexOf(el.id) > -1) return;
+      el.disabled = trabado;
+    });
+    $('#cfgBloqueo').hidden = !trabado;
+  }
+
   function pintarNube() {
     const N = VLM.nube;
     const est = $('#nubeEstado');
@@ -656,10 +683,11 @@ VLM.app = (function () {
       $('#btnNubeSalir').addEventListener('click', () => { N.salir(); pintarNube(); });
     } else {
       est.className = 'nube-estado es-lectura';
-      est.innerHTML = '<span class="dot stale"></span>Conectado en modo lectura · ' +
-        'iniciá sesión para poder subir cambios' +
-        (N.esPorDefecto() ? ' <span class="muted">(conexión del repositorio)</span>' : '');
+      est.innerHTML = '<span class="dot stale"></span>Modo lectura · ' +
+        'iniciá sesión con una cuenta autorizada para poder cambiar algo';
     }
+    // el estado de la sesión define qué se puede tocar en toda la pantalla
+    aplicarBloqueo();
   }
 
   /**

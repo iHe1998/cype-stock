@@ -50,6 +50,22 @@ VLM.nube = (function () {
   /** ¿La conexión vino de config.js y no de esta PC? */
   function esPorDefecto() { return !!(cfg && cfg.porDefecto); }
 
+  /**
+   * ¿Se pueden tocar las configuraciones?
+   *
+   * Con una base conectada hace falta sesión: la pantalla del depósito y
+   * cualquiera que abra la web ven, pero no cambian nada. Sin base conectada
+   * —el archivo suelto en un pendrive— no hay contra qué autenticarse y sería
+   * absurdo trabarlo, así que ahí se puede todo.
+   *
+   * Esto traba la interfaz, que es lo que evita los accidentes: alguien
+   * apoyando el codo en la PC del depósito. No es una barrera de seguridad —
+   * quien sepa abrir la consola del navegador la saltea—. Lo que de verdad
+   * protege lo que ven los demás son las políticas de la base, que rechazan
+   * cualquier escritura sin sesión.
+   */
+  function puedeEditar() { return !configurada() || conSesion(); }
+
   function configurada() { return !!(cfg && cfg.url && cfg.anonKey); }
   function conSesion()   { return !!(sesion && sesion.access_token); }
   function email()       { return sesion ? sesion.email : null; }
@@ -211,7 +227,7 @@ VLM.nube = (function () {
   cargar();
 
   return {
-    cargar, configurada, conSesion, esPorDefecto, email, datos, setConfig,
+    cargar, configurada, conSesion, esPorDefecto, puedeEditar, email, datos, setConfig,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
     bajarStock, subirStock
   };

@@ -1064,3 +1064,20 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
    es de su hoja de estilos: cualquier display que pongamos nosotros le gana
    y los campos quedaban a la vista igual con el bloque cerrado. */
 .cfg-avanzado:not([open]) > *:not(summary) { display: none; }
+
+/* Aviso de modo lectura arriba de Configuración. */
+.cfg-bloqueo {
+  display: flex; align-items: flex-start; gap: 10px;
+  max-width: 1500px; margin: 0 auto 16px;
+  padding: 11px 14px; border-radius: var(--r);
+  background: var(--warn-dim);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-left: 3px solid var(--warn);
+  font-size: 13px; color: var(--text);
+}
+.cfg-bloqueo .ico { color: var(--warn); margin-top: 1px; }
+/* que se note que están trabados, no que parezcan rotos */
+.cfg-card input:disabled, .cfg-card select:disabled,
+.cfg-card button:disabled, .pos-inp:disabled {
+  opacity: .5; cursor: not-allowed;
+}

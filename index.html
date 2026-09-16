@@ -195,6 +195,11 @@
       <button class="btn btn-icon" data-close title="Cerrar"><svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </header>
     <div class="modal-body">
+      <div class="cfg-bloqueo" id="cfgBloqueo" hidden>
+        <svg viewBox="0 0 24 24" class="ico"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <div><strong>Modo lectura.</strong> Para cambiar cualquier configuración hace falta
+          iniciar sesión con una cuenta autorizada, en <em>Stock y máximos</em>.</div>
+      </div>
       <div class="cfg-layout">
 
       <section class="cfg-card">
@@ -228,9 +233,8 @@
       </section>
 
       <section class="cfg-card">
-      <h3>Stock y máximos compartidos</h3>
-      <p class="muted small">Sin conectar, todo vive en <strong>esta</strong> PC y cada máquina
-        necesita su propia carga. Conectada, se carga una vez y lo ven todas.</p>
+      <h3>Stock y máximos</h3>
+      <p class="muted small">Se necesita una cuenta autorizada para cambiar configuraciones.</p>
       <div class="nube-estado" id="nubeEstado"></div>
       <div class="cfg-grid" id="nubeLogin" hidden>
         <label class="field">
