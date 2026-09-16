@@ -1328,19 +1328,30 @@ VLM.app = (function () {
       reglas.map((r, i) => {
         const n = cob ? cob.conteo[i].n : null;
         const ign = r.accion === 'ignorar';
-        return '<div class="regla-row' + (ign ? ' r-ign' : '') + '" data-i="' + i + '">' +
+        // una regla que no agarra nada porque otra de más arriba se le
+        // adelanta no se distingue de una que no coincide con nada
+        const tapada = cob && n === 0 ? cob.conteo[i].tapadaPor : null;
+        const nota = (r.nota || '') +
+          (n !== null ? (r.nota ? ' · ' : '') + n + ' ubic.' : '') +
+          (tapada ? ' · sin efecto: «' + tapada + '» las agarra antes' : '');
+        return '<div class="regla-row' + (ign ? ' r-ign' : '') +
+            (tapada ? ' r-tapada' : '') + '" data-i="' + i + '">' +
           '<div><input type="text" data-campo="patron" value="' + U.esc(r.patron) + '">' +
-            (r.nota || n !== null
-              ? '<span class="regla-nota">' + U.esc(r.nota || '') +
-                (n !== null ? (r.nota ? ' · ' : '') + n + ' ubic.' : '') + '</span>'
-              : '') + '</div>' +
+            (nota ? '<span class="regla-nota">' + U.esc(nota) + '</span>' : '') + '</div>' +
           sel('accion', r.accion || 'usar', { usar: 'Usar', ignorar: 'Ignorar' }) +
           sel('tipo', r.tipo || '', { '': '—', picking: 'Picking', altura: 'Altura' }, ign) +
           sel('zona', r.zona || '', { '': '—', frio: '❄ Frío', ambiente: '🌡 Ambiente' }, ign) +
           sel('ambito', r.ambito || '', { '': '—', vlm: 'VLM', externo: 'Fuera' }, ign) +
-          '<button class="btn btn-icon lab-row-del" title="Quitar regla">' +
-            '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
-          '</div>';
+          '<div class="regla-acciones">' +
+            '<button class="btn btn-icon regla-sube" title="Subir: gana antes"' +
+              (i === 0 ? ' disabled' : '') + '>' +
+              '<svg viewBox="0 0 24 24" class="ico"><path d="m6 15 6-6 6 6"/></svg></button>' +
+            '<button class="btn btn-icon regla-baja" title="Bajar"' +
+              (i === reglas.length - 1 ? ' disabled' : '') + '>' +
+              '<svg viewBox="0 0 24 24" class="ico"><path d="m6 9 6 6 6-6"/></svg></button>' +
+            '<button class="btn btn-icon lab-row-del" title="Quitar regla">' +
+              '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
+          '</div></div>';
       }).join('') +
       (cob && cob.sinRegla
         ? '<p class="muted small" style="margin-top:8px">' + cob.sinRegla +
@@ -1370,17 +1381,60 @@ VLM.app = (function () {
         S.setReglasUbic(S.state.reglasUbic.filter((_, j) => j !== i));
         pintarReglasEditor();
       });
+      U.$('.regla-sube', row).addEventListener('click', () => mover(i, -1));
+      U.$('.regla-baja', row).addEventListener('click', () => mover(i, +1));
     });
+
+    /** Cambia una regla de lugar. El orden ES la lógica: la primera que
+        coincide gana, así que subir una regla es lo que la hace valer. */
+    function mover(i, paso) {
+      const j = i + paso;
+      const lista = S.state.reglasUbic.slice();
+      if (j < 0 || j >= lista.length) return;
+      const t = lista[i]; lista[i] = lista[j]; lista[j] = t;
+      S.setReglasUbic(lista);
+      pintarReglasEditor();
+    }
   }
 
+  /**
+   * Agrega una regla donde pueda servir para algo.
+   *
+   * Antes se agregaba al final, y al final casi nunca gana: las reglas se
+   * evalúan en orden y arriba están los comodines (`1*`, `0*`, `*`) que se
+   * quedan con todo. Una regla para una posición concreta iba a parar abajo
+   * de ellos, no agarraba nada y parecía que la app no se actualizaba.
+   *
+   * Así que se la mete justo ARRIBA de la primera regla que hoy se queda con
+   * alguna de las posiciones que el patrón nuevo abarca. Es el lugar más
+   * abajo posible en el que igual gana: no se saltea reglas que no tienen
+   * nada que ver —las de ignorar, sobre todo— pero sí a la que la tapaba.
+   */
   function agregarRegla() {
     const patron = (prompt('Patrón de posición (ej: BIOCAM*, *100, P*, SPP):') || '').trim();
     if (!patron) return;
-    S.setReglasUbic(S.state.reglasUbic.concat([
-      { patron: patron, accion: 'usar', tipo: 'picking' }
-    ]));
+
+    const Ub = VLM.ubicaciones;
+    const lista = S.state.reglasUbic.slice();
+    const ubics = S.state.meta.ubicacionesVistas || [];
+    const alcanza = ubics.filter(u => Ub.coincide(u, patron));
+
+    let donde = 0;   // sin stock cargado no hay con qué decidir: arriba de todo
+    if (alcanza.length) {
+      donde = lista.length;
+      alcanza.forEach(u => {
+        for (let k = 0; k < lista.length; k++) {
+          if (Ub.coincide(u, lista[k].patron)) { if (k < donde) donde = k; break; }
+        }
+      });
+    }
+
+    lista.splice(donde, 0, { patron: patron, accion: 'usar', tipo: 'picking' });
+    S.setReglasUbic(lista);
     pintarReglasEditor();
-    U.toast('Regla agregada al final. Reordenala editando si hace falta.', 'ok');
+    U.toast(alcanza.length
+      ? 'Regla agregada · agarra ' + alcanza.length + ' ubicación(es)'
+      : 'Regla agregada arriba de todo · no coincide con ninguna ubicación cargada');
   }
 
   /* ---------- catálogo de laboratorios ---------- */

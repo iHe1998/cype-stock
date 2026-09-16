@@ -937,13 +937,13 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .reglas-editor { display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
 .reglas-head, .regla-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.6fr) 94px 94px 112px 94px 32px;
+  grid-template-columns: minmax(150px, 1.6fr) 94px 94px 112px 94px 82px;
   gap: 6px; align-items: center;
   /* En Configuración el nav se lleva 236px y la fila se aplastaba: el patrón
      quedaba en 150px y "VLMVENTA01" cortado. Antes que apretarla, que corra
      de costado — apilada en dos columnas los selects pierden el encabezado y
      no se sabe cuál es Tipo, cuál Zona y cuál Ámbito. */
-  min-width: 660px;
+  min-width: 710px;
 }
 .reglas-head {
   font-size: 10.5px; font-weight: 650; text-transform: uppercase;
@@ -1364,3 +1364,19 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   animation: slidein .2s ease-out;
 }
 .aviso-version .ico { width: 16px; height: 16px; color: var(--accent); flex: none; }
+
+/* ---------- editor de reglas: orden y reglas tapadas ---------- */
+.regla-acciones {
+  display: flex; gap: 2px; justify-content: flex-end;
+  /* Si la fila corre de costado, los botones son lo ultimo que tiene que
+     quedar afuera: se quedan pegados al borde. */
+  position: sticky; right: 0;
+  background: inherit; padding-left: 4px;
+}
+.regla-acciones .btn-icon { width: 24px; height: 24px; }
+.regla-acciones .btn-icon:disabled { opacity: .25; cursor: default; }
+.regla-sube, .regla-baja { color: var(--muted); }
+.regla-sube:hover:not(:disabled), .regla-baja:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+/* una regla que nunca llega a aplicarse: el problema es el orden, no ella */
+.regla-row.r-tapada { opacity: .6; border-left-color: var(--warn); }
+.regla-row.r-tapada .regla-nota { color: var(--warn); }

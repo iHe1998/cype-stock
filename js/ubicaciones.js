@@ -174,12 +174,23 @@ VLM.ubicaciones = (function () {
   /** Cuenta cuántas ubicaciones distintas caen en cada regla. Para el editor. */
   function cobertura(ubicaciones, reglas) {
     const lista = reglas && reglas.length ? reglas : REGLAS_DEFAULT;
-    const conteo = lista.map(r => ({ patron: r.patron, accion: r.accion, tipo: r.tipo, n: 0 }));
+    const conteo = lista.map(r => ({ patron: r.patron, accion: r.accion, tipo: r.tipo,
+                                     n: 0, tapadaPor: null }));
     let sinRegla = 0;
     ubicaciones.forEach(u => {
       let i = -1;
       for (let k = 0; k < lista.length; k++) { if (coincide(u, lista[k].patron)) { i = k; break; } }
-      if (i === -1) sinRegla++; else conteo[i].n++;
+      if (i === -1) { sinRegla++; return; }
+      conteo[i].n++;
+      /* Las de más abajo que también agarraban esta posición pero llegan
+         tarde. Sin esto, una regla tapada se ve igual que una que no
+         coincide con nada —las dos dicen "0 ubic."— y no hay forma de
+         darse cuenta de que el problema es el orden. */
+      for (let k = i + 1; k < lista.length; k++) {
+        if (conteo[k].tapadaPor === null && coincide(u, lista[k].patron)) {
+          conteo[k].tapadaPor = lista[i].patron;
+        }
+      }
     });
     return { conteo, sinRegla };
   }
