@@ -1793,19 +1793,14 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
             </div>
           </div>
 
-          <div class="cfg-grupo">
-            <h4>En esta PC</h4>
-            <div class="cfg-actions">
-              <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>
-            </div>
-          </div>
-
           <div class="cfg-grupo cfg-riesgo">
-            <h4>Borrar el stock cargado</h4>
-            <p class="cfg-ayuda">Saca la planilla de esta PC. Los umbrales, las reglas, los
-              laboratorios y los máximos <strong>no se tocan</strong>.</p>
+            <h4>Borrar el stock de esta PC</h4>
+            <p class="cfg-ayuda">Vacía la pantalla acá y nada más: el stock sigue en la base y
+              <strong>vuelve solo</strong> en el próximo refresco. Sirve para destrabar una PC que
+              quedó con datos raros, no para dar de baja el stock. Los umbrales, las reglas, los
+              laboratorios y los máximos no se tocan.</p>
             <div class="cfg-actions">
-              <button class="btn btn-danger" id="btnClearData">Borrar datos cargados</button>
+              <button class="btn btn-danger" id="btnClearData">Borrar datos de esta PC</button>
             </div>
           </div>
         </section>
@@ -1814,7 +1809,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 16/09/2026 19:35 - f0f0d4a</span>
+      <span class="muted small" id="appVersion">compilado 16/09/2026 19:53 - 515342d</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -7013,7 +7008,7 @@ VLM.app = (function () {
                        'btnIrCuenta',
                        'cfgNubeUrl', 'cfgNubeKey', 'btnNubeGuardar',
                        // sacar una copia no cambia nada: que pueda cualquiera
-                       'btnNubeBajar', 'btnExportCsv', 'btnExportMax'];
+                       'btnNubeBajar', 'btnExportMax'];
 
   /* Sección abierta de Configuración. Se mantiene entre aperturas: quien
      está cargando laboratorios abre y cierra varias veces seguidas. */
@@ -7522,16 +7517,6 @@ VLM.app = (function () {
       S.setCfg({ labsNoListados: e.target.checked ? 'incluir' : 'excluir' });
     });
 
-    $('#btnExportCsv').addEventListener('click', () => {
-      if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
-      const items = itemsVisibles();
-      V.exportarRepo(
-        items.filter(p => ['agotado', 'critico', 'bajo'].indexOf(p.estado) > -1)
-             .sort((a, b) => a.urgencia - b.urgencia),
-        S.state.cfg
-      );
-    });
-
     $('#btnExportMax').addEventListener('click', () => {
       if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
       V.exportarMaximos(itemsCalculados());
@@ -7546,10 +7531,16 @@ VLM.app = (function () {
     });
 
     $('#btnClearData').addEventListener('click', () => {
-      if (!confirm('¿Borrar los datos cargados? Esta acción no se puede deshacer.')) return;
+      /* Con una base conectada esto ya no borra nada de verdad: el stock
+         vuelve en el próximo refresco. Prometer "no se puede deshacer" sería
+         mentir y asustar de gusto. */
+      const hayBase = VLM.nube.configurada();
+      if (!confirm(hayBase
+            ? '¿Vaciar la pantalla de esta PC? El stock sigue en la base y vuelve en un rato.'
+            : '¿Borrar los datos cargados? Esta acción no se puede deshacer.')) return;
       S.limpiar();
       $('#modalSettings').hidden = true;
-      U.toast('Datos borrados');
+      U.toast(hayBase ? 'Pantalla vaciada · el stock vuelve de la base' : 'Datos borrados');
     });
   }
 

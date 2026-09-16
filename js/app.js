@@ -913,7 +913,7 @@ VLM.app = (function () {
                        'btnIrCuenta',
                        'cfgNubeUrl', 'cfgNubeKey', 'btnNubeGuardar',
                        // sacar una copia no cambia nada: que pueda cualquiera
-                       'btnNubeBajar', 'btnExportCsv', 'btnExportMax'];
+                       'btnNubeBajar', 'btnExportMax'];
 
   /* Sección abierta de Configuración. Se mantiene entre aperturas: quien
      está cargando laboratorios abre y cierra varias veces seguidas. */
@@ -1422,16 +1422,6 @@ VLM.app = (function () {
       S.setCfg({ labsNoListados: e.target.checked ? 'incluir' : 'excluir' });
     });
 
-    $('#btnExportCsv').addEventListener('click', () => {
-      if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
-      const items = itemsVisibles();
-      V.exportarRepo(
-        items.filter(p => ['agotado', 'critico', 'bajo'].indexOf(p.estado) > -1)
-             .sort((a, b) => a.urgencia - b.urgencia),
-        S.state.cfg
-      );
-    });
-
     $('#btnExportMax').addEventListener('click', () => {
       if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
       V.exportarMaximos(itemsCalculados());
@@ -1446,10 +1436,16 @@ VLM.app = (function () {
     });
 
     $('#btnClearData').addEventListener('click', () => {
-      if (!confirm('¿Borrar los datos cargados? Esta acción no se puede deshacer.')) return;
+      /* Con una base conectada esto ya no borra nada de verdad: el stock
+         vuelve en el próximo refresco. Prometer "no se puede deshacer" sería
+         mentir y asustar de gusto. */
+      const hayBase = VLM.nube.configurada();
+      if (!confirm(hayBase
+            ? '¿Vaciar la pantalla de esta PC? El stock sigue en la base y vuelve en un rato.'
+            : '¿Borrar los datos cargados? Esta acción no se puede deshacer.')) return;
       S.limpiar();
       $('#modalSettings').hidden = true;
-      U.toast('Datos borrados');
+      U.toast(hayBase ? 'Pantalla vaciada · el stock vuelve de la base' : 'Datos borrados');
     });
   }
 
