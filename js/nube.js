@@ -201,6 +201,20 @@ VLM.nube = (function () {
      Cuando SCE escriba solo, va a escribir en esta misma fila: el panel no
      se entera de si del otro lado hubo una persona o un sistema. */
 
+  /**
+   * Sólo la marca de tiempo del stock, sin el stock.
+   *
+   * La fila entera pesa medio mega y las pantallas refrescan cada pocos
+   * minutos: preguntar "¿cambió algo?" con unos cientos de bytes y bajar el
+   * archivo sólo cuando cambió es la diferencia entre gigas por mes y nada.
+   */
+  async function fechaStock() {
+    const filas = await pedir('/rest/v1/' + TABLA_STOCK + '?id=eq.actual&select=actualizado',
+      { method: 'GET' });
+    const f = (filas || [])[0];
+    return f ? f.actualizado : null;
+  }
+
   async function bajarStock() {
     const filas = await pedir('/rest/v1/' + TABLA_STOCK + '?id=eq.actual&select=productos,meta,actualizado,por',
       { method: 'GET' });
@@ -210,6 +224,7 @@ VLM.nube = (function () {
   }
 
   async function subirStock(productos, meta) {
+    const cuando = new Date().toISOString();
     await pedir('/rest/v1/' + TABLA_STOCK + '?on_conflict=id', {
       method: 'POST',
       headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
@@ -218,10 +233,12 @@ VLM.nube = (function () {
         productos: productos,
         meta: meta || {},
         por: (sesion && sesion.email) || null,
-        actualizado: new Date().toISOString()
+        actualizado: cuando
       }])
     }, true);
-    return productos.length;
+    // devuelve la marca para que quien subió no se baje después su propio
+    // archivo por no saber que la fila de la base ya es la suya
+    return cuando;
   }
 
   cargar();
@@ -229,6 +246,6 @@ VLM.nube = (function () {
   return {
     cargar, configurada, conSesion, esPorDefecto, puedeEditar, email, datos, setConfig,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
-    bajarStock, subirStock
+    fechaStock, bajarStock, subirStock
   };
 })();

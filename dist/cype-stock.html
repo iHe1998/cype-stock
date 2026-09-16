@@ -1800,7 +1800,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 16/09/2026 18:48 - a5230bf</span>
+      <span class="muted small" id="appVersion">compilado 16/09/2026 19:27 - 1298b31</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -2343,6 +2343,20 @@ VLM.nube = (function () {
      Cuando SCE escriba solo, va a escribir en esta misma fila: el panel no
      se entera de si del otro lado hubo una persona o un sistema. */
 
+  /**
+   * Sólo la marca de tiempo del stock, sin el stock.
+   *
+   * La fila entera pesa medio mega y las pantallas refrescan cada pocos
+   * minutos: preguntar "¿cambió algo?" con unos cientos de bytes y bajar el
+   * archivo sólo cuando cambió es la diferencia entre gigas por mes y nada.
+   */
+  async function fechaStock() {
+    const filas = await pedir('/rest/v1/' + TABLA_STOCK + '?id=eq.actual&select=actualizado',
+      { method: 'GET' });
+    const f = (filas || [])[0];
+    return f ? f.actualizado : null;
+  }
+
   async function bajarStock() {
     const filas = await pedir('/rest/v1/' + TABLA_STOCK + '?id=eq.actual&select=productos,meta,actualizado,por',
       { method: 'GET' });
@@ -2352,6 +2366,7 @@ VLM.nube = (function () {
   }
 
   async function subirStock(productos, meta) {
+    const cuando = new Date().toISOString();
     await pedir('/rest/v1/' + TABLA_STOCK + '?on_conflict=id', {
       method: 'POST',
       headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
@@ -2360,10 +2375,12 @@ VLM.nube = (function () {
         productos: productos,
         meta: meta || {},
         por: (sesion && sesion.email) || null,
-        actualizado: new Date().toISOString()
+        actualizado: cuando
       }])
     }, true);
-    return productos.length;
+    // devuelve la marca para que quien subió no se baje después su propio
+    // archivo por no saber que la fila de la base ya es la suya
+    return cuando;
   }
 
   cargar();
@@ -2371,7 +2388,7 @@ VLM.nube = (function () {
   return {
     cargar, configurada, conSesion, esPorDefecto, puedeEditar, email, datos, setConfig,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
-    bajarStock, subirStock
+    fechaStock, bajarStock, subirStock
   };
 })();
 
@@ -7034,16 +7051,24 @@ VLM.app = (function () {
   }
 
   /**
-   * Trae de la base lo compartido: el stock y los máximos.
+   * Trae el stock, pero sólo si cambió desde la última vez.
    *
-   * El stock primero, porque los máximos se aplican sobre los productos. Y
-   * los dos por separado: que falle uno no tiene por qué dejar sin el otro.
+   * La fila del stock pesa medio mega —251 artículos con sus 1.414
+   * posiciones— y cada pantalla abierta refresca cada dos minutos y medio.
+   * Bajarla siempre serían 2,7 GB por mes y por pantalla: más de la mitad del
+   * plan gratis de Supabase gastado en traer exactamente lo mismo que ya
+   * estaba. Preguntar la fecha son unos cientos de bytes, y el stock cambia
+   * una vez por día, cuando alguien importa la planilla.
+   *
+   * Con el botón "Traer de la base" se baja igual: la persona lo pidió.
    */
-  async function bajarDeNube(silencioso) {
+  async function bajarStockSiCambio(silencioso) {
     const N = VLM.nube;
-    if (!N.configurada()) return;
-
     try {
+      if (silencioso) {
+        const fecha = await N.fechaStock();
+        if (fecha && fecha === S.state.meta.subidoEn) return;
+      }
       const s = await N.bajarStock();
       if (s && s.productos && s.productos.length) {
         const productos = s.productos.map(p => VLM.labs.clasificar(S.hidratarFechas(p), S.state.labs));
@@ -7058,6 +7083,19 @@ VLM.app = (function () {
       if (!silencioso) U.toast('No se pudo traer el stock: ' + e.message, 'err');
       else console.warn('nube (stock):', e.message);
     }
+  }
+
+  /**
+   * Trae de la base lo compartido: el stock y los máximos.
+   *
+   * El stock primero, porque los máximos se aplican sobre los productos. Y
+   * los dos por separado: que falle uno no tiene por qué dejar sin el otro.
+   */
+  async function bajarDeNube(silencioso) {
+    const N = VLM.nube;
+    if (!N.configurada()) return;
+
+    await bajarStockSiCambio(silencioso);
 
     try {
       const deLaBase = await N.bajarMaximos();
@@ -7107,7 +7145,12 @@ VLM.app = (function () {
     const N = VLM.nube;
     if (!N.configurada() || !N.conSesion()) return false;
     try {
-      await N.subirStock(S.state.productos, S.state.meta);
+      const cuando = await N.subirStock(S.state.productos, S.state.meta);
+      // dejar anotado que la fila de la base es ésta, o el próximo refresco
+      // se baja medio mega para traer el archivo que acabamos de mandar
+      S.setProductos(S.state.productos, Object.assign({}, S.state.meta, {
+        subidoEn: cuando, subidoPor: N.email()
+      }));
       U.toast('Stock subido: lo ven todas las PCs', 'ok');
       return true;
     } catch (e) {

@@ -1017,16 +1017,24 @@ VLM.app = (function () {
   }
 
   /**
-   * Trae de la base lo compartido: el stock y los máximos.
+   * Trae el stock, pero sólo si cambió desde la última vez.
    *
-   * El stock primero, porque los máximos se aplican sobre los productos. Y
-   * los dos por separado: que falle uno no tiene por qué dejar sin el otro.
+   * La fila del stock pesa medio mega —251 artículos con sus 1.414
+   * posiciones— y cada pantalla abierta refresca cada dos minutos y medio.
+   * Bajarla siempre serían 2,7 GB por mes y por pantalla: más de la mitad del
+   * plan gratis de Supabase gastado en traer exactamente lo mismo que ya
+   * estaba. Preguntar la fecha son unos cientos de bytes, y el stock cambia
+   * una vez por día, cuando alguien importa la planilla.
+   *
+   * Con el botón "Traer de la base" se baja igual: la persona lo pidió.
    */
-  async function bajarDeNube(silencioso) {
+  async function bajarStockSiCambio(silencioso) {
     const N = VLM.nube;
-    if (!N.configurada()) return;
-
     try {
+      if (silencioso) {
+        const fecha = await N.fechaStock();
+        if (fecha && fecha === S.state.meta.subidoEn) return;
+      }
       const s = await N.bajarStock();
       if (s && s.productos && s.productos.length) {
         const productos = s.productos.map(p => VLM.labs.clasificar(S.hidratarFechas(p), S.state.labs));
@@ -1041,6 +1049,19 @@ VLM.app = (function () {
       if (!silencioso) U.toast('No se pudo traer el stock: ' + e.message, 'err');
       else console.warn('nube (stock):', e.message);
     }
+  }
+
+  /**
+   * Trae de la base lo compartido: el stock y los máximos.
+   *
+   * El stock primero, porque los máximos se aplican sobre los productos. Y
+   * los dos por separado: que falle uno no tiene por qué dejar sin el otro.
+   */
+  async function bajarDeNube(silencioso) {
+    const N = VLM.nube;
+    if (!N.configurada()) return;
+
+    await bajarStockSiCambio(silencioso);
 
     try {
       const deLaBase = await N.bajarMaximos();
@@ -1090,7 +1111,12 @@ VLM.app = (function () {
     const N = VLM.nube;
     if (!N.configurada() || !N.conSesion()) return false;
     try {
-      await N.subirStock(S.state.productos, S.state.meta);
+      const cuando = await N.subirStock(S.state.productos, S.state.meta);
+      // dejar anotado que la fila de la base es ésta, o el próximo refresco
+      // se baja medio mega para traer el archivo que acabamos de mandar
+      S.setProductos(S.state.productos, Object.assign({}, S.state.meta, {
+        subidoEn: cuando, subidoPor: N.email()
+      }));
       U.toast('Stock subido: lo ven todas las PCs', 'ok');
       return true;
     } catch (e) {
