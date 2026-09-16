@@ -128,6 +128,12 @@
 
 * { box-sizing: border-box; }
 
+/* El navegador oculta lo que tiene [hidden] desde SU hoja de estilos, que pierde
+   contra cualquier clase nuestra: un .cfg-grid con display:grid seguía a la vista
+   con el atributo puesto. Pasó con el formulario de login, que quedaba abajo del
+   cartel de "ya iniciaste sesión". Esto lo zanja para toda la app. */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -911,11 +917,16 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* ============================================================
    EDITOR DE REGLAS DE POSICIÓN (Configuración)
    ============================================================ */
-.reglas-editor { display: flex; flex-direction: column; gap: 6px; }
+.reglas-editor { display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
 .reglas-head, .regla-row {
   display: grid;
-  grid-template-columns: 1.5fr 90px 90px 110px 90px 32px;
+  grid-template-columns: minmax(150px, 1.6fr) 94px 94px 112px 94px 32px;
   gap: 6px; align-items: center;
+  /* En Configuración el nav se lleva 236px y la fila se aplastaba: el patrón
+     quedaba en 150px y "VLMVENTA01" cortado. Antes que apretarla, que corra
+     de costado — apilada en dos columnas los selects pierden el encabezado y
+     no se sabe cuál es Tipo, cuál Zona y cuál Ámbito. */
+  min-width: 660px;
 }
 .reglas-head {
   font-size: 10.5px; font-weight: 650; text-transform: uppercase;
@@ -939,8 +950,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .regla-nota { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 
 @media (max-width: 760px) {
+  .reglas-editor { overflow-x: visible; }
   .reglas-head { display: none; }
-  .regla-row { grid-template-columns: 1fr 1fr; }
+  .regla-row { grid-template-columns: 1fr 1fr; min-width: 0; }
 }
 
 /* ============================================================
@@ -983,101 +995,227 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .row-link { cursor: pointer; }
 .row-link:hover { background: var(--surface-2); }
 
-/* ---------- máximos compartidos (nube) ---------- */
-.nube-estado {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 10px; padding: 8px 11px;
-  font-size: 12.5px; color: var(--text-2);
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft); border-left: 3px solid var(--muted);
-  border-radius: var(--r-sm);
-}
-.nube-estado.es-ok      { border-left-color: var(--ok); }
-.nube-estado.es-lectura { border-left-color: var(--warn); }
-.btn-sm { height: 26px; padding: 0 9px; font-size: 12px; margin-left: auto; }
-
 /* ============================================================
-   CONFIGURACIÓN A PANTALLA COMPLETA
+   CONFIGURACIÓN
 
-   Creció hasta cinco bloques —umbrales, TV, base compartida, reglas y
-   laboratorios— y en una caja de 560px eran cinco pantallas de scroll
-   una atrás de otra. A pantalla completa entran en columnas y se ve de
-   una qué hay para tocar.
+   Pantalla completa con nav a la izquierda y una sección por vez.
+   Antes eran seis tarjetas en una grilla: entraban todas juntas pero
+   sin jerarquía —la cuenta al lado de los umbrales al lado de las
+   reglas— y había que leerlas enteras para encontrar algo.
    ============================================================ */
 .modal-pantalla { padding: 0; }
 .modal-full {
-  max-width: none; width: 100vw; height: 100vh;
+  /* max-height la limitaba a 88vh y quedaba una franja del panel abajo */
+  max-width: none; width: 100vw; max-height: none;
+  height: 100vh; height: 100dvh;
   border: 0; border-radius: 0;
 }
-.modal-full .modal-body { padding: 20px clamp(16px, 4vw, 48px); }
+.cfg-head { padding-left: clamp(16px, 3.5vw, 40px); }
+.cfg-head h2 { flex: none; }
 
-.cfg-layout {
-  display: grid; gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  align-items: start;
-  max-width: 1500px; margin: 0 auto;
+/* aviso permanente arriba: por qué está todo gris */
+.cfg-chip-lectura {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 650; letter-spacing: .01em;
+  color: var(--warn);
+  background: var(--warn-dim);
+  border: 1px solid color-mix(in srgb, var(--warn) 32%, transparent);
 }
-/* Las reglas y los laboratorios son listas largas de filas anchas: en una
-   columna angosta se les apretaban los campos. */
-.cfg-ancha { grid-column: 1 / -1; }
+.cfg-chip-lectura .ico { width: 13px; height: 13px; }
 
-.cfg-card {
-  padding: 16px 18px;
+.cfg-shell {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: 236px minmax(0, 1fr);
+}
+
+/* ---------- nav ---------- */
+.cfg-nav {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 14px 10px 24px;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+.cfg-nav-tit {
+  margin: 14px 11px 5px;
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: .09em; text-transform: uppercase;
+  color: var(--muted);
+}
+.cfg-nav-tit:first-child { margin-top: 2px; }
+.cfg-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 9px 11px;
+  font: inherit; font-size: 13px; font-weight: 550; text-align: left;
+  color: var(--text-2);
+  background: none; border: 0; border-radius: var(--r-sm);
+  cursor: pointer; transition: background .12s, color .12s;
+}
+.cfg-nav-item .ico { width: 16px; height: 16px; flex: none; opacity: .75; }
+.cfg-nav-item:hover { background: var(--surface-2); color: var(--text); }
+.cfg-nav-item.is-sel {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--text); font-weight: 650;
+}
+.cfg-nav-item.is-sel .ico { color: var(--accent); opacity: 1; }
+
+/* ---------- panel ---------- */
+.cfg-panel { overflow: auto; padding: 24px clamp(16px, 3.5vw, 40px) 40px; }
+.cfg-sec { max-width: 1120px; }
+
+.cfg-sec-head { margin-bottom: 18px; }
+.cfg-sec-head h3 { font-size: 17px; letter-spacing: -.01em; }
+.cfg-sec-head p {
+  margin: 7px 0 0; max-width: 78ch;
+  font-size: 13px; line-height: 1.6; color: var(--text-2);
+}
+
+.cfg-grupo {
+  padding: 16px 18px; margin-bottom: 14px;
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
   border-radius: var(--r);
 }
-.cfg-card > h3 {
-  font-size: 13px; font-weight: 700;
-  letter-spacing: .04em; text-transform: uppercase;
+.cfg-grupo > h4 {
+  font-size: 11.5px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-2);
-  padding-bottom: 8px; margin-bottom: 10px;
-  border-bottom: 1px solid var(--border-soft);
+  margin: 0 0 10px;
 }
-.cfg-card > p.muted { margin: 0 0 12px; }
-.cfg-card .cfg-actions { margin-top: 12px; }
+/* Campos a medida del dato: un porcentaje de dos dígitos en un input de 600px
+   se lee como si esperara un párrafo. Los de la conexión sí son largos. */
+.cfg-grupo .cfg-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 290px));
+  justify-content: start;
+}
+.cfg-grupo .cfg-grid.cfg-grid-ancha {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.cfg-grupo > .cfg-actions { margin-top: 12px; }
+.cfg-grupo > h4 + .cfg-actions,
+.cfg-grupo > .cfg-ayuda + .cfg-actions { margin-top: 10px; }
+.cfg-ayuda {
+  margin: 10px 0 0; max-width: 80ch;
+  font-size: 12px; line-height: 1.55; color: var(--muted);
+}
+.cfg-grupo > h4 + .cfg-ayuda { margin-top: -2px; margin-bottom: 2px; }
 
-@media (max-width: 760px) {
-  .cfg-layout { grid-template-columns: 1fr; }
+/* el borrado, aparte y marcado */
+.cfg-riesgo { border-color: color-mix(in srgb, var(--crit) 28%, var(--border)); }
+.cfg-riesgo > h4 { color: var(--crit); }
+
+/* ---------- cuenta ---------- */
+.cuenta-box {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 15px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--muted);
+  border-radius: var(--r-sm);
+}
+.cuenta-box.es-ok      { border-left-color: var(--ok); }
+.cuenta-box.es-lectura { border-left-color: var(--warn); }
+.cuenta-box .ico { width: 20px; height: 20px; flex: none; color: var(--muted); }
+.cuenta-box.es-lectura .ico { color: var(--warn); }
+.cuenta-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.cuenta-txt strong { font-size: 13.5px; }
+.cuenta-txt span { font-size: 12px; color: var(--muted); }
+.cuenta-avatar {
+  width: 32px; height: 32px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ok) 20%, transparent);
+  color: var(--ok); font-size: 14px; font-weight: 700;
 }
 
-/* Conexión a la base: plegada. Viene de config.js y ya funciona, así que
-   tenerla desplegada era dejar la clave a la vista de cualquiera que mire
-   la pantalla —en una reunión, proyectada— para algo que casi nunca se toca. */
-.cfg-avanzado {
-  margin-top: 14px; padding-top: 12px;
-  border-top: 1px solid var(--border-soft);
+/* correo + clave + botón en una línea; el botón alineado al pie de los campos */
+.cfg-login {
+  display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
+  gap: 12px; align-items: end;
+  margin-top: 14px;
 }
+
+.cfg-permisos { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.cfg-permisos li {
+  display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 12px;
+  align-items: start;
+  font-size: 12.5px; line-height: 1.55; color: var(--text-2);
+}
+.perm-tag {
+  justify-self: start;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 650; white-space: nowrap;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.perm-tag.perm-ok {
+  color: var(--ok); background: var(--ok-dim);
+  border-color: color-mix(in srgb, var(--ok) 32%, transparent);
+}
+
+/* ---------- leyenda de umbrales ---------- */
+.cfg-leyenda {
+  display: flex; gap: 18px; flex-wrap: wrap;
+  margin-top: 14px; font-size: 12px; color: var(--text-2);
+}
+.cfg-leyenda span { display: inline-flex; align-items: center; gap: 7px; }
+.cfg-leyenda .lg { width: 11px; height: 11px; border-radius: 3px; }
+.cfg-leyenda .lg-crit { background: var(--crit-fill, var(--crit)); }
+.cfg-leyenda .lg-bajo { background: var(--warn-fill, var(--warn)); }
+.cfg-leyenda .lg-ok   { background: var(--ok-fill, var(--ok)); }
+
+/* ---------- conexión (plegada) ---------- */
+/* Viene de config.js y ya funciona: tenerla desplegada era dejar la clave a la
+   vista de cualquiera que mire la pantalla, para algo que casi nunca se toca. */
+.cfg-avanzado { margin-top: 4px; }
 .cfg-avanzado > summary {
   cursor: pointer; list-style: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 2px;
   font-size: 12px; font-weight: 600; color: var(--muted);
-  display: flex; align-items: center; gap: 6px;
 }
 .cfg-avanzado > summary::-webkit-details-marker { display: none; }
-.cfg-avanzado > summary::before {
-  content: "▸"; font-size: 10px; transition: transform .12s;
-}
+.cfg-avanzado > summary::before { content: "▸"; font-size: 10px; transition: transform .12s; }
 .cfg-avanzado[open] > summary::before { transform: rotate(90deg); }
 .cfg-avanzado > summary:hover { color: var(--text-2); }
-.cfg-avanzado > p { margin-top: 10px; }
-/* El navegador oculta el contenido plegado con un display:none propio, pero
-   es de su hoja de estilos: cualquier display que pongamos nosotros le gana
-   y los campos quedaban a la vista igual con el bloque cerrado. */
+/* El navegador oculta el contenido plegado con un display:none propio, pero es
+   de su hoja de estilos: cualquier display que pongamos nosotros le gana y los
+   campos quedaban a la vista igual con el bloque cerrado. */
 .cfg-avanzado:not([open]) > *:not(summary) { display: none; }
 
-/* Aviso de modo lectura arriba de Configuración. */
+/* ---------- modo lectura ---------- */
 .cfg-bloqueo {
-  display: flex; align-items: flex-start; gap: 10px;
-  max-width: 1500px; margin: 0 auto 16px;
-  padding: 11px 14px; border-radius: var(--r);
+  display: flex; align-items: center; gap: 12px;
+  max-width: 1120px; margin: 0 0 18px;
+  padding: 12px 15px; border-radius: var(--r);
   background: var(--warn-dim);
   border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
   border-left: 3px solid var(--warn);
   font-size: 13px; color: var(--text);
 }
-.cfg-bloqueo .ico { color: var(--warn); margin-top: 1px; }
+.cfg-bloqueo > div { flex: 1; }
+.cfg-bloqueo .ico { width: 18px; height: 18px; flex: none; color: var(--warn); }
+.btn-sm { height: 27px; padding: 0 10px; font-size: 12px; }
 /* que se note que están trabados, no que parezcan rotos */
-.cfg-card input:disabled, .cfg-card select:disabled,
-.cfg-card button:disabled, .pos-inp:disabled {
+.cfg-grupo input:disabled, .cfg-grupo select:disabled,
+.cfg-grupo button:disabled, .pos-inp:disabled {
   opacity: .5; cursor: not-allowed;
+}
+
+@media (max-width: 860px) {
+  .cfg-shell { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .cfg-nav {
+    flex-direction: row; gap: 4px;
+    padding: 8px 10px; overflow-x: auto;
+    border-right: 0; border-bottom: 1px solid var(--border);
+  }
+  .cfg-nav-tit { display: none; }
+  .cfg-nav-item { width: auto; white-space: nowrap; }
+  .cfg-nav-item span { display: none; }
+  .cfg-nav-item .ico { width: 18px; height: 18px; }
+  .cfg-nav-item.is-sel span { display: inline; }
+  .cfg-login { grid-template-columns: 1fr; }
+  .cfg-permisos li { grid-template-columns: 1fr; gap: 5px; }
 }

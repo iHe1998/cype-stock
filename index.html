@@ -190,137 +190,254 @@
 <!-- ============ CONFIGURACIÓN (pantalla completa) ============ -->
 <div class="modal modal-pantalla" id="modalSettings" hidden>
   <div class="modal-box modal-full">
-    <header class="modal-head">
+    <header class="modal-head cfg-head">
       <h2>Configuración</h2>
+      <span class="cfg-chip-lectura" id="cfgChipLectura" hidden>
+        <svg viewBox="0 0 24 24" class="ico"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Modo lectura
+      </span>
+      <div class="spacer"></div>
       <button class="btn btn-icon" data-close title="Cerrar"><svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </header>
-    <div class="modal-body">
-      <div class="cfg-bloqueo" id="cfgBloqueo" hidden>
-        <svg viewBox="0 0 24 24" class="ico"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-        <div><strong>Modo lectura.</strong> Para cambiar cualquier configuración hace falta
-          iniciar sesión con una cuenta autorizada, en <em>Stock y máximos</em>.</div>
-      </div>
-      <div class="cfg-layout">
 
-      <section class="cfg-card">
-      <h3>Umbrales de alerta</h3>
-      <p class="muted small">Sobre la capacidad (máximo) de la posición.</p>
-      <div class="cfg-grid">
-        <label class="field">
-          <span>% del máximo · CRÍTICO ≤</span>
-          <input type="number" id="cfgPctCritico" min="1" max="99" step="1">
-        </label>
-        <label class="field">
-          <span>% del máximo · BAJO ≤</span>
-          <input type="number" id="cfgPctBajo" min="1" max="99" step="1">
-        </label>
-      </div>
-      </section>
+    <!-- Nav a la izquierda, una sección por vez a la derecha. Todo junto en una
+         grilla de tarjetas era una pared de controles sin jerarquía: no se veía
+         qué tenía que ver con qué ni por dónde empezar. -->
+    <div class="cfg-shell">
+      <nav class="cfg-nav" id="cfgNav" aria-label="Secciones de configuración">
+        <span class="cfg-nav-tit">Acceso</span>
+        <button type="button" class="cfg-nav-item is-sel" data-sec="cuenta">
+          <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+          <span>Cuenta y acceso</span>
+        </button>
 
-      <section class="cfg-card">
-      <h3>Modo TV</h3>
-      <p class="muted small">Cómo rota la pantalla del depósito.</p>
-      <div class="cfg-grid">
-        <label class="field">
-          <span>Segundos por pantalla</span>
-          <input type="number" id="cfgTvSegundos" min="5" max="120" step="1">
-        </label>
-        <label class="field field-check">
-          <input type="checkbox" id="cfgTvSoloCriticos">
-          <span>Priorizar sólo productos críticos</span>
-        </label>
-      </div>
-      </section>
+        <span class="cfg-nav-tit">Panel</span>
+        <button type="button" class="cfg-nav-item" data-sec="alertas">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 16.5h.01"/></svg>
+          <span>Umbrales de alerta</span>
+        </button>
+        <button type="button" class="cfg-nav-item" data-sec="tv">
+          <svg viewBox="0 0 24 24" class="ico"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <span>Pantalla TV</span>
+        </button>
 
-      <section class="cfg-card">
-      <h3>Stock y máximos</h3>
-      <p class="muted small">Se necesita una cuenta autorizada para cambiar configuraciones.</p>
-      <div class="nube-estado" id="nubeEstado"></div>
-      <div class="cfg-grid" id="nubeLogin" hidden>
-        <label class="field">
-          <span>Correo</span>
-          <input type="email" id="cfgNubeMail" spellcheck="false" autocomplete="username">
-        </label>
-        <label class="field">
-          <span>Contraseña</span>
-          <input type="password" id="cfgNubePass" autocomplete="current-password">
-        </label>
-      </div>
-      <div class="cfg-actions" id="nubeLoginBtns" hidden>
-        <button class="btn btn-primary" id="btnNubeEntrar">Iniciar sesión</button>
-      </div>
-      <div class="cfg-actions">
-        <button class="btn" id="btnNubeBajar">Traer de la base</button>
-        <button class="btn" id="btnNubeSubir">Subir máximos</button>
-        <button class="btn" id="btnNubeSubirStock">Subir stock</button>
-      </div>
+        <span class="cfg-nav-tit">Clasificación</span>
+        <button type="button" class="cfg-nav-item" data-sec="reglas">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="7" cy="17" r="2"/></svg>
+          <span>Reglas de posición</span>
+        </button>
+        <button type="button" class="cfg-nav-item" data-sec="labs">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M10 3h4M10 3v6l-5.2 9.4A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-2.6L14 9V3"/><path d="M7.5 15h9"/></svg>
+          <span>Laboratorios</span>
+        </button>
 
-      <!-- La conexión no se muestra: viene de config.js y ya está andando.
-           Tenerla a la vista era dejar la clave proyectada en una reunión y
-           ocupar media tarjeta con dos campos que casi nunca se tocan. Queda
-           acá abajo para el caso de apuntar a otra base. -->
-      <details class="cfg-avanzado">
-        <summary>Conexión</summary>
-        <p class="muted small">Sólo hace falta tocar esto para apuntar a otra base. Lo que se
-          guarde acá vale <strong>en esta PC</strong> y manda sobre la conexión del repositorio.</p>
-        <div class="cfg-grid">
-          <label class="field">
-            <span>URL del proyecto</span>
-            <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
-          </label>
-          <label class="field">
-            <span>Clave anónima (anon)</span>
-            <input type="password" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false" autocomplete="off">
-          </label>
+        <span class="cfg-nav-tit">Datos</span>
+        <button type="button" class="cfg-nav-item" data-sec="datos">
+          <svg viewBox="0 0 24 24" class="ico"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+          <span>Stock y máximos</span>
+        </button>
+      </nav>
+
+      <div class="cfg-panel" id="cfgPanel">
+
+        <div class="cfg-bloqueo" id="cfgBloqueo" hidden>
+          <svg viewBox="0 0 24 24" class="ico"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          <div><strong>Esta sección está en modo lectura.</strong> Para cambiar algo hace falta
+            entrar con una cuenta autorizada.</div>
+          <button class="btn btn-sm" id="btnIrCuenta">Iniciar sesión</button>
         </div>
-        <div class="cfg-actions">
-          <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
-        </div>
-      </details>
-      </section>
 
-      <section class="cfg-card">
-      <h3>Datos</h3>
-      <p class="muted small">La configuración y los máximos no se tocan.</p>
-      <div class="cfg-actions">
-        <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>
-        <button class="btn btn-danger" id="btnClearData">Borrar datos cargados</button>
-      </div>
-      </section>
+        <!-- ---------- cuenta ---------- -->
+        <section class="cfg-sec" data-sec="cuenta">
+          <header class="cfg-sec-head">
+            <h3>Cuenta y acceso</h3>
+            <p>El stock y los máximos viven en una base: se cargan una vez y los ve cualquier PC
+              que abra el panel. Para <strong>cambiar</strong> algo —importar una planilla, tocar
+              un máximo, editar reglas— hace falta una cuenta autorizada.</p>
+          </header>
 
-      <section class="cfg-card cfg-ancha">
-      <h3>Reglas de posición</h3>
-      <p class="muted small">Se evalúan <strong>en orden</strong> y gana la primera que coincide, así
-        que las de ignorar van arriba: <code>PACK</code> tiene que resolverse antes que <code>P*</code>.
-        Comodín <code>*</code> al principio, al final o solo (<code>*</code> = todas).
-        Los cambios se aplican al instante sobre el stock cargado, salvo las filas
-        que una regla de ignorar ya descartó: esas vuelven al reimportar.</p>
-      <div class="reglas-editor" id="reglasEditor"></div>
-      <div class="cfg-actions">
-        <button class="btn" id="btnAddRegla">+ Agregar regla</button>
-        <button class="btn" id="btnResetReglas">Restaurar reglas originales</button>
-      </div>
-      </section>
+          <div class="cfg-grupo">
+            <div id="nubeEstado"></div>
+            <div class="cfg-login" id="nubeLogin" hidden>
+              <label class="field">
+                <span>Correo</span>
+                <input type="email" id="cfgNubeMail" spellcheck="false" autocomplete="username" placeholder="nombre@empresa.com">
+              </label>
+              <label class="field">
+                <span>Contraseña</span>
+                <input type="password" id="cfgNubePass" autocomplete="current-password" placeholder="••••••••">
+              </label>
+              <button class="btn btn-primary" id="btnNubeEntrar">Iniciar sesión</button>
+            </div>
+          </div>
 
-      <section class="cfg-card cfg-ancha">
-      <h3>Laboratorios</h3>
-      <p class="muted small">Sólo se procesan los laboratorios de esta lista. Acá se define
-        <strong>cuáles</strong> entran y cómo se llaman, nada más: si el artículo está dentro del
-        VLM o fuera, y si es frío o ambiente, lo decide <strong>cada SKU según sus ubicaciones</strong>.
-        Un mismo laboratorio tiene artículos de los dos tipos.</p>
-      <div class="labs-editor" id="labsEditor"></div>
-      <div class="cfg-actions">
-        <button class="btn" id="btnAddLab">+ Agregar laboratorio</button>
-        <button class="btn" id="btnResetLabs">Restaurar catálogo original</button>
-      </div>
-      <label class="field field-check" style="margin-top:12px">
-        <input type="checkbox" id="cfgIncluirNoListados">
-        <span>Mostrar también los laboratorios que no están en la lista</span>
-      </label>
-      </section>
+          <div class="cfg-grupo">
+            <h4>Quién puede qué</h4>
+            <ul class="cfg-permisos">
+              <li>
+                <span class="perm-tag">Sin sesión</span>
+                <span>Ve el panel entero, el inventario y la reposición. No puede cambiar nada:
+                  es el modo de la pantalla del depósito.</span>
+              </li>
+              <li>
+                <span class="perm-tag perm-ok">Cuenta autorizada</span>
+                <span>Importa la planilla, carga los máximos y edita umbrales, reglas y
+                  laboratorios. Lo que cambia, lo ven todas las PCs.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- La conexión no se muestra de entrada: viene de config.js y ya está
+               andando. Tenerla a la vista era dejar la clave proyectada en una
+               reunión por dos campos que casi nunca se tocan. -->
+          <details class="cfg-avanzado">
+            <summary>Conexión a la base</summary>
+            <div class="cfg-grupo">
+              <p class="cfg-ayuda">Sólo hace falta tocar esto para apuntar a otra base. Lo que se
+                guarde acá vale <strong>en esta PC</strong> y manda sobre la conexión del repositorio.</p>
+              <div class="cfg-grid cfg-grid-ancha">
+                <label class="field">
+                  <span>URL del proyecto</span>
+                  <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
+                </label>
+                <label class="field">
+                  <span>Clave anónima (anon)</span>
+                  <input type="password" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false" autocomplete="off">
+                </label>
+              </div>
+              <div class="cfg-actions">
+                <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <!-- ---------- umbrales ---------- -->
+        <section class="cfg-sec" data-sec="alertas" hidden>
+          <header class="cfg-sec-head">
+            <h3>Umbrales de alerta</h3>
+            <p>Definen a partir de qué porcentaje del máximo de la posición un artículo pasa a
+              BAJO y a CRÍTICO. Es lo que decide los colores de todo el panel.</p>
+          </header>
+          <div class="cfg-grupo">
+            <div class="cfg-grid">
+              <label class="field">
+                <span>CRÍTICO · ≤ % del máximo</span>
+                <input type="number" id="cfgPctCritico" min="1" max="99" step="1">
+              </label>
+              <label class="field">
+                <span>BAJO · ≤ % del máximo</span>
+                <input type="number" id="cfgPctBajo" min="1" max="99" step="1">
+              </label>
+            </div>
+            <div class="cfg-leyenda">
+              <span><i class="lg lg-crit"></i>Crítico</span>
+              <span><i class="lg lg-bajo"></i>Bajo</span>
+              <span><i class="lg lg-ok"></i>OK</span>
+            </div>
+            <p class="cfg-ayuda">Por encima del umbral de BAJO la posición queda en OK. Los
+              artículos sin máximo cargado no entran en el cálculo.</p>
+          </div>
+        </section>
+
+        <!-- ---------- TV ---------- -->
+        <section class="cfg-sec" data-sec="tv" hidden>
+          <header class="cfg-sec-head">
+            <h3>Pantalla TV</h3>
+            <p>Cómo rota la pantalla del depósito cuando se pone en modo TV.</p>
+          </header>
+          <div class="cfg-grupo">
+            <div class="cfg-grid">
+              <label class="field">
+                <span>Segundos por pantalla</span>
+                <input type="number" id="cfgTvSegundos" min="5" max="120" step="1">
+              </label>
+              <label class="field field-check">
+                <input type="checkbox" id="cfgTvSoloCriticos">
+                <span>Priorizar sólo productos críticos</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------- reglas ---------- -->
+        <section class="cfg-sec" data-sec="reglas" hidden>
+          <header class="cfg-sec-head">
+            <h3>Reglas de posición</h3>
+            <p>Se evalúan <strong>en orden</strong> y gana la primera que coincide, así que las de
+              ignorar van arriba: <code>PACK</code> tiene que resolverse antes que <code>P*</code>.
+              Comodín <code>*</code> al principio, al final o solo (<code>*</code> = todas).</p>
+          </header>
+          <div class="cfg-grupo">
+            <div class="reglas-editor" id="reglasEditor"></div>
+            <div class="cfg-actions">
+              <button class="btn" id="btnAddRegla">+ Agregar regla</button>
+              <button class="btn" id="btnResetReglas">Restaurar reglas originales</button>
+            </div>
+            <p class="cfg-ayuda">Los cambios se aplican al instante sobre el stock cargado, salvo
+              las filas que una regla de ignorar ya descartó: esas vuelven al reimportar.</p>
+          </div>
+        </section>
+
+        <!-- ---------- laboratorios ---------- -->
+        <section class="cfg-sec" data-sec="labs" hidden>
+          <header class="cfg-sec-head">
+            <h3>Laboratorios</h3>
+            <p>Acá se define <strong>cuáles</strong> se procesan y cómo se llaman, nada más. Si el
+              artículo está dentro del VLM o fuera, y si es frío o ambiente, lo decide
+              <strong>cada SKU según sus ubicaciones</strong>: un mismo laboratorio tiene artículos
+              de los dos tipos.</p>
+          </header>
+          <div class="cfg-grupo">
+            <div class="labs-editor" id="labsEditor"></div>
+            <div class="cfg-actions">
+              <button class="btn" id="btnAddLab">+ Agregar laboratorio</button>
+              <button class="btn" id="btnResetLabs">Restaurar catálogo original</button>
+            </div>
+            <label class="field field-check" style="margin-top:14px">
+              <input type="checkbox" id="cfgIncluirNoListados">
+              <span>Mostrar también los laboratorios que no están en la lista</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- ---------- datos ---------- -->
+        <section class="cfg-sec" data-sec="datos" hidden>
+          <header class="cfg-sec-head">
+            <h3>Stock y máximos</h3>
+            <p>Lo que se comparte con las demás PCs y lo que queda sólo acá.</p>
+          </header>
+
+          <div class="cfg-grupo">
+            <h4>En la base, compartido</h4>
+            <p class="cfg-ayuda">Al importar una planilla el stock sube solo. Estos botones son
+              para forzarlo a mano.</p>
+            <div class="cfg-actions">
+              <button class="btn" id="btnNubeBajar">Traer de la base</button>
+              <button class="btn" id="btnNubeSubir">Subir máximos</button>
+              <button class="btn" id="btnNubeSubirStock">Subir stock</button>
+            </div>
+          </div>
+
+          <div class="cfg-grupo">
+            <h4>En esta PC</h4>
+            <div class="cfg-actions">
+              <button class="btn" id="btnExportCsv">Exportar reposición (CSV)</button>
+            </div>
+          </div>
+
+          <div class="cfg-grupo cfg-riesgo">
+            <h4>Borrar el stock cargado</h4>
+            <p class="cfg-ayuda">Saca la planilla de esta PC. Los umbrales, las reglas, los
+              laboratorios y los máximos <strong>no se tocan</strong>.</p>
+            <div class="cfg-actions">
+              <button class="btn btn-danger" id="btnClearData">Borrar datos cargados</button>
+            </div>
+          </div>
+        </section>
 
       </div>
     </div>
+
     <footer class="modal-foot">
       <span class="muted small" id="appVersion">build local</span>
       <div class="spacer"></div>

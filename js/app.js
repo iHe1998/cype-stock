@@ -29,6 +29,7 @@ VLM.app = (function () {
     wireImport();
     wireSettings();
     wireNube();
+    wireCfgNav();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       if (motivo === 'posiciones') reaplicarPosiciones();
@@ -640,8 +641,30 @@ VLM.app = (function () {
        que ven los demás;
      - los de sólo lectura: traer de la base y exportar el CSV. */
   const SIN_BLOQUEO = ['cfgNubeMail', 'cfgNubePass', 'btnNubeEntrar', 'btnNubeSalir',
+                       'btnIrCuenta',
                        'cfgNubeUrl', 'cfgNubeKey', 'btnNubeGuardar',
                        'btnNubeBajar', 'btnExportCsv'];
+
+  /* Sección abierta de Configuración. Se mantiene entre aperturas: quien
+     está cargando laboratorios abre y cierra varias veces seguidas. */
+  let seccionCfg = 'cuenta';
+
+  function mostrarSeccion(sec) {
+    seccionCfg = sec;
+    $$('#cfgNav .cfg-nav-item').forEach(b => b.classList.toggle('is-sel', b.dataset.sec === sec));
+    $$('#cfgPanel .cfg-sec').forEach(s => { s.hidden = s.dataset.sec !== sec; });
+    $('#cfgPanel').scrollTop = 0;
+    aplicarBloqueo();
+  }
+
+  function wireCfgNav() {
+    $$('#cfgNav .cfg-nav-item').forEach(b =>
+      b.addEventListener('click', () => mostrarSeccion(b.dataset.sec)));
+    $('#btnIrCuenta').addEventListener('click', () => {
+      mostrarSeccion('cuenta');
+      $('#cfgNubeMail').focus();
+    });
+  }
 
   /**
    * Traba la pantalla de Configuración entera cuando no hay sesión.
@@ -649,15 +672,19 @@ VLM.app = (function () {
    * Es una traba de interfaz: evita el accidente —alguien tocando la PC del
    * depósito— no al que sepa abrir la consola. Lo que de verdad protege lo
    * que ven los demás son las políticas de la base.
+   *
+   * Sólo mira adentro del panel: el nav y el pie quedan afuera, que si no se
+   * traba también el botón de cambiar de sección.
    */
   function aplicarBloqueo() {
     const trabado = !VLM.nube.puedeEditar();
-    $$('#modalSettings input, #modalSettings select, #modalSettings button').forEach(el => {
-      if (el.hasAttribute('data-close')) return;
+    $$('#cfgPanel input, #cfgPanel select, #cfgPanel button').forEach(el => {
       if (SIN_BLOQUEO.indexOf(el.id) > -1) return;
       el.disabled = trabado;
     });
-    $('#cfgBloqueo').hidden = !trabado;
+    $('#cfgChipLectura').hidden = !trabado;
+    // en Cuenta el cartel sobra: ahí abajo está el recuadro que dice lo mismo
+    $('#cfgBloqueo').hidden = !trabado || seccionCfg === 'cuenta';
   }
 
   function pintarNube() {
@@ -666,25 +693,33 @@ VLM.app = (function () {
     const d = N.datos();
     if (d) { $('#cfgNubeUrl').value = d.url; $('#cfgNubeKey').value = d.anonKey; }
 
-    const hayLogin = N.configurada() && !N.conSesion();
-    $('#nubeLogin').hidden = !hayLogin;
-    $('#nubeLoginBtns').hidden = !hayLogin;
+    $('#nubeLogin').hidden = !(N.configurada() && !N.conSesion());
     $('#btnNubeSubir').disabled = !N.conSesion();
     $('#btnNubeSubirStock').disabled = !N.conSesion();
 
     if (!N.configurada()) {
-      est.className = 'nube-estado';
-      est.innerHTML = '<span class="dot"></span>Sin conectar · los máximos quedan sólo en esta PC';
+      est.className = 'cuenta-box';
+      est.innerHTML =
+        '<svg viewBox="0 0 24 24" class="ico"><path d="M17 18H7a4 4 0 0 1-.5-8 6 6 0 0 1 11.2-1.8A3.5 3.5 0 0 1 21 13.5"/>' +
+        '<path d="M3 3l18 18"/></svg>' +
+        '<div class="cuenta-txt"><strong>Sin base conectada</strong>' +
+        '<span>Todo queda en esta PC. Se configura en «Conexión a la base».</span></div>';
     } else if (N.conSesion()) {
-      est.className = 'nube-estado es-ok';
-      est.innerHTML = '<span class="dot live"></span>Conectado como <strong>' +
-        U.esc(N.email() || '') + '</strong> · podés subir cambios' +
-        ' <button class="btn btn-sm" id="btnNubeSalir">Cerrar sesión</button>';
+      const mail = N.email() || '';
+      est.className = 'cuenta-box es-ok';
+      est.innerHTML =
+        '<span class="cuenta-avatar">' + U.esc((mail[0] || '?').toUpperCase()) + '</span>' +
+        '<div class="cuenta-txt"><strong>' + U.esc(mail) + '</strong>' +
+        '<span>Cuenta autorizada · podés cambiar todo y subir cambios</span></div>' +
+        '<button class="btn btn-sm" id="btnNubeSalir">Cerrar sesión</button>';
       $('#btnNubeSalir').addEventListener('click', () => { N.salir(); pintarNube(); });
     } else {
-      est.className = 'nube-estado es-lectura';
-      est.innerHTML = '<span class="dot stale"></span>Modo lectura · ' +
-        'iniciá sesión con una cuenta autorizada para poder cambiar algo';
+      est.className = 'cuenta-box es-lectura';
+      est.innerHTML =
+        '<svg viewBox="0 0 24 24" class="ico"><rect x="4" y="11" width="16" height="10" rx="2"/>' +
+        '<path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' +
+        '<div class="cuenta-txt"><strong>Modo lectura</strong>' +
+        '<span>Entrá con una cuenta autorizada para poder cambiar la configuración.</span></div>';
     }
     // el estado de la sesión define qué se puede tocar en toda la pantalla
     aplicarBloqueo();
@@ -775,6 +810,9 @@ VLM.app = (function () {
     $('#btnNubeEntrar').addEventListener('click', async () => {
       try {
         await N.entrar($('#cfgNubeMail').value.trim(), $('#cfgNubePass').value);
+        // los campos se vacían: el recuadro de arriba ya dice con qué cuenta
+        // entraste, dejarlos llenos hacía dudar de si había entrado
+        $('#cfgNubeMail').value = '';
         $('#cfgNubePass').value = '';
         pintarNube();
         U.toast('Sesión iniciada', 'ok');
@@ -799,6 +837,7 @@ VLM.app = (function () {
     pintarReglasEditor();
     pintarLabsEditor();
     pintarNube();
+    mostrarSeccion(seccionCfg);
     $('#modalSettings').hidden = false;
   }
 
