@@ -712,7 +712,7 @@ VLM.app = (function () {
         '<div class="cuenta-txt"><strong>' + U.esc(mail) + '</strong>' +
         '<span>Cuenta autorizada · podés cambiar todo y subir cambios</span></div>' +
         '<button class="btn btn-sm" id="btnNubeSalir">Cerrar sesión</button>';
-      $('#btnNubeSalir').addEventListener('click', () => { N.salir(); pintarNube(); });
+      $('#btnNubeSalir').addEventListener('click', () => { N.salir(); refrescarPorSesion(); });
     } else {
       est.className = 'cuenta-box es-lectura';
       est.innerHTML =
@@ -723,6 +723,17 @@ VLM.app = (function () {
     }
     // el estado de la sesión define qué se puede tocar en toda la pantalla
     aplicarBloqueo();
+  }
+
+  /**
+   * Entrar o salir no cambia sólo la pantalla de Configuración: la tabla de
+   * Posiciones dibuja los mínimos y máximos `disabled` según la sesión, y el
+   * aviso de modo lectura sale de ahí también. Sin volver a dibujar el panel,
+   * iniciar sesión y cerrar la pantalla dejaba todo trabado hasta un F5.
+   */
+  function refrescarPorSesion() {
+    pintarNube();
+    render();
   }
 
   /**
@@ -787,7 +798,8 @@ VLM.app = (function () {
 
     $('#btnNubeGuardar').addEventListener('click', async () => {
       N.setConfig($('#cfgNubeUrl').value, $('#cfgNubeKey').value);
-      pintarNube();
+      // conectar o desconectar también cambia quién puede editar
+      refrescarPorSesion();
       if (!N.configurada()) { U.toast('Conexión borrada: los máximos vuelven a ser locales'); return; }
       U.toast('Conexión guardada');
       await bajarDeNube();
@@ -814,7 +826,7 @@ VLM.app = (function () {
         // entraste, dejarlos llenos hacía dudar de si había entrado
         $('#cfgNubeMail').value = '';
         $('#cfgNubePass').value = '';
-        pintarNube();
+        refrescarPorSesion();
         U.toast('Sesión iniciada', 'ok');
       } catch (e) { U.toast('No se pudo entrar: ' + e.message, 'err'); }
     });
