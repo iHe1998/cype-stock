@@ -39,6 +39,8 @@ VLM.tv = (function () {
     datos = { items, cfg, filtroLab: filtroLab || null };
     activo = true;
     idx = 0;
+    // para volver acá si la página se recarga sola por una versión nueva
+    try { sessionStorage.setItem('vlm.tv', '1'); } catch (e) {}
     C.destruirTodos();
     $('#tvMode').hidden = false;
     document.body.style.overflow = 'hidden';
@@ -52,6 +54,7 @@ VLM.tv = (function () {
 
   function salir() {
     activo = false;
+    try { sessionStorage.removeItem('vlm.tv'); } catch (e) {}
     clearTimeout(timerSlide);
     clearInterval(timerReloj);
     clearInterval(timerBarra);

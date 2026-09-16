@@ -1359,6 +1359,21 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   .ia-ej { grid-template-columns: 1fr; gap: 2px; }
 }
 
+/* ---------- aviso de versión nueva ----------
+   Abajo a la izquierda: los toasts van a la derecha y este se queda hasta
+   que alguien lo atienda, así que no pueden pelearse el lugar. */
+.aviso-version {
+  position: fixed; bottom: 20px; left: 20px; z-index: 200;
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px 11px 15px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--r); box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  animation: slidein .2s ease-out;
+}
+.aviso-version .ico { width: 16px; height: 16px; color: var(--accent); flex: none; }
+
 </style>
 </head>
 <body>
@@ -1809,7 +1824,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 16/09/2026 19:53 - 515342d</span>
+      <span class="muted small" id="appVersion">compilado 16/09/2026 20:15 - 3de7574</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -1844,6 +1859,17 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
       <button class="btn btn-primary" data-close>Cerrar</button>
     </footer>
   </div>
+</div>
+
+<!-- Se publicó una versión nueva mientras esta pantalla estaba abierta.
+     En modo TV no aparece: esa se recarga sola. -->
+<div class="aviso-version" id="avisoVersion" hidden>
+  <svg viewBox="0 0 24 24" class="ico"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 4v5h-5"/></svg>
+  <span>Hay una versión nueva del panel.</span>
+  <button class="btn btn-sm btn-primary" id="btnActualizar">Actualizar</button>
+  <button class="btn btn-icon btn-sm" id="btnAvisoCerrar" title="Ahora no">
+    <svg viewBox="0 0 24 24" class="ico"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
 </div>
 
 <div class="toast-wrap" id="toasts"></div>
@@ -5855,6 +5881,8 @@ VLM.tv = (function () {
     datos = { items, cfg, filtroLab: filtroLab || null };
     activo = true;
     idx = 0;
+    // para volver acá si la página se recarga sola por una versión nueva
+    try { sessionStorage.setItem('vlm.tv', '1'); } catch (e) {}
     C.destruirTodos();
     $('#tvMode').hidden = false;
     document.body.style.overflow = 'hidden';
@@ -5868,6 +5896,7 @@ VLM.tv = (function () {
 
   function salir() {
     activo = false;
+    try { sessionStorage.removeItem('vlm.tv'); } catch (e) {}
     clearTimeout(timerSlide);
     clearInterval(timerReloj);
     clearInterval(timerBarra);
@@ -6147,6 +6176,20 @@ VLM.app = (function () {
     if (VLM.nube.configurada()) bajarDeNube(true);
     setInterval(actualizarEstado, 60000);
     setInterval(refrescoPeriodico, REFRESCO_MS);
+    mirarVersion();   // deja anotada la versión con la que arrancó
+
+    $('#btnActualizar').addEventListener('click', () => location.reload());
+    $('#btnAvisoCerrar').addEventListener('click', () => { $('#avisoVersion').hidden = true; });
+
+    /* Si la pantalla se recargó sola estando en modo TV, vuelve a entrar:
+       si no, la tele se quedaría en el resumen sin rotar y nadie la va a
+       tocar. La pantalla completa sí se pierde —el navegador no la da sin
+       un clic—, pero la del depósito suele estar en F11, que sí sobrevive. */
+    try {
+      if (sessionStorage.getItem('vlm.tv') === '1' && S.hayDatos()) {
+        VLM.tv.entrar(itemsVisibles(), S.state.cfg, S.state.ui.filtroLab);
+      }
+    } catch (e) {}
   }
 
   /* ------------------------------------------------------------
@@ -6158,7 +6201,47 @@ VLM.app = (function () {
      ------------------------------------------------------------ */
   const REFRESCO_MS = 150000;   // 2 min y medio
 
+  /* ------------------------------------------------------------
+     Versión nueva publicada
+
+     Los datos se refrescan solos, pero el programa es el que se cargó al
+     abrir la página. La pantalla del depósito queda con el código de esa
+     mañana hasta que alguien la recargue, y nadie la va a recargar.
+
+     version.json lo escribe build.ps1 en cada compilada. Si no existe —el
+     archivo suelto del pendrive, o una versión vieja de la web— no pasa
+     nada: esto queda callado.
+     ------------------------------------------------------------ */
+  let versionVista = null;
+
+  async function mirarVersion() {
+    let v;
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      v = await r.json();
+    } catch (e) { return; }   // sin internet o sin el archivo: no molestar
+
+    const firma = (v.commit || '') + ' · ' + (v.compilado || '');
+    if (firma === ' · ') return;
+    // en la web el pie dice "build local" porque el sello lo pone el build
+    // del archivo suelto; acá sí se sabe qué versión está corriendo
+    const pie = $('#appVersion');
+    if (pie && pie.textContent === 'build local') pie.textContent = 'web · ' + firma;
+    if (versionVista === null) { versionVista = firma; return; }
+    if (firma === versionVista) return;
+    versionVista = firma;
+
+    /* En modo TV se recarga sola: es la pantalla que nadie mira de cerca y
+       la única que nadie va a recargar nunca. En cualquier otro caso se
+       avisa y decide la persona — recargarle la pantalla a alguien que está
+       leyendo la lista de reposición es peor que mostrarle código de ayer. */
+    if (VLM.tv.activo) { location.reload(); return; }
+    $('#avisoVersion').hidden = false;
+  }
+
   function refrescoPeriodico() {
+    mirarVersion();
     if (!VLM.nube.configurada()) return;
     // no mientras alguien está cargando un número: le cambiaría la tabla debajo
     const act = document.activeElement;

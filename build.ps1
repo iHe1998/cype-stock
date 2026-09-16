@@ -80,6 +80,17 @@ if ($html -notlike "*$marca*") { throw "No se encontro la marca de version ($mar
 $html = $html.Replace($marca, ">$sello<")
 Write-Host "  sello: $sello"
 
+# --- version.json, para la web ---
+# El .html suelto lleva el sello adentro, pero la version de la web son los
+# archivos del repo tal cual, sin sello. Sin este archivo una pantalla abierta
+# no tiene forma de enterarse de que se publico algo nuevo: se queda con el
+# codigo que cargo a la manana hasta que alguien apriete F5.
+# El instante importa mas que el commit: cambia en cada compilada, asi que
+# alcanza con comparar para saber que hay algo nuevo.
+$ver = "{`"commit`":`"$commit`",`"compilado`":`"$fecha`"}"
+[System.IO.File]::WriteAllText((Join-Path $root 'version.json'), $ver, (New-Object System.Text.UTF8Encoding $false))
+Write-Host "  version.json: $ver"
+
 # --- control: no puede quedar ninguna referencia externa ---
 if ($html -match '<script src=' -or $html -match '<link rel="stylesheet"') {
   throw "Quedaron referencias externas sin embeber. Revisa las listas \$libs / \$modulos."

@@ -52,6 +52,20 @@ VLM.app = (function () {
     if (VLM.nube.configurada()) bajarDeNube(true);
     setInterval(actualizarEstado, 60000);
     setInterval(refrescoPeriodico, REFRESCO_MS);
+    mirarVersion();   // deja anotada la versión con la que arrancó
+
+    $('#btnActualizar').addEventListener('click', () => location.reload());
+    $('#btnAvisoCerrar').addEventListener('click', () => { $('#avisoVersion').hidden = true; });
+
+    /* Si la pantalla se recargó sola estando en modo TV, vuelve a entrar:
+       si no, la tele se quedaría en el resumen sin rotar y nadie la va a
+       tocar. La pantalla completa sí se pierde —el navegador no la da sin
+       un clic—, pero la del depósito suele estar en F11, que sí sobrevive. */
+    try {
+      if (sessionStorage.getItem('vlm.tv') === '1' && S.hayDatos()) {
+        VLM.tv.entrar(itemsVisibles(), S.state.cfg, S.state.ui.filtroLab);
+      }
+    } catch (e) {}
   }
 
   /* ------------------------------------------------------------
@@ -63,7 +77,47 @@ VLM.app = (function () {
      ------------------------------------------------------------ */
   const REFRESCO_MS = 150000;   // 2 min y medio
 
+  /* ------------------------------------------------------------
+     Versión nueva publicada
+
+     Los datos se refrescan solos, pero el programa es el que se cargó al
+     abrir la página. La pantalla del depósito queda con el código de esa
+     mañana hasta que alguien la recargue, y nadie la va a recargar.
+
+     version.json lo escribe build.ps1 en cada compilada. Si no existe —el
+     archivo suelto del pendrive, o una versión vieja de la web— no pasa
+     nada: esto queda callado.
+     ------------------------------------------------------------ */
+  let versionVista = null;
+
+  async function mirarVersion() {
+    let v;
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      v = await r.json();
+    } catch (e) { return; }   // sin internet o sin el archivo: no molestar
+
+    const firma = (v.commit || '') + ' · ' + (v.compilado || '');
+    if (firma === ' · ') return;
+    // en la web el pie dice "build local" porque el sello lo pone el build
+    // del archivo suelto; acá sí se sabe qué versión está corriendo
+    const pie = $('#appVersion');
+    if (pie && pie.textContent === 'build local') pie.textContent = 'web · ' + firma;
+    if (versionVista === null) { versionVista = firma; return; }
+    if (firma === versionVista) return;
+    versionVista = firma;
+
+    /* En modo TV se recarga sola: es la pantalla que nadie mira de cerca y
+       la única que nadie va a recargar nunca. En cualquier otro caso se
+       avisa y decide la persona — recargarle la pantalla a alguien que está
+       leyendo la lista de reposición es peor que mostrarle código de ayer. */
+    if (VLM.tv.activo) { location.reload(); return; }
+    $('#avisoVersion').hidden = false;
+  }
+
   function refrescoPeriodico() {
+    mirarVersion();
     if (!VLM.nube.configurada()) return;
     // no mientras alguien está cargando un número: le cambiaría la tabla debajo
     const act = document.activeElement;

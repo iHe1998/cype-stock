@@ -1349,3 +1349,18 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   .ia-fila-num { grid-column: 2; text-align: left; }
   .ia-ej { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* ---------- aviso de versión nueva ----------
+   Abajo a la izquierda: los toasts van a la derecha y este se queda hasta
+   que alguien lo atienda, así que no pueden pelearse el lugar. */
+.aviso-version {
+  position: fixed; bottom: 20px; left: 20px; z-index: 200;
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px 11px 15px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--r); box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  animation: slidein .2s ease-out;
+}
+.aviso-version .ico { width: 16px; height: 16px; color: var(--accent); flex: none; }
