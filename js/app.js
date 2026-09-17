@@ -182,6 +182,16 @@ VLM.app = (function () {
     const ui = S.state.ui;
     let items = itemsCalculados();
     const cfg = S.state.cfg;
+
+    /* Fuera los que no tienen ninguna posición de picking.
+
+       Son SKU que están sólo en los racks, sin lugar asignado en el piso. El
+       panel es sobre qué reponer en picking, y de esos no hay nada que
+       reponer: no se les carga máximo, así que caían todos en «sin datos» y
+       ensuciaban los gráficos y el inventario con filas que nunca van a
+       cambiar de estado. Se los sigue encontrando desde el buscador. */
+    items = items.filter(p => !p.sinPicking);
+
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
     items = A.filtrarPorZona(items, ui);
     // el laboratorio es un filtro global como los otros dos: afecta al resumen

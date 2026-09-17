@@ -11,6 +11,15 @@ VLM.views = (function () {
 
   /* ---------- fragmentos reutilizables ---------- */
 
+  /**
+   * Artículos que están sólo en los racks, sin ninguna posición de picking.
+   * Quedan afuera del panel (ver app.itemsVisibles) pero existen, así que se
+   * dicen: si no, faltan unidades contra la planilla y no se entiende por qué.
+   */
+  function contarSoloReserva() {
+    return VLM.store.state.productos.filter(p => p.sinPicking).length;
+  }
+
   function badge(estado) {
     const e = A.ESTADOS[estado] || A.ESTADOS.sd;
     return '<span class="badge b-' + estado + '">' + e.label + '</span>';
@@ -122,27 +131,25 @@ VLM.views = (function () {
     /* El corte principal es el artículo: adentro del VLM la ubicación no
        distingue nada, todos comparten VLMVENTA01 o VLMVENTA02.
 
-       Los que están sólo en reserva no entran: no tienen posición de picking,
-       así que no hay nada que reponer y sólo aportarían barras en cero. */
-    const conPicking = items.filter(p => !p.sinPicking);
-    const soloReserva = items.length - conPicking.length;
-    const topArt = Math.min(conPicking.length, 15);
+       Los que están sólo en reserva ya quedaron afuera antes de llegar acá
+       (ver app.itemsVisibles); se los nombra para que el total cierre con lo
+       que dice la planilla. */
+    const soloReserva = contarSoloReserva();
+    const topArt = Math.min(items.length, 15);
     html += cardChart('Stock por artículo',
-        (topArt < conPicking.length
-          ? 'unidades en picking · los ' + topArt + ' de mayor stock, de ' + conPicking.length
+        (topArt < items.length
+          ? 'unidades en picking · los ' + topArt + ' de mayor stock, de ' + items.length
           : 'unidades en picking') +
-        (soloReserva ? ' · ' + soloReserva + ' sólo en reserva, fuera del gráfico' : ''),
+        (soloReserva ? ' · ' + soloReserva + ' sólo en reserva, fuera del panel' : ''),
         'chArtStock', Math.max(280, topArt * 24 + 50));
     html += '<div class="grid grid-2" style="margin-top:14px">' +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
       '</div>';
 
-    /* --- posiciones sin configurar: sin máximo no hay alerta posible ---
-       Sólo cuentan los que tienen picking: a los de pura reserva no se les
-       carga máximo, así que nunca se van a poder "terminar de configurar". */
-    const sinConfig = conPicking.filter(p => !(p.stockMax > 0) && !(p.stockMin > 0)).length;
-    if (sinConfig) html += avisoSinConfig(sinConfig, conPicking.length, cfg);
+    /* --- posiciones sin configurar: sin máximo no hay alerta posible --- */
+    const sinConfig = items.filter(p => !(p.stockMax > 0) && !(p.stockMin > 0)).length;
+    if (sinConfig) html += avisoSinConfig(sinConfig, items.length, cfg);
 
     /* --- top urgentes --- */
     if (urgentes.length) {
@@ -154,7 +161,7 @@ VLM.views = (function () {
     el.innerHTML = html;
 
     /* --- montaje de gráficos --- */
-    C.stockPorArticulo($('#chArtStock', el), conPicking);
+    C.stockPorArticulo($('#chArtStock', el), items);
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
   }
@@ -708,6 +715,17 @@ VLM.views = (function () {
       '<span class="muted small" id="invCount"></span>' +
       '</div>' +
       '<div class="table-wrap"><table class="table" id="invTable"></table></div>';
+
+    /* Los de pura reserva no se listan: sin posición de picking no hay estado
+       que mostrar. Pero son stock que existe, así que se dice cuántos son y
+       dónde buscarlos, en vez de que falten y nadie sepa por qué. */
+    const soloReserva = contarSoloReserva();
+    if (soloReserva) {
+      html += '<p class="muted small" style="margin-top:10px">' +
+        U.fmt(soloReserva) + ' artículo(s) están sólo en reserva, sin posición de picking, ' +
+        'y no se listan acá: no hay nada que reponer. Se encuentran desde el buscador ' +
+        '(<kbd>Ctrl</kbd>+<kbd>K</kbd>).</p>';
+    }
 
     el.innerHTML = html;
     pintarTabla(el, items, cfg);
