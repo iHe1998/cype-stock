@@ -1398,3 +1398,23 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   border-color: var(--accent) !important; color: var(--text) !important;
 }
 .regla-pie .regla-nota { margin-top: 0; flex: none; white-space: nowrap; }
+
+/* ---------- catálogo de laboratorios ---------- */
+.lab-pie { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; min-width: 0; }
+.lab-pie .lab-alias { margin-top: 0; flex: none; }
+/* el alias es lo que decide a qué laboratorio va cada fila: se edita */
+.lab-alias-inp {
+  flex: 1 1 auto; min-width: 80px; width: auto;
+  height: 19px !important; padding: 0 4px !important;
+  font-size: 11px !important; color: var(--text-2) !important;
+  background: none !important; border: 1px solid transparent !important;
+  border-radius: 3px;
+}
+.lab-alias-inp:hover { border-color: var(--border) !important; }
+.lab-alias-inp:focus {
+  background: var(--surface) !important;
+  border-color: var(--accent) !important; color: var(--text) !important;
+}
+.lab-cuenta { flex: none; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.lab-row.r-tapada { opacity: .65; border-left: 3px solid var(--warn); padding-left: 9px; }
+.lab-row.r-tapada .lab-cuenta { color: var(--warn); }

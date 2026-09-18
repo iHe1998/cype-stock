@@ -1553,17 +1553,34 @@ VLM.app = (function () {
     const labs = S.state.labs;
     const cont = $('#labsEditor');
 
+    const cob = coberturaLabs(labs);
+
     cont.innerHTML =
       '<div class="labs-head"><span>Laboratorio</span><span></span></div>' +
-      labs.map((l, i) =>
-        '<div class="lab-row" data-i="' + i + '">' +
+      labs.map((l, i) => {
+        const c = cob[i];
+        // el "0 filas" también se dice: un laboratorio que no reconoce nada
+        // es casi siempre un alias mal escrito, y callarlo no ayuda
+        const info = c.tapadoPor
+          ? 'sin efecto: «' + c.tapadoPor + '» lo reconoce antes'
+          : U.fmt(c.n) + (c.n === 1 ? ' fila' : ' filas');
+        return '<div class="lab-row' + (c.tapadoPor ? ' r-tapada' : '') + '" data-i="' + i + '">' +
           '<div>' +
             '<input type="text" data-campo="nombre" value="' + U.esc(l.nombre) + '" placeholder="Nombre">' +
-            '<span class="lab-alias">Reconoce: ' + U.esc(l.alias.join(', ')) + '</span>' +
+            '<div class="lab-pie">' +
+              '<span class="lab-alias">Reconoce:</span>' +
+              // editable: el alias es lo que decide a qué laboratorio va cada
+              // fila del Excel, y era lo único del catálogo que no se podía tocar
+              '<input type="text" class="lab-alias-inp" data-campo="alias" ' +
+                'value="' + U.esc(l.alias.join(', ')) + '" ' +
+                'title="Nombres tal como vienen en el Excel, separados por coma">' +
+              (info ? '<span class="lab-cuenta">' + U.esc(info) + '</span>' : '') +
+            '</div>' +
           '</div>' +
           '<button class="btn btn-icon lab-row-del" title="Quitar del catálogo">' +
             '<svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>' +
-        '</div>').join('');
+        '</div>';
+      }).join('');
 
     U.$$('.lab-row', cont).forEach(row => {
       const i = +row.dataset.i;
@@ -1576,6 +1593,12 @@ VLM.app = (function () {
           l.nombre = valor;
           // el nombre siempre tiene que estar entre los alias reconocidos
           if (!l.alias.some(a => U.norm(a) === U.norm(valor))) l.alias = [valor].concat(l.alias);
+        } else if (campo.dataset.campo === 'alias') {
+          /* Sin ningún alias el laboratorio no reconoce nada y desaparecería
+             sin decir por qué: se vuelve al que había. */
+          const lista = valor.split(',').map(a => a.trim()).filter(Boolean);
+          if (!lista.length) { campo.value = l.alias.join(', '); return; }
+          l.alias = lista;
         } else {
           l[campo.dataset.campo] = valor;
         }
@@ -1590,6 +1613,40 @@ VLM.app = (function () {
         pintarLabsEditor();
       });
     });
+  }
+
+  /**
+   * Cuántas filas del stock cargado reconoce cada laboratorio, y cuál queda
+   * sin efecto porque otro de más arriba se le adelanta.
+   *
+   * Es el mismo problema que el de las reglas de posición: dos laboratorios
+   * con el mismo alias no dan error, gana el primero y el otro no agarra nada.
+   * Pasa con "Biosidus" y "Biosidus ARG", que son dos propietarios distintos
+   * en la planilla pero comparten el principio del nombre.
+   */
+  function coberturaLabs(labs) {
+    const conteo = labs.map(() => ({ n: 0, tapadoPor: null }));
+    const nombres = {};
+    S.state.productos.forEach(p => {
+      const n = p.laboratorio || '';
+      nombres[n] = (nombres[n] || 0) + ((p.detalle && p.detalle.length) || 1);
+    });
+    Object.keys(nombres).forEach(n => {
+      const idGana = VLM.labs.clasificar({ laboratorio: n }, labs).labId;
+      const i = labs.map(l => l.id).indexOf(idGana);
+      if (i < 0) return;                       // ese nombre no está en el catálogo
+      conteo[i].n += nombres[n];
+      // los que también lo reconocerían, pero llegan tarde
+      labs.forEach((l, k) => {
+        if (k === i || conteo[k].tapadoPor) return;
+        if (VLM.labs.clasificar({ laboratorio: n }, [l]).labId === l.id) {
+          conteo[k].tapadoPor = labs[i].nombre;
+        }
+      });
+    });
+    // sólo se avisa del que no agarra NADA: el problema es que está de más
+    conteo.forEach(c => { if (c.n) c.tapadoPor = null; });
+    return conteo;
   }
 
   function agregarLab() {
