@@ -17,7 +17,8 @@ VLM.views = (function () {
    * dicen: si no, faltan unidades contra la planilla y no se entiende por qué.
    */
   function contarSoloReserva() {
-    return VLM.store.state.productos.filter(p => p.sinPicking).length;
+    return VLM.store.state.productos.filter(p =>
+      p.sinPicking && !VLM.parser.estaIgnorado(p)).length;
   }
 
   function badge(estado) {

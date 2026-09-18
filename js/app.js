@@ -148,7 +148,12 @@ VLM.app = (function () {
     P.aplicarPosiciones(S.state.productos, S.state.posiciones);
     S.guardar();
     calculados = null;
-    if (!silencioso) U.toast('Reglas aplicadas sobre el stock cargado', 'ok');
+    if (silencioso) return;
+    // decir cuántos quedaron afuera del todo: si no, desaparecen sin explicación
+    const fuera = S.state.productos.filter(p =>
+      p.ignorado || (p.detalleIgnorado && p.detalleIgnorado.length && !(p.detalle || []).length)).length;
+    U.toast('Reglas aplicadas sobre el stock cargado' +
+            (fuera ? ' · ' + fuera + ' artículo(s) quedaron ignorados por completo' : ''), 'ok');
   }
 
   /** Reaplica el catálogo de laboratorios sobre los productos ya cargados. */
@@ -165,7 +170,12 @@ VLM.app = (function () {
    * la pantalla estaba filtrada por frío sería desconcertante.
    */
   function itemsCalculados() {
-    if (!calculados) calculados = A.calcular(S.state.productos, S.state.cfg);
+    if (!calculados) {
+      // los que una regla de ignorar dejó sin ninguna posición no existen ni
+      // para el panel ni para el buscador: se pidió que no estuvieran
+      calculados = A.calcular(S.state.productos, S.state.cfg)
+        .filter(p => !P.estaIgnorado(p));
+    }
     return calculados;
   }
 

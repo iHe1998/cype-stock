@@ -297,6 +297,45 @@ VLM.parser = (function () {
     catalogo = catalogo || VLM.labs.catalogoDefault();
 
     productos.forEach(p => {
+      /* --- 0. las reglas de ignorar, también acá ---
+
+         Al importar, una fila con una regla de ignorar directamente no entra.
+         Pero esta función es la que corre al EDITAR las reglas, y no miraba
+         la acción: agregar una regla para ignorar una posición no hacía nada
+         sobre el stock ya cargado. Con el stock viniendo de la base y no de
+         un Excel por día, "hasta la próxima importación" es nunca.
+
+         Las filas ignoradas no se tiran: se guardan aparte, así sacar la
+         regla las devuelve en el acto y sin reimportar. */
+      if (p.detalle || p.detalleIgnorado) {
+        const todas = (p.detalle || []).concat(p.detalleIgnorado || []);
+        const activas = [], fuera = [];
+        todas.forEach(d => {
+          const r = VLM.ubicaciones.evaluar(d.ubicacion, reglas);
+          (r && r.accion === 'ignorar' ? fuera : activas).push(d);
+        });
+        p.detalle = activas;
+        p.detalleIgnorado = fuera;
+        // los totales del artículo son la suma de lo que queda en pie
+        if (todas.length) {
+          p.stock    = activas.reduce((s, d) => s + (d.stock || 0), 0);
+          p.asignado = activas.reduce((s, d) => s + (d.asignado || 0), 0);
+          if (p.hayDisponible) {
+            p.disponible = activas.reduce((s, d) => s + (d.disponible || 0), 0);
+          }
+        }
+        /* Si no le quedó ninguna posición, el artículo igual se conserva, con
+           el detalle vacío: queda en cero, sin picking, y así lo saltea el
+           panel igual que a los de pura reserva. Tirarlo sería más prolijo
+           pero haría falta reimportar para volver atrás, y una regla se
+           agrega justamente para probar qué pasa. */
+      } else {
+        // planilla sin agrupar: una fila por producto, la ubicación es la suya
+        const r = VLM.ubicaciones.evaluar(p.ubicacion, reglas);
+        if (r && r.accion === 'ignorar') { p.ignorado = true; p.stock = 0; }
+        else p.ignorado = false;
+      }
+
       // sin agrupar (una fila por producto) no hay detalle: la única ubicación
       // del producto hace de detalle para poder clasificarlo igual
       const dets = (p.detalle && p.detalle.length)
@@ -714,9 +753,22 @@ VLM.parser = (function () {
     return !!det && det.tipo !== 'altura';
   }
 
+  /**
+   * ¿Una regla de ignorar se llevó todas las posiciones de este artículo?
+   *
+   * Sigue guardado —con sus filas en `detalleIgnorado`— para que sacar la
+   * regla lo devuelva sin reimportar, pero para el panel y para el buscador
+   * no existe: se pidió expresamente que no esté.
+   */
+  function estaIgnorado(p) {
+    if (!p) return false;
+    if (p.ignorado) return true;
+    return !!(p.detalle && !p.detalle.length);
+  }
+
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
-    autoMapear, normalizar, generarPlantilla, esConfigurable,
+    autoMapear, normalizar, generarPlantilla, esConfigurable, estaIgnorado,
     detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, reaplicarReglas
   };
 })();
