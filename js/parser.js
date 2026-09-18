@@ -409,6 +409,10 @@ VLM.parser = (function () {
       if (zonaGana && !p.zonaDeColumna) { p.zonaPlanilla = zonaGana; p.zonaExplicita = true; }
       p.ambitoPos = esVLM ? 'vlm' : 'externo';
 
+      // la identidad se recalcula siempre: los productos guardados por una
+      // versión anterior no la traen
+      p.uid = uidDe(p);
+
       VLM.labs.clasificar(p, catalogo);
     });
     return productos;
@@ -436,7 +440,7 @@ VLM.parser = (function () {
   function agrupar(productos) {
     const mapa = {}, orden = [];
     productos.forEach(p => {
-      const k = p.codigo;
+      const k = uidDe(p);
       if (!mapa[k]) {
         mapa[k] = Object.assign({}, p, {
           ubicaciones: [], ubicPicking: [], ubicAltura: [], lotes: [], detalle: [],
@@ -749,6 +753,23 @@ VLM.parser = (function () {
    * cargar un máximo en una posición que la tabla no muestra y el número no
    * aparecería en ningún lado.
    */
+  /**
+   * Identidad de un artículo: el código Y el propietario.
+   *
+   * No alcanza con el código. Biosidus se separó en dos —SAU y ARG— y las dos
+   * mitades comparten SKU, pero son mercadería distinta: distinto stock,
+   * distintas posiciones, distintos lotes y distinto fin. Agrupando por código
+   * solo, las dos se juntaban en un artículo y el panel mostraba la suma con
+   * el propietario de la primera fila del archivo, que es una mentira
+   * prolija: 131 artículos aparecían como 74.
+   *
+   * El propietario va normalizado para que "BIOSIDUS" y "Biosidus" sean el
+   * mismo, que es lo que pasa cuando la planilla viene de dos exportaciones.
+   */
+  function uidDe(p) {
+    return String(p.codigo) + '|' + U.norm(p.laboratorio);
+  }
+
   function esConfigurable(det) {
     return !!det && det.tipo !== 'altura';
   }
@@ -768,7 +789,7 @@ VLM.parser = (function () {
 
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
-    autoMapear, normalizar, generarPlantilla, esConfigurable, estaIgnorado,
+    autoMapear, normalizar, generarPlantilla, esConfigurable, estaIgnorado, uidDe,
     detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, reaplicarReglas
   };
 })();

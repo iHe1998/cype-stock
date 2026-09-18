@@ -487,7 +487,7 @@ VLM.views = (function () {
     const clase = p.estado === 'agotado' ? 'r-agotado' : (p.estado === 'bajo' ? 'r-bajo' : '');
     const pct = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
 
-    return '<div class="repo-item row-link ' + clase + '" data-art="' + U.esc(p.codigo) + '">' +
+    return '<div class="repo-item row-link ' + clase + '" data-uid="' + U.esc(p.uid || p.codigo) + '">' +
       '<div class="repo-fila">' +
       '<div class="repo-rank">' + rank + '</div>' +
       '<div class="repo-main">' +
@@ -778,7 +778,7 @@ VLM.views = (function () {
     } else {
       filtrados.forEach(p => {
         const pct = p.ocupacion !== null ? Math.min(100, p.ocupacion * 100) : 0;
-        html += '<tr class="row-' + p.estado + ' row-link" data-art="' + U.esc(p.codigo) + '">' +
+        html += '<tr class="row-' + p.estado + ' row-link" data-uid="' + U.esc(p.uid || p.codigo) + '">' +
           '<td class="t-code">' + U.esc(p.codigo) + '</td>' +
           '<td class="t-desc">' + U.esc(p.descripcion) + '</td>' +
           '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.labNombre || p.laboratorio) + '"></i> ' +

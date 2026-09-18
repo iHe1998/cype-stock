@@ -1879,7 +1879,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 18/09/2026 18:08 - 27a15aa</span>
+      <span class="muted small" id="appVersion">compilado 18/09/2026 18:19 - 7bacc17</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -3667,6 +3667,10 @@ VLM.parser = (function () {
       if (zonaGana && !p.zonaDeColumna) { p.zonaPlanilla = zonaGana; p.zonaExplicita = true; }
       p.ambitoPos = esVLM ? 'vlm' : 'externo';
 
+      // la identidad se recalcula siempre: los productos guardados por una
+      // versión anterior no la traen
+      p.uid = uidDe(p);
+
       VLM.labs.clasificar(p, catalogo);
     });
     return productos;
@@ -3694,7 +3698,7 @@ VLM.parser = (function () {
   function agrupar(productos) {
     const mapa = {}, orden = [];
     productos.forEach(p => {
-      const k = p.codigo;
+      const k = uidDe(p);
       if (!mapa[k]) {
         mapa[k] = Object.assign({}, p, {
           ubicaciones: [], ubicPicking: [], ubicAltura: [], lotes: [], detalle: [],
@@ -4007,6 +4011,23 @@ VLM.parser = (function () {
    * cargar un máximo en una posición que la tabla no muestra y el número no
    * aparecería en ningún lado.
    */
+  /**
+   * Identidad de un artículo: el código Y el propietario.
+   *
+   * No alcanza con el código. Biosidus se separó en dos —SAU y ARG— y las dos
+   * mitades comparten SKU, pero son mercadería distinta: distinto stock,
+   * distintas posiciones, distintos lotes y distinto fin. Agrupando por código
+   * solo, las dos se juntaban en un artículo y el panel mostraba la suma con
+   * el propietario de la primera fila del archivo, que es una mentira
+   * prolija: 131 artículos aparecían como 74.
+   *
+   * El propietario va normalizado para que "BIOSIDUS" y "Biosidus" sean el
+   * mismo, que es lo que pasa cuando la planilla viene de dos exportaciones.
+   */
+  function uidDe(p) {
+    return String(p.codigo) + '|' + U.norm(p.laboratorio);
+  }
+
   function esConfigurable(det) {
     return !!det && det.tipo !== 'altura';
   }
@@ -4026,7 +4047,7 @@ VLM.parser = (function () {
 
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
-    autoMapear, normalizar, generarPlantilla, esConfigurable, estaIgnorado,
+    autoMapear, normalizar, generarPlantilla, esConfigurable, estaIgnorado, uidDe,
     detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, reaplicarReglas
   };
 })();
@@ -5447,7 +5468,7 @@ VLM.views = (function () {
     const clase = p.estado === 'agotado' ? 'r-agotado' : (p.estado === 'bajo' ? 'r-bajo' : '');
     const pct = p.ocupacion !== null ? Math.round(p.ocupacion * 100) + '%' : 's/d';
 
-    return '<div class="repo-item row-link ' + clase + '" data-art="' + U.esc(p.codigo) + '">' +
+    return '<div class="repo-item row-link ' + clase + '" data-uid="' + U.esc(p.uid || p.codigo) + '">' +
       '<div class="repo-fila">' +
       '<div class="repo-rank">' + rank + '</div>' +
       '<div class="repo-main">' +
@@ -5738,7 +5759,7 @@ VLM.views = (function () {
     } else {
       filtrados.forEach(p => {
         const pct = p.ocupacion !== null ? Math.min(100, p.ocupacion * 100) : 0;
-        html += '<tr class="row-' + p.estado + ' row-link" data-art="' + U.esc(p.codigo) + '">' +
+        html += '<tr class="row-' + p.estado + ' row-link" data-uid="' + U.esc(p.uid || p.codigo) + '">' +
           '<td class="t-code">' + U.esc(p.codigo) + '</td>' +
           '<td class="t-desc">' + U.esc(p.descripcion) + '</td>' +
           '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.labNombre || p.laboratorio) + '"></i> ' +
@@ -6625,11 +6646,13 @@ VLM.app = (function () {
 
     // clic en un artículo -> detalle (es el único lugar donde se ve el
     // disponible: en los gráficos y los estados manda el físico)
-    $$('[data-art]', el).forEach(n => {
-      if (n.tagName === 'INPUT' || n.tagName === 'BUTTON') return;
+    /* Por uid y no por código: el mismo SKU puede estar dos veces, una por
+       propietario, y son artículos distintos. (`data-art`, que es otra cosa,
+       lleva el código suelto para configurar la posición.) */
+    $$('[data-uid]', el).forEach(n => {
       n.addEventListener('click', ev => {
         if (ev.target.closest('input, button, a')) return;
-        abrirArticulo(n.dataset.art, items, cfg);
+        abrirArticulo(n.dataset.uid, items, cfg);
       });
     });
 
@@ -6687,11 +6710,14 @@ VLM.app = (function () {
     if (n.select) n.select();
   }
 
-  function abrirArticulo(codigo, items, cfg) {
-    const p = items.filter(x => x.codigo === codigo)[0];
+  /** @param id el uid del artículo (código|propietario); tolera un código suelto */
+  function abrirArticulo(id, items, cfg) {
+    const p = items.filter(x => x.uid === id)[0] || items.filter(x => x.codigo === id)[0];
     if (!p) return;
-    $('#artTitulo').textContent = p.descripcion && p.descripcion !== p.codigo
-      ? p.descripcion : p.codigo;
+    /* Con el propietario adelante: el mismo SKU puede estar dos veces, con la
+       misma descripción, y sin esto las dos fichas se ven idénticas. */
+    const nombre = p.descripcion && p.descripcion !== p.codigo ? p.descripcion : p.codigo;
+    $('#artTitulo').textContent = nombre + ' · ' + (p.labNombre || p.laboratorio);
     $('#artBody').innerHTML = V.detalleArticulo(p, cfg);
     $('#modalArt').hidden = false;
   }
@@ -6868,7 +6894,8 @@ VLM.app = (function () {
       ? U.fmt(p.stockMin || 0) + '<span>de mínimo</span>'
       : U.fmt(ref) + (hayMax ? ' / ' + U.fmt(p.stockMax) : '') +
         '<span>' + (hayMax ? 'de su máximo' : 'sin máximo') + '</span>';
-    return '<button class="ia-fila" data-cod="' + U.esc(p.codigo) + '">' +
+    return '<button class="ia-fila" data-uid="' + U.esc(p.uid || p.codigo) + '" ' +
+      'data-cod="' + U.esc(p.codigo) + '">' +
       V.badge(p.estado) +
       '<span class="ia-fila-txt"><strong>' + U.esc(p.descripcion || p.codigo) + '</strong>' +
       '<span class="ia-fila-sub">' + U.esc(p.codigo) + ' · ' +
@@ -6881,7 +6908,7 @@ VLM.app = (function () {
   function iaAlDetalle(cuerpo) {
     $$('.ia-fila', cuerpo).forEach(b => b.addEventListener('click', () => {
       $('#modalIA').hidden = true;
-      abrirArticulo(b.dataset.cod, itemsCalculados(), S.state.cfg);
+      abrirArticulo(b.dataset.uid, itemsCalculados(), S.state.cfg);
     }));
   }
 
