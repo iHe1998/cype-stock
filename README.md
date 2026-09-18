@@ -467,13 +467,24 @@ create table stock (
   actualizado timestamptz default now()
 );
 
+-- umbrales, laboratorios y reglas de posición: también una sola fila
+create table config (
+  id          text primary key,
+  datos       jsonb not null,
+  por         text,
+  actualizado timestamptz default now()
+);
+
 alter table maximos enable row level security;
 alter table stock   enable row level security;
+alter table config  enable row level security;
 
 -- leer: cualquiera que abra el panel
 create policy "leer" on maximos
   for select to anon, authenticated using (true);
 create policy "leer" on stock
+  for select to anon, authenticated using (true);
+create policy "leer" on config
   for select to anon, authenticated using (true);
 
 -- escribir: sólo con sesión
@@ -481,7 +492,13 @@ create policy "escribir" on maximos
   for all to authenticated using (true) with check (true);
 create policy "escribir" on stock
   for all to authenticated using (true) with check (true);
+create policy "escribir" on config
+  for all to authenticated using (true) with check (true);
 ```
+
+> `config` guarda las reglas de posición, el catálogo de laboratorios y los umbrales. No es
+> un detalle de comodidad: con reglas distintas en cada PC, la misma posición es picking acá
+> y altura allá, y dos pantallas del mismo depósito muestran números que no cierran entre sí.
 
 Después, en **Authentication → Users → Add user**, se crea el usuario que va a configurar.
 

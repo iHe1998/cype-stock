@@ -37,6 +37,12 @@ VLM.app = (function () {
       if (motivo === 'posiciones') { reaplicarPosiciones(); if (!aplicandoDeNube) sincronizarMaximosPronto(); }
       if (motivo === 'ubicaciones') reaplicarReglas();
       if (motivo === 'cfg' || motivo === 'datos') calculados = null;
+      // la configuración compartida bajó de la base: un solo repaso de todo
+      if (motivo === 'compartida') { reclasificar(); reaplicarReglas(true); calculados = null; }
+      // umbrales, laboratorios y reglas cambian lo que ven todos, así que viajan
+      if (!aplicandoDeNube && (motivo === 'cfg' || motivo === 'labs' || motivo === 'ubicaciones')) {
+        sincronizarConfigPronto();
+      }
       render();
     });
     // Al abrir: las reglas de posición pueden haber cambiado desde la última
@@ -1155,6 +1161,80 @@ VLM.app = (function () {
     try { S.setPosiciones(mapa); } finally { aplicandoDeNube = false; }
   }
 
+  /* ------------------------------------------------------------
+     Configuración compartida: umbrales, laboratorios y reglas
+
+     Deciden lo que ve el panel tanto como el stock. Con reglas distintas en
+     cada PC, la misma posición es picking acá y altura allá, y dos pantallas
+     del mismo depósito muestran números que no cierran entre sí. Viajan por
+     la base igual que los máximos.
+     ------------------------------------------------------------ */
+  const KEY_PEND_CFG = 'vlm.cfgpend.v1';
+  let cfgSinSubir = false;
+  let cfgDeLaBase = null;   // la última firma vista, para no reaplicar de gusto
+
+  try { cfgSinSubir = localStorage.getItem(KEY_PEND_CFG) === '1'; } catch (e) {}
+
+  function marcarCfgSinSubir(v) {
+    cfgSinSubir = v;
+    try {
+      if (v) localStorage.setItem(KEY_PEND_CFG, '1');
+      else localStorage.removeItem(KEY_PEND_CFG);
+    } catch (e) {}
+  }
+
+  function firmaConfig(d) {
+    try { return JSON.stringify(d); } catch (e) { return ''; }
+  }
+
+  async function sincronizarConfig() {
+    const N = VLM.nube;
+    if (!N.configurada() || !N.conSesion()) return;
+    const d = S.configCompartida();
+    try {
+      await N.subirConfig(d);
+      cfgDeLaBase = firmaConfig(d);
+      if (cfgSinSubir) { marcarCfgSinSubir(false); U.toast('Configuración guardada en la base', 'ok'); }
+    } catch (e) {
+      marcarCfgSinSubir(true);
+      U.toast('No se pudo guardar la configuración en la base: ' + e.message, 'err');
+    }
+  }
+
+  /* Editar reglas es tocar un select atrás de otro: sin esperar sería una
+     subida por clic. */
+  const sincronizarConfigPronto = U.debounce(sincronizarConfig, 1200);
+
+  /**
+   * Trae la configuración compartida. Manda la base, con las mismas dos
+   * excepciones que los máximos: si la base no tiene nada, esta PC siembra lo
+   * suyo; y si acá quedó algo sin subir, no se pisa y se reintenta.
+   */
+  async function bajarConfig(silencioso) {
+    const N = VLM.nube;
+    try {
+      const r = await N.bajarConfig();
+      if (!r || !r.datos) {
+        // primera vez: la primera PC con sesión deja la configuración puesta
+        if (N.conSesion()) sincronizarConfig();
+        return;
+      }
+      if (cfgSinSubir) { sincronizarConfig(); return; }
+
+      const firma = firmaConfig(r.datos);
+      if (firma === cfgDeLaBase) return;        // nada nuevo
+      if (firma === firmaConfig(S.configCompartida())) { cfgDeLaBase = firma; return; }
+
+      cfgDeLaBase = firma;
+      aplicandoDeNube = true;
+      try { S.setConfigCompartida(r.datos); } finally { aplicandoDeNube = false; }
+      if (!silencioso) U.toast('Traída la configuración de la base', 'ok');
+    } catch (e) {
+      if (!silencioso) U.toast('No se pudo traer la configuración: ' + e.message, 'err');
+      else console.warn('nube (config):', e.message);
+    }
+  }
+
   /**
    * Trae el stock, pero sólo si cambió desde la última vez.
    *
@@ -1200,6 +1280,10 @@ VLM.app = (function () {
     const N = VLM.nube;
     if (!N.configurada()) return;
 
+    /* La configuración primero: define cómo se clasifica todo lo demás. Si
+       bajara después, el stock se mostraría un instante con las reglas viejas
+       y se reclasificaría de nuevo a la vista de todos. */
+    await bajarConfig(silencioso);
     await bajarStockSiCambio(silencioso);
 
     try {

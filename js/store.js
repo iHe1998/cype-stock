@@ -287,6 +287,29 @@ VLM.store = (function () {
 
   function limpiarPosiciones() { setPosiciones({}); }
 
+  /**
+   * Lo que se comparte entre PCs además del stock y los máximos: umbrales,
+   * laboratorios y reglas de posición. Se lee y se escribe entero.
+   */
+  function configCompartida() {
+    return { cfg: state.cfg, labs: state.labs, reglas: state.reglasUbic };
+  }
+
+  /**
+   * Aplica de una vez la configuración que vino de la base.
+   *
+   * Emite un solo aviso y no tres: cada uno dispara una reclasificación del
+   * stock entero y un redibujado, y hacerlo tres veces seguidas se ve como un
+   * parpadeo cada vez que otra PC toca algo.
+   */
+  function setConfigCompartida(d) {
+    if (!d) return;
+    if (d.cfg)    { Object.assign(state.cfg, d.cfg); guardarCfg(); }
+    if (d.labs && d.labs.length)     { state.labs = d.labs; guardarLabs(); }
+    if (d.reglas && d.reglas.length) { state.reglasUbic = d.reglas; guardarReglasUbic(); }
+    emit('compartida');
+  }
+
   function setUi(parcial, silencioso) {
     Object.assign(state.ui, parcial);
     guardarUi();
@@ -299,7 +322,7 @@ VLM.store = (function () {
     state, CFG_DEFAULT,
     on, emit, cargar, guardar,
     setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
-    setReglasUbic, resetReglasUbic,
+    setReglasUbic, resetReglasUbic, configCompartida, setConfigCompartida,
     setPosicion, setPosiciones, limpiarPosiciones, clavePos, hidratarFechas, hayDatos
   };
 })();

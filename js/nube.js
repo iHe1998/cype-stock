@@ -27,8 +27,9 @@ window.VLM = window.VLM || {};
 VLM.nube = (function () {
   const KEY_CFG  = 'vlm.nube.v1';
   const KEY_SESS = 'vlm.nube.sesion.v1';
-  const TABLA       = 'maximos';
-  const TABLA_STOCK = 'stock';
+  const TABLA        = 'maximos';
+  const TABLA_STOCK  = 'stock';
+  const TABLA_CONFIG = 'config';
 
   let cfg = null;      // { url, anonKey }
   let sesion = null;   // { access_token, refresh_token, email }
@@ -241,11 +242,42 @@ VLM.nube = (function () {
     return cuando;
   }
 
+  /* ---------------- configuración compartida ----------------
+     Reglas de posición, catálogo de laboratorios y umbrales. Deciden lo que
+     ve el panel tanto como el stock: con reglas distintas, dos PCs clasifican
+     el mismo artículo distinto y muestran números que no cierran entre sí.
+
+     Una sola fila, como el stock: se cambia poco y siempre entera. */
+
+  async function bajarConfig() {
+    const filas = await pedir('/rest/v1/' + TABLA_CONFIG + '?id=eq.actual&select=datos,actualizado,por',
+      { method: 'GET' });
+    const f = (filas || [])[0];
+    if (!f || !f.datos) return null;
+    return { datos: f.datos, actualizado: f.actualizado, por: f.por };
+  }
+
+  async function subirConfig(datos) {
+    const cuando = new Date().toISOString();
+    await pedir('/rest/v1/' + TABLA_CONFIG + '?on_conflict=id', {
+      method: 'POST',
+      headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify([{
+        id: 'actual',
+        datos: datos,
+        por: (sesion && sesion.email) || null,
+        actualizado: cuando
+      }])
+    }, true);
+    return cuando;
+  }
+
   cargar();
 
   return {
     cargar, configurada, conSesion, esPorDefecto, puedeEditar, email, datos, setConfig,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
-    fechaStock, bajarStock, subirStock
+    fechaStock, bajarStock, subirStock,
+    bajarConfig, subirConfig
   };
 })();
