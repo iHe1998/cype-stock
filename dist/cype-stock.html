@@ -1947,7 +1947,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 05/10/2026 19:43 - f796a0e</span>
+      <span class="muted small" id="appVersion">compilado 05/10/2026 20:23 - 6d92a40</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -4667,6 +4667,9 @@ VLM.vigia = (function () {
     } else {
       t += ' · todavía no subió nada';
     }
+    if (VLM.app.stockPendiente && VLM.app.stockPendiente()) {
+      t += ' · la base no contesta: el último está cargado en esta PC y se sube solo apenas vuelva';
+    }
     if (!persistida) t += ' · ojo: si se recarga la página hay que volver a elegir la carpeta';
     return extra ? t + ' · ' + extra : t;
   }
@@ -4707,7 +4710,7 @@ VLM.vigia = (function () {
       const nuevos = (await planillas()).filter(f =>
         f.lastModified > desde && !rechazados.some(r => mismaFirma(r, firmaDe(f))));
 
-      if (!nuevos.length) { poner('vigilando', textoVigilando()); return; }
+      if (!nuevos.length) { poner(estadoTranquilo(), textoVigilando()); return; }
 
       for (const f of nuevos) {
         // recién guardado: puede estar todavía escribiéndose
@@ -4719,7 +4722,7 @@ VLM.vigia = (function () {
         if (r === 'subido' || r === 'esperar') return;
         // 'rechazado': probar con el siguiente
       }
-      poner('vigilando', textoVigilando());
+      poner(estadoTranquilo(), textoVigilando());
     } catch (e) {
       if (e && e.name === 'NotAllowedError') {
         poner('esperando-permiso', 'El navegador quitó el permiso sobre la carpeta. Apretá Retomar.');
@@ -4792,20 +4795,23 @@ VLM.vigia = (function () {
       return 'esperar';
     }
 
-    const subio = await VLM.app.aplicarImportacion(res, {
+    await VLM.app.aplicarImportacion(res, {
       archivo: file.name, hoja: r.hojas[0], mapeo: mapa, automatico: true
     });
-    if (!subio && N.configurada()) {
-      poner('error', 'Se cargó ' + file.name + ' en esta PC pero no se pudo subir a la base. ' +
-                     'Se reintenta en la próxima revisión.');
-      return 'esperar';
-    }
 
+    /* Se anota como hecho aunque la subida haya fallado: el archivo YA está
+       cargado en esta PC, y la subida pendiente la reintenta app.js en cada
+       refresco (ver marcarStockSinSubir). Reprocesarlo acá no arreglaría nada. */
     const m = leerMemoria();
     m.ultimo = Object.assign(firmaDe(file), { cuando: Date.now(), productos: res.productos.length });
     guardarMemoria(m);
-    poner('vigilando', textoVigilando());
+    poner(estadoTranquilo(), textoVigilando());
     return 'subido';
+  }
+
+  /** "Vigilando", salvo que haya stock que todavía no llegó a la base. */
+  function estadoTranquilo() {
+    return VLM.app.stockPendiente && VLM.app.stockPendiente() ? 'error' : 'vigilando';
   }
 
   async function subirIgual() {
@@ -4820,7 +4826,7 @@ VLM.vigia = (function () {
     if (!retenido) return;
     rechazar(retenido.file);
     retenido = null;
-    poner('vigilando', textoVigilando());
+    poner(estadoTranquilo(), textoVigilando());
   }
 
   function revisarAhora() { if (carpeta) revisar(); }
@@ -7891,6 +7897,8 @@ VLM.app = (function () {
     render();
     // si el vigilante estaba esperando una sesión para subir, que pruebe ya
     VLM.vigia.revisarAhora();
+    // y si quedó stock de esta PC sin llegar a la base, también
+    if (stockSinSubir && VLM.nube.conSesion()) subirStockANube(true);
   }
 
   /* ------------------------------------------------------------
@@ -8103,6 +8111,16 @@ VLM.app = (function () {
    */
   async function bajarStockSiCambio(silencioso) {
     const N = VLM.nube;
+    // lo de acá es más nuevo que lo de la base: no se baja nada encima, se
+    // vuelve a intentar subirlo (ver marcarStockSinSubir)
+    if (stockSinSubir) {
+      if (N.conSesion()) {
+        const ok = await subirStockANube(true);
+        if (!ok && !silencioso) U.toast('Hay stock de esta PC que todavía no llegó a la base, ' +
+                                        'y la base no contesta. No se bajó nada encima.', 'err');
+      }
+      return;
+    }
     try {
       if (silencioso) {
         const fecha = await N.fechaStock();
@@ -8180,13 +8198,41 @@ VLM.app = (function () {
     }
   }
 
+  /* ------------------------------------------------------------
+     Stock cargado acá que todavía no llegó a la base
+
+     Pasa si la base no contesta (caída, o el proyecto pausado) en el momento
+     de importar. Sin esta marca, el stock nuevo quedaba sólo en esta PC y,
+     peor, el primer refresco después de que la base volviera bajaba el stock
+     VIEJO de la base y lo pisaba sin avisar: la última planilla se perdía
+     justo cuando todo volvía a andar.
+
+     Mientras está marcado, una bajada no pisa nada —lo de acá es más nuevo—
+     y en cada refresco se reintenta subir.
+     ------------------------------------------------------------ */
+  const KEY_PEND_STOCK = 'vlm.stockpend.v1';
+  let stockSinSubir = false;
+  try { stockSinSubir = localStorage.getItem(KEY_PEND_STOCK) === '1'; } catch (e) {}
+
+  function marcarStockSinSubir(v) {
+    stockSinSubir = v;
+    try {
+      if (v) localStorage.setItem(KEY_PEND_STOCK, '1');
+      else localStorage.removeItem(KEY_PEND_STOCK);
+    } catch (e) {}
+  }
+
   /**
    * Sube el stock recién importado, para que lo vean las demás PCs.
    * Sólo con sesión: el panel del depósito no tiene que poder pisarlo.
+   *
+   * @param reintento si es un reintento automático: no repite el aviso de
+   *   error en cada refresco mientras la base siga sin contestar
    */
-  async function subirStockANube() {
+  async function subirStockANube(reintento) {
     const N = VLM.nube;
-    if (!N.configurada() || !N.conSesion()) return false;
+    if (!N.configurada()) return false;
+    if (!N.conSesion()) { marcarStockSinSubir(true); return false; }
     try {
       const cuando = await N.subirStock(S.state.productos, S.state.meta);
       // dejar anotado que la fila de la base es ésta, o el próximo refresco
@@ -8194,10 +8240,16 @@ VLM.app = (function () {
       S.setProductos(S.state.productos, Object.assign({}, S.state.meta, {
         subidoEn: cuando, subidoPor: N.email()
       }));
-      U.toast('Stock subido: lo ven todas las PCs', 'ok');
+      const estabaPendiente = stockSinSubir;
+      marcarStockSinSubir(false);
+      U.toast(estabaPendiente && reintento
+        ? 'La base volvió: subido el stock que estaba pendiente'
+        : 'Stock subido: lo ven todas las PCs', 'ok');
       return true;
     } catch (e) {
-      U.toast('No se pudo subir el stock: ' + e.message, 'err');
+      if (!reintento) U.toast('No se pudo subir el stock: queda en esta PC y se sube solo ' +
+                              'apenas la base conteste (' + e.message + ')', 'err');
+      marcarStockSinSubir(true);
       return false;
     }
   }
@@ -8579,7 +8631,8 @@ VLM.app = (function () {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { render, irA, cargarDemo, aplicarImportacion };
+  return { render, irA, cargarDemo, aplicarImportacion,
+           stockPendiente: () => stockSinSubir };
 })();
 
 </script>

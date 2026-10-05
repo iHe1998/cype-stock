@@ -170,6 +170,9 @@ VLM.vigia = (function () {
     } else {
       t += ' · todavía no subió nada';
     }
+    if (VLM.app.stockPendiente && VLM.app.stockPendiente()) {
+      t += ' · la base no contesta: el último está cargado en esta PC y se sube solo apenas vuelva';
+    }
     if (!persistida) t += ' · ojo: si se recarga la página hay que volver a elegir la carpeta';
     return extra ? t + ' · ' + extra : t;
   }
@@ -210,7 +213,7 @@ VLM.vigia = (function () {
       const nuevos = (await planillas()).filter(f =>
         f.lastModified > desde && !rechazados.some(r => mismaFirma(r, firmaDe(f))));
 
-      if (!nuevos.length) { poner('vigilando', textoVigilando()); return; }
+      if (!nuevos.length) { poner(estadoTranquilo(), textoVigilando()); return; }
 
       for (const f of nuevos) {
         // recién guardado: puede estar todavía escribiéndose
@@ -222,7 +225,7 @@ VLM.vigia = (function () {
         if (r === 'subido' || r === 'esperar') return;
         // 'rechazado': probar con el siguiente
       }
-      poner('vigilando', textoVigilando());
+      poner(estadoTranquilo(), textoVigilando());
     } catch (e) {
       if (e && e.name === 'NotAllowedError') {
         poner('esperando-permiso', 'El navegador quitó el permiso sobre la carpeta. Apretá Retomar.');
@@ -295,20 +298,23 @@ VLM.vigia = (function () {
       return 'esperar';
     }
 
-    const subio = await VLM.app.aplicarImportacion(res, {
+    await VLM.app.aplicarImportacion(res, {
       archivo: file.name, hoja: r.hojas[0], mapeo: mapa, automatico: true
     });
-    if (!subio && N.configurada()) {
-      poner('error', 'Se cargó ' + file.name + ' en esta PC pero no se pudo subir a la base. ' +
-                     'Se reintenta en la próxima revisión.');
-      return 'esperar';
-    }
 
+    /* Se anota como hecho aunque la subida haya fallado: el archivo YA está
+       cargado en esta PC, y la subida pendiente la reintenta app.js en cada
+       refresco (ver marcarStockSinSubir). Reprocesarlo acá no arreglaría nada. */
     const m = leerMemoria();
     m.ultimo = Object.assign(firmaDe(file), { cuando: Date.now(), productos: res.productos.length });
     guardarMemoria(m);
-    poner('vigilando', textoVigilando());
+    poner(estadoTranquilo(), textoVigilando());
     return 'subido';
+  }
+
+  /** "Vigilando", salvo que haya stock que todavía no llegó a la base. */
+  function estadoTranquilo() {
+    return VLM.app.stockPendiente && VLM.app.stockPendiente() ? 'error' : 'vigilando';
   }
 
   async function subirIgual() {
@@ -323,7 +329,7 @@ VLM.vigia = (function () {
     if (!retenido) return;
     rechazar(retenido.file);
     retenido = null;
-    poner('vigilando', textoVigilando());
+    poner(estadoTranquilo(), textoVigilando());
   }
 
   function revisarAhora() { if (carpeta) revisar(); }

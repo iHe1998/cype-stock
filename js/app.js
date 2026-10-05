@@ -1116,6 +1116,8 @@ VLM.app = (function () {
     render();
     // si el vigilante estaba esperando una sesión para subir, que pruebe ya
     VLM.vigia.revisarAhora();
+    // y si quedó stock de esta PC sin llegar a la base, también
+    if (stockSinSubir && VLM.nube.conSesion()) subirStockANube(true);
   }
 
   /* ------------------------------------------------------------
@@ -1328,6 +1330,16 @@ VLM.app = (function () {
    */
   async function bajarStockSiCambio(silencioso) {
     const N = VLM.nube;
+    // lo de acá es más nuevo que lo de la base: no se baja nada encima, se
+    // vuelve a intentar subirlo (ver marcarStockSinSubir)
+    if (stockSinSubir) {
+      if (N.conSesion()) {
+        const ok = await subirStockANube(true);
+        if (!ok && !silencioso) U.toast('Hay stock de esta PC que todavía no llegó a la base, ' +
+                                        'y la base no contesta. No se bajó nada encima.', 'err');
+      }
+      return;
+    }
     try {
       if (silencioso) {
         const fecha = await N.fechaStock();
@@ -1405,13 +1417,41 @@ VLM.app = (function () {
     }
   }
 
+  /* ------------------------------------------------------------
+     Stock cargado acá que todavía no llegó a la base
+
+     Pasa si la base no contesta (caída, o el proyecto pausado) en el momento
+     de importar. Sin esta marca, el stock nuevo quedaba sólo en esta PC y,
+     peor, el primer refresco después de que la base volviera bajaba el stock
+     VIEJO de la base y lo pisaba sin avisar: la última planilla se perdía
+     justo cuando todo volvía a andar.
+
+     Mientras está marcado, una bajada no pisa nada —lo de acá es más nuevo—
+     y en cada refresco se reintenta subir.
+     ------------------------------------------------------------ */
+  const KEY_PEND_STOCK = 'vlm.stockpend.v1';
+  let stockSinSubir = false;
+  try { stockSinSubir = localStorage.getItem(KEY_PEND_STOCK) === '1'; } catch (e) {}
+
+  function marcarStockSinSubir(v) {
+    stockSinSubir = v;
+    try {
+      if (v) localStorage.setItem(KEY_PEND_STOCK, '1');
+      else localStorage.removeItem(KEY_PEND_STOCK);
+    } catch (e) {}
+  }
+
   /**
    * Sube el stock recién importado, para que lo vean las demás PCs.
    * Sólo con sesión: el panel del depósito no tiene que poder pisarlo.
+   *
+   * @param reintento si es un reintento automático: no repite el aviso de
+   *   error en cada refresco mientras la base siga sin contestar
    */
-  async function subirStockANube() {
+  async function subirStockANube(reintento) {
     const N = VLM.nube;
-    if (!N.configurada() || !N.conSesion()) return false;
+    if (!N.configurada()) return false;
+    if (!N.conSesion()) { marcarStockSinSubir(true); return false; }
     try {
       const cuando = await N.subirStock(S.state.productos, S.state.meta);
       // dejar anotado que la fila de la base es ésta, o el próximo refresco
@@ -1419,10 +1459,16 @@ VLM.app = (function () {
       S.setProductos(S.state.productos, Object.assign({}, S.state.meta, {
         subidoEn: cuando, subidoPor: N.email()
       }));
-      U.toast('Stock subido: lo ven todas las PCs', 'ok');
+      const estabaPendiente = stockSinSubir;
+      marcarStockSinSubir(false);
+      U.toast(estabaPendiente && reintento
+        ? 'La base volvió: subido el stock que estaba pendiente'
+        : 'Stock subido: lo ven todas las PCs', 'ok');
       return true;
     } catch (e) {
-      U.toast('No se pudo subir el stock: ' + e.message, 'err');
+      if (!reintento) U.toast('No se pudo subir el stock: queda en esta PC y se sube solo ' +
+                              'apenas la base conteste (' + e.message + ')', 'err');
+      marcarStockSinSubir(true);
       return false;
     }
   }
@@ -1804,5 +1850,6 @@ VLM.app = (function () {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { render, irA, cargarDemo, aplicarImportacion };
+  return { render, irA, cargarDemo, aplicarImportacion,
+           stockPendiente: () => stockSinSubir };
 })();
