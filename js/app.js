@@ -31,6 +31,7 @@ VLM.app = (function () {
     wireNube();
     wireCfgNav();
     wireAsistente();
+    wireVigia();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       // lo que acaba de bajar de la base no se vuelve a subir
@@ -821,19 +822,30 @@ VLM.app = (function () {
                                             { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic, posiciones: S.state.posiciones });
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
-    S.setProductos(r.productos, {
-      archivo: imp.nombre,
-      hoja: imp.hoja,
-      filas: r.productos.length,
-      importadoEn: Date.now(),
-      mapeo: Object.assign({}, imp.mapa),
-      ubicacionesVistas: r.ubicacionesVistas || []
-    });
     $('#modalImport').hidden = true;
     U.toast('Importados ' + r.productos.length + ' productos', 'ok');
     r.avisos.forEach(a => U.toast(a));
+    aplicarImportacion(r, { archivo: imp.nombre, hoja: imp.hoja, mapeo: Object.assign({}, imp.mapa) });
+  }
+
+  /**
+   * Deja cargado un stock recién leído y lo comparte.
+   *
+   * Es el final común de los dos caminos: la importación a mano y la carga
+   * automática desde una carpeta (vigia.js). Que sea uno solo es lo que
+   * garantiza que el Excel que sube solo quede igual que si lo hubiera
+   * importado una persona.
+   *
+   * @returns promesa de si se pudo subir a la base
+   */
+  function aplicarImportacion(r, meta) {
+    S.setProductos(r.productos, Object.assign({
+      filas: r.productos.length,
+      importadoEn: Date.now(),
+      ubicacionesVistas: r.ubicacionesVistas || []
+    }, meta));
     // y se comparte solo: quien importa no tiene que acordarse de subirlo
-    subirStockANube();
+    return subirStockANube();
   }
 
   /* ============================================================
@@ -1102,6 +1114,67 @@ VLM.app = (function () {
   function refrescarPorSesion() {
     pintarNube();
     render();
+    // si el vigilante estaba esperando una sesión para subir, que pruebe ya
+    VLM.vigia.revisarAhora();
+  }
+
+  /* ------------------------------------------------------------
+     Carga automática desde una carpeta (vigia.js)
+     ------------------------------------------------------------ */
+
+  /** El cartelito de arriba: una vigilancia frenada no puede pasar callada. */
+  function pintarVigia() {
+    const V2 = VLM.vigia, e = V2.estado();
+    const chip = $('#vigiaChip');
+    if (chip) {
+      const visible = ['vigilando', 'esperando-permiso', 'retenido', 'error'].indexOf(e.estado) > -1;
+      chip.hidden = !visible;
+      chip.className = 'vigia-chip v-' + e.estado;
+      chip.textContent = e.estado === 'vigilando' ? 'Carga automática'
+        : e.estado === 'esperando-permiso' ? 'Carga automática frenada · Retomar'
+        : 'Carga automática: revisar';
+      chip.title = e.texto || '';
+    }
+
+    const cont = $('#vigiaEstado');
+    if (!cont) return;
+    const txt = {
+      'no-soportado': 'Este navegador no puede vigilar carpetas. Hace falta Chrome o Edge, ' +
+                      'con el panel abierto desde la web (no desde el archivo suelto).',
+      'apagado': 'Apagada en esta PC.'
+    }[e.estado] || e.texto;
+    cont.className = 'vigia-estado v-' + e.estado;
+    cont.textContent = txt;
+
+    const es = s => e.estado === s;
+    $('#btnVigiaElegir').hidden    = es('no-soportado');
+    $('#btnVigiaElegir').textContent = es('apagado') ? 'Elegir carpeta…' : 'Cambiar de carpeta…';
+    $('#btnVigiaRetomar').hidden   = !es('esperando-permiso');
+    $('#btnVigiaRevisar').hidden   = !(es('vigilando') || es('error'));
+    $('#btnVigiaSubir').hidden     = !es('retenido');
+    $('#btnVigiaDescartar').hidden = !es('retenido');
+    $('#btnVigiaDetener').hidden   = es('apagado') || es('no-soportado');
+  }
+
+  function wireVigia() {
+    const V2 = VLM.vigia;
+    V2.alCambiar(pintarVigia);
+    $('#btnVigiaElegir').addEventListener('click', () => V2.elegir());
+    $('#btnVigiaRetomar').addEventListener('click', () => V2.retomar());
+    $('#btnVigiaRevisar').addEventListener('click', () => V2.revisarAhora());
+    $('#btnVigiaSubir').addEventListener('click', () => V2.subirIgual());
+    $('#btnVigiaDescartar').addEventListener('click', () => V2.descartarRetenido());
+    $('#btnVigiaDetener').addEventListener('click', () => {
+      if (confirm('¿Dejar de vigilar la carpeta en esta PC?')) V2.detener();
+    });
+    // el clic en el cartelito también sirve de gesto para pedir el permiso de nuevo
+    $('#vigiaChip').addEventListener('click', () => {
+      if (V2.estado().estado === 'esperando-permiso') { V2.retomar(); return; }
+      abrirSettings();
+      mostrarSeccion('datos');
+    });
+    pintarVigia();
+    V2.iniciar();
   }
 
   /* ------------------------------------------------------------
@@ -1731,5 +1804,5 @@ VLM.app = (function () {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { render, irA, cargarDemo };
+  return { render, irA, cargarDemo, aplicarImportacion };
 })();

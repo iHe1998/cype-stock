@@ -28,6 +28,8 @@
   <div class="topbar-status">
     <span class="dot" id="statusDot"></span>
     <span id="statusText">Sin datos cargados</span>
+    <!-- sólo en la PC que vigila la carpeta de SCE -->
+    <button class="vigia-chip" id="vigiaChip" hidden></button>
   </div>
 
   <div class="topbar-actions">
@@ -428,6 +430,35 @@
           </div>
 
           <div class="cfg-grupo">
+            <h4>Carga automática desde SCE</h4>
+            <p class="cfg-ayuda">SCE no deja programar exportaciones, así que el Excel lo sigue
+              bajando alguien con <strong>Exportar a Excel</strong> en la vista
+              <strong>SALDOS STOCK GRAL</strong>. Lo demás es automático: si Chrome guarda las
+              descargas en una carpeta que esta PC vigila, el archivo se sube solo y lo ven todas
+              las pantallas. Reconoce el de saldos por sus columnas, así que las otras
+              exportaciones de SCE —que también se llaman <code>export.xlsx</code>— no lo
+              confunden.</p>
+            <ol class="cfg-pasos">
+              <li>Creá una carpeta adentro de Descargas, por ejemplo <code>Descargas\SCE</code>.
+                Chrome no deja vigilar Descargas entera.</li>
+              <li>En Chrome: <strong>Configuración → Descargas → Ubicación</strong>, elegí esa
+                carpeta.</li>
+              <li>Acá: <strong>Elegir carpeta…</strong>, la misma. Cuando Chrome pregunte, elegí
+                <strong>Permitir en todas las visitas</strong>.</li>
+              <li>Dejá esta pestaña abierta, con la sesión iniciada.</li>
+            </ol>
+            <div class="vigia-estado" id="vigiaEstado"></div>
+            <div class="cfg-actions">
+              <button class="btn btn-primary" id="btnVigiaElegir">Elegir carpeta…</button>
+              <button class="btn btn-primary" id="btnVigiaRetomar" hidden>Retomar</button>
+              <button class="btn" id="btnVigiaSubir" hidden>Subir igual</button>
+              <button class="btn" id="btnVigiaDescartar" hidden>Descartar ese archivo</button>
+              <button class="btn" id="btnVigiaRevisar" hidden>Revisar ahora</button>
+              <button class="btn" id="btnVigiaDetener" hidden>Dejar de vigilar</button>
+            </div>
+          </div>
+
+          <div class="cfg-grupo">
             <h4>Respaldo de los máximos</h4>
             <p class="cfg-ayuda">El stock se recupera siempre del Excel de SCE, pero los máximos
               se cargan a mano y viven sólo en la base. Guardate este archivo cada tanto. Sirve
@@ -519,6 +550,7 @@
 <script src="js/store.js"></script>
 <script src="js/parser.js"></script>
 <script src="js/asistente.js"></script>
+<script src="js/vigia.js"></script>
 <script src="js/analytics.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/views.js"></script>

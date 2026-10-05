@@ -1418,3 +1418,40 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .lab-cuenta { flex: none; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
 .lab-row.r-tapada { opacity: .65; border-left: 3px solid var(--warn); padding-left: 9px; }
 .lab-row.r-tapada .lab-cuenta { color: var(--warn); }
+
+/* ============================================================
+   CARGA AUTOMÁTICA (vigia.js)
+   ============================================================ */
+.cfg-pasos { margin: 10px 0 0 18px; padding: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+.cfg-pasos li { margin-bottom: 3px; }
+.cfg-pasos code { font-size: 11.5px; }
+
+.vigia-estado {
+  margin-top: 12px; padding: 9px 12px;
+  font-size: 12.5px; line-height: 1.5; color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border-soft); border-left: 3px solid var(--muted);
+  border-radius: var(--r-sm);
+}
+.vigia-estado.v-vigilando         { border-left-color: var(--ok); }
+.vigia-estado.v-esperando-permiso { border-left-color: var(--warn); }
+.vigia-estado.v-retenido,
+.vigia-estado.v-error             { border-left-color: var(--crit); color: var(--text); }
+
+/* El cartelito de arriba. Verde y discreto cuando anda; si se frena, que se
+   vea: una carga automática parada en silencio es peor que no tenerla. */
+.vigia-chip {
+  margin-left: 10px; padding: 2px 9px;
+  font: inherit; font-size: 11.5px; font-weight: 600; white-space: nowrap;
+  border-radius: 999px; cursor: pointer;
+  color: var(--ok); background: var(--ok-dim);
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.vigia-chip.v-esperando-permiso {
+  color: var(--warn); background: var(--warn-dim);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.vigia-chip.v-retenido, .vigia-chip.v-error {
+  color: var(--crit); background: var(--crit-dim);
+  border-color: color-mix(in srgb, var(--crit) 40%, transparent);
+}

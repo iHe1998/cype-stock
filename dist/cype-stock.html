@@ -1428,6 +1428,43 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .lab-row.r-tapada { opacity: .65; border-left: 3px solid var(--warn); padding-left: 9px; }
 .lab-row.r-tapada .lab-cuenta { color: var(--warn); }
 
+/* ============================================================
+   CARGA AUTOMÁTICA (vigia.js)
+   ============================================================ */
+.cfg-pasos { margin: 10px 0 0 18px; padding: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-2); }
+.cfg-pasos li { margin-bottom: 3px; }
+.cfg-pasos code { font-size: 11.5px; }
+
+.vigia-estado {
+  margin-top: 12px; padding: 9px 12px;
+  font-size: 12.5px; line-height: 1.5; color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border-soft); border-left: 3px solid var(--muted);
+  border-radius: var(--r-sm);
+}
+.vigia-estado.v-vigilando         { border-left-color: var(--ok); }
+.vigia-estado.v-esperando-permiso { border-left-color: var(--warn); }
+.vigia-estado.v-retenido,
+.vigia-estado.v-error             { border-left-color: var(--crit); color: var(--text); }
+
+/* El cartelito de arriba. Verde y discreto cuando anda; si se frena, que se
+   vea: una carga automática parada en silencio es peor que no tenerla. */
+.vigia-chip {
+  margin-left: 10px; padding: 2px 9px;
+  font: inherit; font-size: 11.5px; font-weight: 600; white-space: nowrap;
+  border-radius: 999px; cursor: pointer;
+  color: var(--ok); background: var(--ok-dim);
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.vigia-chip.v-esperando-permiso {
+  color: var(--warn); background: var(--warn-dim);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.vigia-chip.v-retenido, .vigia-chip.v-error {
+  color: var(--crit); background: var(--crit-dim);
+  border-color: color-mix(in srgb, var(--crit) 40%, transparent);
+}
+
 </style>
 </head>
 <body>
@@ -1450,6 +1487,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   <div class="topbar-status">
     <span class="dot" id="statusDot"></span>
     <span id="statusText">Sin datos cargados</span>
+    <!-- sólo en la PC que vigila la carpeta de SCE -->
+    <button class="vigia-chip" id="vigiaChip" hidden></button>
   </div>
 
   <div class="topbar-actions">
@@ -1850,6 +1889,35 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
           </div>
 
           <div class="cfg-grupo">
+            <h4>Carga automática desde SCE</h4>
+            <p class="cfg-ayuda">SCE no deja programar exportaciones, así que el Excel lo sigue
+              bajando alguien con <strong>Exportar a Excel</strong> en la vista
+              <strong>SALDOS STOCK GRAL</strong>. Lo demás es automático: si Chrome guarda las
+              descargas en una carpeta que esta PC vigila, el archivo se sube solo y lo ven todas
+              las pantallas. Reconoce el de saldos por sus columnas, así que las otras
+              exportaciones de SCE —que también se llaman <code>export.xlsx</code>— no lo
+              confunden.</p>
+            <ol class="cfg-pasos">
+              <li>Creá una carpeta adentro de Descargas, por ejemplo <code>Descargas\SCE</code>.
+                Chrome no deja vigilar Descargas entera.</li>
+              <li>En Chrome: <strong>Configuración → Descargas → Ubicación</strong>, elegí esa
+                carpeta.</li>
+              <li>Acá: <strong>Elegir carpeta…</strong>, la misma. Cuando Chrome pregunte, elegí
+                <strong>Permitir en todas las visitas</strong>.</li>
+              <li>Dejá esta pestaña abierta, con la sesión iniciada.</li>
+            </ol>
+            <div class="vigia-estado" id="vigiaEstado"></div>
+            <div class="cfg-actions">
+              <button class="btn btn-primary" id="btnVigiaElegir">Elegir carpeta…</button>
+              <button class="btn btn-primary" id="btnVigiaRetomar" hidden>Retomar</button>
+              <button class="btn" id="btnVigiaSubir" hidden>Subir igual</button>
+              <button class="btn" id="btnVigiaDescartar" hidden>Descartar ese archivo</button>
+              <button class="btn" id="btnVigiaRevisar" hidden>Revisar ahora</button>
+              <button class="btn" id="btnVigiaDetener" hidden>Dejar de vigilar</button>
+            </div>
+          </div>
+
+          <div class="cfg-grupo">
             <h4>Respaldo de los máximos</h4>
             <p class="cfg-ayuda">El stock se recupera siempre del Excel de SCE, pero los máximos
               se cargan a mano y viven sólo en la base. Guardate este archivo cada tanto. Sirve
@@ -1879,7 +1947,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 18/09/2026 18:19 - 7bacc17</span>
+      <span class="muted small" id="appVersion">compilado 05/10/2026 19:43 - f796a0e</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -4428,6 +4496,346 @@ VLM.asistente = (function () {
 </script>
 <script>
 /* ============================================================
+   vigia.js · carga automática: vigilar una carpeta y subir el
+   Excel de saldos de SCE apenas aparece
+
+   SCE no deja programar exportaciones a nivel usuario, así
+   que el Excel lo sigue bajando una persona con "Exportar a Excel"
+   en la vista "SALDOS STOCK GRAL". Lo que se automatiza es todo lo
+   demás: Chrome lo guarda en una carpeta, esta pestaña la vigila,
+   comprueba que sea el de saldos y lo sube. La persona ya no abre el
+   panel, no inicia sesión ni mapea columnas.
+
+   Corre en el navegador, con la API de acceso a carpetas de Chrome y
+   Edge: no hay que instalar nada en una PC de empresa, y el Excel se
+   lee con el mismo lector que la importación a mano.
+
+   Tres trampas de SCE que esto tiene que esquivar:
+     - TODAS las exportaciones de SCE se llaman export.xlsx, de la
+       pantalla que sean. El nombre no dice nada: la de saldos se
+       reconoce por sus 15 columnas.
+     - Chrome no pisa: crea export (1).xlsx, export (2).xlsx… Hay que
+       mirar las fechas, no los nombres.
+     - Chrome no deja vigilar Descargas entera, sólo una subcarpeta.
+   ============================================================ */
+window.VLM = window.VLM || {};
+
+VLM.vigia = (function () {
+  const U = VLM.util;
+
+  const KEY = 'vlm.vigia.v1';
+  const CADA_MS = 20000;
+
+  /* Las 15 columnas de la vista de saldos, normalizadas. Es la huella: un
+     archivo que no las tiene todas es otra exportación de SCE, y subirla
+     reemplazaría el stock de todas las pantallas por cualquier cosa. */
+  const HUELLA = ['propietario', 'articulo', 'descripcion', 'lote', 'ubicacion', 'lpn',
+                  'stock fisico', 'disponible', 'estatus', 'asignado', 'atributo 02',
+                  'fecha de vencimiento', 'atributo 07', 'atributo 08', 'paquete'];
+
+  /* Campo del panel -> columna de la vista de saldos. Fijo, no adivinado: la
+     importación a mano adivina y deja que la persona corrija, pero acá no hay
+     nadie para corregir. "Disponible" y "Stock físico", por ejemplo, se
+     parecen lo bastante como para que un adivino los confunda. */
+  const MAPEO = {
+    laboratorio: 'propietario', codigo: 'articulo', descripcion: 'descripcion',
+    lote: 'lote', ubicacion: 'ubicacion', stock: 'stock fisico', disponible: 'disponible',
+    estatus: 'estatus', asignado: 'asignado', lote2: 'atributo 02',
+    vencimiento: 'fecha de vencimiento', atributo07: 'atributo 07', paquete: 'paquete'
+  };
+
+  let carpeta = null;        // FileSystemDirectoryHandle
+  let persistida = false;    // si el handle quedó guardado para la próxima vez
+  let timer = null;
+  let ocupado = false;
+  let retenido = null;       // { file, firma, n, antes } a la espera de "Subir igual"
+  let est = { estado: 'apagado', texto: '' };
+  const oyentes = [];
+
+  /* ---------------- estado ---------------- */
+
+  function soportado() {
+    return typeof window.showDirectoryPicker === 'function' && !!window.isSecureContext;
+  }
+
+  function leerMemoria() {
+    try { return JSON.parse(localStorage.getItem(KEY) || 'null') || {}; } catch (e) { return {}; }
+  }
+  function guardarMemoria(m) {
+    try { localStorage.setItem(KEY, JSON.stringify(m)); } catch (e) {}
+  }
+
+  function poner(estado, texto) {
+    est = { estado: estado, texto: texto || '' };
+    oyentes.forEach(fn => { try { fn(est); } catch (e) {} });
+  }
+
+  function firmaDe(file) {
+    return { nombre: file.name, modificado: file.lastModified, tamano: file.size };
+  }
+  function mismaFirma(a, b) {
+    return !!a && !!b && a.nombre === b.nombre && a.modificado === b.modificado && a.tamano === b.tamano;
+  }
+
+  /* ---------------- dónde queda guardada la carpeta ----------------
+     El permiso sobre la carpeta no se puede guardar en localStorage: el
+     "handle" sólo entra en IndexedDB. */
+
+  function abrirDb() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('cype', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('vigia');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idb(modo, accion, valor) {
+    const db = await abrirDb();
+    return new Promise((res, rej) => {
+      const st = db.transaction('vigia', modo).objectStore('vigia');
+      const q = accion === 'get' ? st.get('carpeta')
+              : accion === 'put' ? st.put(valor, 'carpeta')
+              : st.delete('carpeta');
+      q.onsuccess = () => res(q.result);
+      q.onerror = () => rej(q.error);
+    });
+  }
+
+  /* ---------------- ciclo de vida ---------------- */
+
+  async function iniciar() {
+    if (!soportado()) { poner('no-soportado'); return; }
+    try { carpeta = await idb('readonly', 'get'); } catch (e) { carpeta = null; }
+    if (!carpeta) { poner('apagado'); return; }
+    persistida = true;
+    let p = 'prompt';
+    try { p = await carpeta.queryPermission({ mode: 'read' }); } catch (e) {}
+    if (p === 'granted') arrancar();
+    else poner('esperando-permiso', 'El navegador pide permiso otra vez para leer «' +
+                carpeta.name + '». Apretá Retomar.');
+  }
+
+  /** Lo llama un clic: el navegador sólo abre el selector con un gesto. */
+  async function elegir() {
+    if (!soportado()) { poner('no-soportado'); return; }
+    let h;
+    try {
+      h = await window.showDirectoryPicker({ id: 'cype-sce', mode: 'read' });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;   // la persona cerró el selector
+      poner('error', 'No se pudo abrir la carpeta: ' + e.message);
+      return;
+    }
+    carpeta = h;
+    // si no se puede guardar, igual vigila; sólo que no va a sobrevivir a una recarga
+    try { await idb('readwrite', 'put', h); persistida = true; } catch (e) { persistida = false; }
+    const m = leerMemoria();
+    m.rechazados = [];
+    guardarMemoria(m);
+    arrancar();
+  }
+
+  /** También tiene que venir de un clic, por el mismo motivo. */
+  async function retomar() {
+    if (!carpeta) { poner('apagado'); return; }
+    let p = 'denied';
+    try { p = await carpeta.requestPermission({ mode: 'read' }); } catch (e) {}
+    if (p === 'granted') arrancar();
+    else poner('esperando-permiso', 'Sin permiso no puedo leer la carpeta. Apretá Retomar y aceptá.');
+  }
+
+  async function detener() {
+    clearInterval(timer); timer = null;
+    carpeta = null; retenido = null;
+    try { await idb('readwrite', 'del'); } catch (e) {}
+    poner('apagado');
+  }
+
+  function arrancar() {
+    poner('vigilando', textoVigilando());
+    clearInterval(timer);
+    timer = setInterval(revisar, CADA_MS);
+    revisar();
+  }
+
+  function textoVigilando(extra) {
+    const m = leerMemoria();
+    let t = 'Vigilando «' + (carpeta ? carpeta.name : '?') + '»';
+    if (m.ultimo) {
+      t += ' · último: ' + m.ultimo.nombre + ', ' + U.hace(m.ultimo.cuando) +
+           ', ' + U.fmt(m.ultimo.productos) + ' artículos';
+    } else {
+      t += ' · todavía no subió nada';
+    }
+    if (!persistida) t += ' · ojo: si se recarga la página hay que volver a elegir la carpeta';
+    return extra ? t + ' · ' + extra : t;
+  }
+
+  /* ---------------- la revisión ---------------- */
+
+  /** Todas las planillas de la carpeta, de la más nueva a la más vieja. */
+  async function planillas() {
+    const lista = [];
+    for await (const h of carpeta.values()) {
+      if (h.kind !== 'file') continue;
+      if (!/\.(xlsx|xls)$/i.test(h.name)) continue;          // .crdownload todavía se está bajando
+      if (h.name.indexOf('~$') === 0) continue;              // archivo de bloqueo de Excel
+      lista.push(await h.getFile());
+    }
+    return lista.sort((a, b) => b.lastModified - a.lastModified);
+  }
+
+  /** Desde cuándo es el stock que ya está cargado: nada más viejo que eso entra. */
+  function stockVigenteDesde() {
+    const meta = VLM.store.state.meta || {};
+    const sub = meta.subidoEn ? Date.parse(meta.subidoEn) : 0;
+    return Math.max(meta.importadoEn || 0, isFinite(sub) ? sub : 0);
+  }
+
+  async function revisar() {
+    if (!carpeta || ocupado || retenido) return;
+    ocupado = true;
+    try {
+      const m = leerMemoria();
+      const rechazados = m.rechazados || [];
+      const desde = Math.max(stockVigenteDesde(), m.ultimo ? m.ultimo.modificado : 0);
+
+      /* Candidatos: lo que es más nuevo que el stock cargado. No alcanza con
+         mirar el más nuevo de todos: si alguien exporta los saldos y enseguida
+         otra pantalla de SCE, el más nuevo es el otro, y los saldos quedarían
+         sin subir. Se prueban del más nuevo al más viejo hasta dar con uno. */
+      const nuevos = (await planillas()).filter(f =>
+        f.lastModified > desde && !rechazados.some(r => mismaFirma(r, firmaDe(f))));
+
+      if (!nuevos.length) { poner('vigilando', textoVigilando()); return; }
+
+      for (const f of nuevos) {
+        // recién guardado: puede estar todavía escribiéndose
+        if (Date.now() - f.lastModified < 4000) {
+          poner('vigilando', textoVigilando('llegó ' + f.name + ', esperando que termine de guardarse'));
+          return;
+        }
+        const r = await procesar(f, false);
+        if (r === 'subido' || r === 'esperar') return;
+        // 'rechazado': probar con el siguiente
+      }
+      poner('vigilando', textoVigilando());
+    } catch (e) {
+      if (e && e.name === 'NotAllowedError') {
+        poner('esperando-permiso', 'El navegador quitó el permiso sobre la carpeta. Apretá Retomar.');
+        clearInterval(timer); timer = null;
+      } else {
+        poner('error', 'No se pudo leer la carpeta: ' + (e && e.message));
+      }
+    } finally {
+      ocupado = false;
+    }
+  }
+
+  function rechazar(file, motivo) {
+    const m = leerMemoria();
+    m.rechazados = (m.rechazados || []).concat([firmaDe(file)]).slice(-50);
+    guardarMemoria(m);
+    return motivo;
+  }
+
+  /**
+   * Lee un archivo y, si es el de saldos, lo sube.
+   * @returns 'subido' | 'rechazado' | 'esperar'
+   */
+  async function procesar(file, forzar) {
+    const N = VLM.nube, P = VLM.parser, S = VLM.store;
+
+    // sin sesión no hay cómo subir: se reintenta solo en cuanto alguien entre
+    if (N.configurada() && !N.conSesion()) {
+      poner('error', 'Llegó ' + file.name + ', pero hace falta la sesión iniciada en esta PC ' +
+                     'para subirlo. Apenas entres, lo sube.');
+      return 'esperar';
+    }
+
+    let r;
+    try { r = await P.leerArchivo(file); }
+    catch (e) { rechazar(file); return 'rechazado'; }   // no es un Excel legible
+
+    const matriz = P.hojaAMatriz(r.wb, r.hojas[0]);
+    const fh = P.detectarFilaEncabezado(matriz);
+    const cab = (matriz[fh] || []).map(h => U.norm(h));
+    const faltan = HUELLA.filter(h => cab.indexOf(h) === -1);
+    if (faltan.length) {
+      // otra exportación de SCE: es lo más común, no merece un cartel
+      rechazar(file);
+      return 'rechazado';
+    }
+
+    const mapa = {};
+    Object.keys(MAPEO).forEach(campo => { mapa[campo] = cab.indexOf(MAPEO[campo]); });
+
+    const res = P.normalizar(matriz, fh, mapa, S.state.cfg, S.state.labs,
+      { agrupar: true, reglas: S.state.reglasUbic, posiciones: S.state.posiciones });
+
+    if (!res.productos.length) {
+      rechazar(file);
+      poner('error', file.name + ' tiene las columnas de saldos pero ninguna fila válida. No se subió.');
+      return 'rechazado';
+    }
+
+    /* Una exportación con la mitad de artículos que lo que hay suele ser un
+       error —la vista con otro filtro, un propietario solo— y subirla dejaría
+       a todas las pantallas mostrando medio depósito. Se retiene hasta que
+       alguien confirme. */
+    const antes = S.state.productos.length;
+    if (!forzar && antes >= 20 && res.productos.length < antes * 0.5) {
+      retenido = { file: file, n: res.productos.length, antes: antes };
+      poner('retenido', file.name + ' trae ' + U.fmt(res.productos.length) +
+            ' artículos y hoy hay ' + U.fmt(antes) + '. Puede ser una exportación con otro ' +
+            'filtro. Si está bien, apretá Subir igual.');
+      return 'esperar';
+    }
+
+    const subio = await VLM.app.aplicarImportacion(res, {
+      archivo: file.name, hoja: r.hojas[0], mapeo: mapa, automatico: true
+    });
+    if (!subio && N.configurada()) {
+      poner('error', 'Se cargó ' + file.name + ' en esta PC pero no se pudo subir a la base. ' +
+                     'Se reintenta en la próxima revisión.');
+      return 'esperar';
+    }
+
+    const m = leerMemoria();
+    m.ultimo = Object.assign(firmaDe(file), { cuando: Date.now(), productos: res.productos.length });
+    guardarMemoria(m);
+    poner('vigilando', textoVigilando());
+    return 'subido';
+  }
+
+  async function subirIgual() {
+    if (!retenido) return;
+    const f = retenido.file;
+    retenido = null;
+    ocupado = true;
+    try { await procesar(f, true); } finally { ocupado = false; }
+  }
+
+  function descartarRetenido() {
+    if (!retenido) return;
+    rechazar(retenido.file);
+    retenido = null;
+    poner('vigilando', textoVigilando());
+  }
+
+  function revisarAhora() { if (carpeta) revisar(); }
+
+  return {
+    HUELLA, soportado, iniciar, elegir, retomar, detener, revisarAhora,
+    subirIgual, descartarRetenido,
+    estado: () => est,
+    alCambiar: fn => { oyentes.push(fn); }
+  };
+})();
+
+</script>
+<script>
+/* ============================================================
    analytics.js · cálculo de cobertura, criticidad y proyecciones
    ============================================================ */
 window.VLM = window.VLM || {};
@@ -6398,6 +6806,7 @@ VLM.app = (function () {
     wireNube();
     wireCfgNav();
     wireAsistente();
+    wireVigia();
     S.on(motivo => {
       if (motivo === 'labs') reclasificar();
       // lo que acaba de bajar de la base no se vuelve a subir
@@ -7188,19 +7597,30 @@ VLM.app = (function () {
                                             { agrupar: $('#impAgrupar').checked, reglas: S.state.reglasUbic, posiciones: S.state.posiciones });
     if (!r.productos.length) { U.toast('No hay filas válidas para importar', 'err'); return; }
 
-    S.setProductos(r.productos, {
-      archivo: imp.nombre,
-      hoja: imp.hoja,
-      filas: r.productos.length,
-      importadoEn: Date.now(),
-      mapeo: Object.assign({}, imp.mapa),
-      ubicacionesVistas: r.ubicacionesVistas || []
-    });
     $('#modalImport').hidden = true;
     U.toast('Importados ' + r.productos.length + ' productos', 'ok');
     r.avisos.forEach(a => U.toast(a));
+    aplicarImportacion(r, { archivo: imp.nombre, hoja: imp.hoja, mapeo: Object.assign({}, imp.mapa) });
+  }
+
+  /**
+   * Deja cargado un stock recién leído y lo comparte.
+   *
+   * Es el final común de los dos caminos: la importación a mano y la carga
+   * automática desde una carpeta (vigia.js). Que sea uno solo es lo que
+   * garantiza que el Excel que sube solo quede igual que si lo hubiera
+   * importado una persona.
+   *
+   * @returns promesa de si se pudo subir a la base
+   */
+  function aplicarImportacion(r, meta) {
+    S.setProductos(r.productos, Object.assign({
+      filas: r.productos.length,
+      importadoEn: Date.now(),
+      ubicacionesVistas: r.ubicacionesVistas || []
+    }, meta));
     // y se comparte solo: quien importa no tiene que acordarse de subirlo
-    subirStockANube();
+    return subirStockANube();
   }
 
   /* ============================================================
@@ -7469,6 +7889,67 @@ VLM.app = (function () {
   function refrescarPorSesion() {
     pintarNube();
     render();
+    // si el vigilante estaba esperando una sesión para subir, que pruebe ya
+    VLM.vigia.revisarAhora();
+  }
+
+  /* ------------------------------------------------------------
+     Carga automática desde una carpeta (vigia.js)
+     ------------------------------------------------------------ */
+
+  /** El cartelito de arriba: una vigilancia frenada no puede pasar callada. */
+  function pintarVigia() {
+    const V2 = VLM.vigia, e = V2.estado();
+    const chip = $('#vigiaChip');
+    if (chip) {
+      const visible = ['vigilando', 'esperando-permiso', 'retenido', 'error'].indexOf(e.estado) > -1;
+      chip.hidden = !visible;
+      chip.className = 'vigia-chip v-' + e.estado;
+      chip.textContent = e.estado === 'vigilando' ? 'Carga automática'
+        : e.estado === 'esperando-permiso' ? 'Carga automática frenada · Retomar'
+        : 'Carga automática: revisar';
+      chip.title = e.texto || '';
+    }
+
+    const cont = $('#vigiaEstado');
+    if (!cont) return;
+    const txt = {
+      'no-soportado': 'Este navegador no puede vigilar carpetas. Hace falta Chrome o Edge, ' +
+                      'con el panel abierto desde la web (no desde el archivo suelto).',
+      'apagado': 'Apagada en esta PC.'
+    }[e.estado] || e.texto;
+    cont.className = 'vigia-estado v-' + e.estado;
+    cont.textContent = txt;
+
+    const es = s => e.estado === s;
+    $('#btnVigiaElegir').hidden    = es('no-soportado');
+    $('#btnVigiaElegir').textContent = es('apagado') ? 'Elegir carpeta…' : 'Cambiar de carpeta…';
+    $('#btnVigiaRetomar').hidden   = !es('esperando-permiso');
+    $('#btnVigiaRevisar').hidden   = !(es('vigilando') || es('error'));
+    $('#btnVigiaSubir').hidden     = !es('retenido');
+    $('#btnVigiaDescartar').hidden = !es('retenido');
+    $('#btnVigiaDetener').hidden   = es('apagado') || es('no-soportado');
+  }
+
+  function wireVigia() {
+    const V2 = VLM.vigia;
+    V2.alCambiar(pintarVigia);
+    $('#btnVigiaElegir').addEventListener('click', () => V2.elegir());
+    $('#btnVigiaRetomar').addEventListener('click', () => V2.retomar());
+    $('#btnVigiaRevisar').addEventListener('click', () => V2.revisarAhora());
+    $('#btnVigiaSubir').addEventListener('click', () => V2.subirIgual());
+    $('#btnVigiaDescartar').addEventListener('click', () => V2.descartarRetenido());
+    $('#btnVigiaDetener').addEventListener('click', () => {
+      if (confirm('¿Dejar de vigilar la carpeta en esta PC?')) V2.detener();
+    });
+    // el clic en el cartelito también sirve de gesto para pedir el permiso de nuevo
+    $('#vigiaChip').addEventListener('click', () => {
+      if (V2.estado().estado === 'esperando-permiso') { V2.retomar(); return; }
+      abrirSettings();
+      mostrarSeccion('datos');
+    });
+    pintarVigia();
+    V2.iniciar();
   }
 
   /* ------------------------------------------------------------
@@ -8098,7 +8579,7 @@ VLM.app = (function () {
 
   document.addEventListener('DOMContentLoaded', init);
 
-  return { render, irA, cargarDemo };
+  return { render, irA, cargarDemo, aplicarImportacion };
 })();
 
 </script>
