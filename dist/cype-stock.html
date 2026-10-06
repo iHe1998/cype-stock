@@ -1947,7 +1947,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 05/10/2026 20:59 - 4a00965</span>
+      <span class="muted small" id="appVersion">compilado 05/10/2026 21:35 - e6d291c</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -2399,15 +2399,21 @@ VLM.nube = (function () {
     return h;
   }
 
-  async function pedir(ruta, opciones, conToken) {
+  async function pedir(ruta, opciones, conToken, reintento) {
     if (!configurada()) throw new Error('La nube no está configurada');
-    const r = await fetch(cfg.url + ruta, Object.assign({
-      headers: cabeceras(conToken)
-    }, opciones || {}));
-    if (r.status === 401 && conToken && sesion && sesion.refresh_token) {
-      // el token dura una hora: se renueva y se reintenta una sola vez
-      const ok = await renovar();
-      if (ok) return pedir(ruta, opciones, conToken);
+    /* El permiso se pone acá, en cada intento, encima de lo que traiga quien
+       llama. Antes las subidas lo traían armado de antemano, y el reintento
+       después de renovar salía con el permiso VENCIDO: lo rechazaban, se
+       renovaba de nuevo, se reintentaba con el vencido de nuevo... sin fin,
+       hasta que Supabase cortaba por exceso de pedidos y la sesión se perdía.
+       Pasaba en la primera subida más de una hora después de iniciar sesión,
+       que es justo lo que hace la carga automática. */
+    const op = Object.assign({}, opciones || {});
+    op.headers = Object.assign({}, op.headers || {}, cabeceras(conToken));
+    const r = await fetch(cfg.url + ruta, op);
+    if (r.status === 401 && conToken && !reintento && sesion && sesion.refresh_token) {
+      // el permiso dura una hora: se renueva y se reintenta UNA vez
+      if (await renovar()) return pedir(ruta, opciones, conToken, true);
     }
     const txt = await r.text();
     if (!r.ok) throw new Error('Supabase ' + r.status + ': ' + txt.slice(0, 200));
@@ -2417,20 +2423,61 @@ VLM.nube = (function () {
     try { return JSON.parse(txt); } catch (e) { return null; }
   }
 
+  function sesionGuardada() {
+    try { return JSON.parse(localStorage.getItem(KEY_SESS) || 'null'); } catch (e) { return null; }
+  }
+
+  /**
+   * Renueva el permiso con el refresh token.
+   *
+   * El refresh token sirve UNA vez: al usarlo, Supabase da uno nuevo. Y si
+   * alguien vuelve a presentar uno ya gastado, lo toma como un posible robo y
+   * revoca la sesión entera. Eso pasaba con dos pestañas del panel en la
+   * misma PC: comparten la sesión guardada, pero cada una tenía su copia en
+   * memoria; cuando una renovaba, la otra quedaba con el token gastado, y al
+   * renovar ella se caía la sesión en las dos. Por eso, antes de renovar, se
+   * mira si otra pestaña ya lo hizo.
+   */
   async function renovar() {
+    const g = sesionGuardada();
+    if (g && g.refresh_token && (!sesion || g.refresh_token !== sesion.refresh_token)) {
+      sesion = g;                       // otra pestaña ya renovó: usar esa
+      return true;
+    }
+    if (!sesion || !sesion.refresh_token) return false;
+    const usado = sesion.refresh_token;
     try {
       const r = await fetch(cfg.url + '/auth/v1/token?grant_type=refresh_token', {
         method: 'POST',
         headers: { 'apikey': cfg.anonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: sesion.refresh_token })
+        body: JSON.stringify({ refresh_token: usado })
       });
-      if (!r.ok) { guardarSesion(null); return false; }
+      if (!r.ok) {
+        // otra pestaña renovó mientras tanto: la sesión sigue viva, era ésa
+        const g2 = sesionGuardada();
+        if (g2 && g2.refresh_token && g2.refresh_token !== usado) { sesion = g2; return true; }
+        /* Sólo un token inválido cierra la sesión. Un 429 (demasiados pedidos)
+           o un 5xx son pasajeros: el token sigue sirviendo y cerrar la sesión
+           por eso obligaría a volver a entrar sin motivo. */
+        if (r.status === 400 || r.status === 401 || r.status === 403) guardarSesion(null);
+        return false;
+      }
       const j = await r.json();
       guardarSesion({ access_token: j.access_token, refresh_token: j.refresh_token,
                       email: (j.user && j.user.email) || (sesion && sesion.email) });
       return true;
     } catch (e) { return false; }
   }
+
+  /* Otra pestaña inició sesión, la cerró o la renovó: ponerse al día. Sin
+     esto, la que quedaba atrás seguía con su copia vieja (ver renovar). */
+  const oyentesSesion = [];
+  window.addEventListener('storage', e => {
+    if (e.key !== KEY_SESS) return;
+    const habia = conSesion();
+    try { sesion = JSON.parse(e.newValue || 'null'); } catch (x) { sesion = null; }
+    if (habia !== conSesion()) oyentesSesion.forEach(fn => { try { fn(); } catch (x) {} });
+  });
 
   async function entrar(correo, clave) {
     if (!configurada()) throw new Error('Falta configurar la nube');
@@ -2477,7 +2524,7 @@ VLM.nube = (function () {
     if (!filas.length) return 0;
     await pedir('/rest/v1/' + TABLA + '?on_conflict=clave', {
       method: 'POST',
-      headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },   // el permiso lo pone pedir()
       body: JSON.stringify(filas)
     }, true);
     return filas.length;
@@ -2528,7 +2575,7 @@ VLM.nube = (function () {
     const cuando = new Date().toISOString();
     await pedir('/rest/v1/' + TABLA_STOCK + '?on_conflict=id', {
       method: 'POST',
-      headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },   // el permiso lo pone pedir()
       body: JSON.stringify([{
         id: 'actual',
         productos: productos,
@@ -2561,7 +2608,7 @@ VLM.nube = (function () {
     const cuando = new Date().toISOString();
     await pedir('/rest/v1/' + TABLA_CONFIG + '?on_conflict=id', {
       method: 'POST',
-      headers: Object.assign(cabeceras(true), { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+      headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },   // el permiso lo pone pedir()
       body: JSON.stringify([{
         id: 'actual',
         datos: datos,
@@ -2578,7 +2625,8 @@ VLM.nube = (function () {
     cargar, configurada, conSesion, esPorDefecto, puedeEditar, email, datos, setConfig,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
     fechaStock, bajarStock, subirStock,
-    bajarConfig, subirConfig
+    bajarConfig, subirConfig,
+    alCambiarSesion: fn => { oyentesSesion.push(fn); }
   };
 })();
 
@@ -8285,6 +8333,8 @@ VLM.app = (function () {
 
   function wireNube() {
     const N = VLM.nube;
+    // otra pestaña inició o cerró sesión: esta pantalla tiene que mostrarlo ya
+    N.alCambiarSesion(refrescarPorSesion);
 
     $('#btnNubeGuardar').addEventListener('click', async () => {
       N.setConfig($('#cfgNubeUrl').value, $('#cfgNubeKey').value);

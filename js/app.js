@@ -1500,6 +1500,8 @@ VLM.app = (function () {
 
   function wireNube() {
     const N = VLM.nube;
+    // otra pestaña inició o cerró sesión: esta pantalla tiene que mostrarlo ya
+    N.alCambiarSesion(refrescarPorSesion);
 
     $('#btnNubeGuardar').addEventListener('click', async () => {
       N.setConfig($('#cfgNubeUrl').value, $('#cfgNubeKey').value);
