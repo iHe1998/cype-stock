@@ -170,8 +170,12 @@ VLM.vigia = (function () {
     } else {
       t += ' · todavía no subió nada';
     }
-    if (VLM.app.stockPendiente && VLM.app.stockPendiente()) {
-      t += ' · la base no contesta: el último está cargado en esta PC y se sube solo apenas vuelva';
+    const pendiente = VLM.app.stockPendiente && VLM.app.stockPendiente();
+    if (pendiente === 'sesion') {
+      t += ' · NO SE SUBIÓ: la sesión venció. Está cargado en esta PC; iniciá sesión ' +
+           '(Configuración → Cuenta y acceso) y se sube solo';
+    } else if (pendiente) {
+      t += ' · NO SE SUBIÓ: la base no contesta. Está cargado en esta PC y se sube solo apenas vuelva';
     }
     if (!persistida) t += ' · ojo: si se recarga la página hay que volver a elegir la carpeta';
     return extra ? t + ' · ' + extra : t;

@@ -1134,6 +1134,8 @@ VLM.app = (function () {
       chip.className = 'vigia-chip v-' + e.estado;
       chip.textContent = e.estado === 'vigilando' ? 'Carga automática'
         : e.estado === 'esperando-permiso' ? 'Carga automática frenada · Retomar'
+        : stockSinSubir === 'sesion' ? 'Carga automática: iniciá sesión'
+        : stockSinSubir === 'red' ? 'Carga automática: la base no contesta'
         : 'Carga automática: revisar';
       chip.title = e.texto || '';
     }
@@ -1173,7 +1175,8 @@ VLM.app = (function () {
     $('#vigiaChip').addEventListener('click', () => {
       if (V2.estado().estado === 'esperando-permiso') { V2.retomar(); return; }
       abrirSettings();
-      mostrarSeccion('datos');
+      // si lo que falta es la sesión, directo a donde se inicia
+      mostrarSeccion(stockSinSubir === 'sesion' ? 'cuenta' : 'datos');
     });
     pintarVigia();
     V2.iniciar();
@@ -1430,13 +1433,20 @@ VLM.app = (function () {
      y en cada refresco se reintenta subir.
      ------------------------------------------------------------ */
   const KEY_PEND_STOCK = 'vlm.stockpend.v1';
+  /* false, o por qué no subió: 'sesion' (no hay sesión o venció) o 'red' (la
+     base no contestó). Importa decir cuál: la primera se arregla iniciando
+     sesión, la segunda esperando, y con un solo mensaje para las dos el
+     cartel mandaba a esperar a quien en realidad tenía que entrar. */
   let stockSinSubir = false;
-  try { stockSinSubir = localStorage.getItem(KEY_PEND_STOCK) === '1'; } catch (e) {}
+  try {
+    const g = localStorage.getItem(KEY_PEND_STOCK);
+    stockSinSubir = g === 'sesion' || g === 'red' ? g : (g ? 'red' : false);
+  } catch (e) {}
 
   function marcarStockSinSubir(v) {
-    stockSinSubir = v;
+    stockSinSubir = v || false;
     try {
-      if (v) localStorage.setItem(KEY_PEND_STOCK, '1');
+      if (v) localStorage.setItem(KEY_PEND_STOCK, v);
       else localStorage.removeItem(KEY_PEND_STOCK);
     } catch (e) {}
   }
@@ -1451,7 +1461,7 @@ VLM.app = (function () {
   async function subirStockANube(reintento) {
     const N = VLM.nube;
     if (!N.configurada()) return false;
-    if (!N.conSesion()) { marcarStockSinSubir(true); return false; }
+    if (!N.conSesion()) { marcarStockSinSubir('sesion'); return false; }
     try {
       const cuando = await N.subirStock(S.state.productos, S.state.meta);
       // dejar anotado que la fila de la base es ésta, o el próximo refresco
@@ -1461,16 +1471,31 @@ VLM.app = (function () {
       }));
       const estabaPendiente = stockSinSubir;
       marcarStockSinSubir(false);
+      if (estabaPendiente) VLM.vigia.revisarAhora();   // que el cartel vuelva a verde ya
       U.toast(estabaPendiente && reintento
-        ? 'La base volvió: subido el stock que estaba pendiente'
+        ? 'Subido el stock que estaba pendiente: ya lo ven todas las PCs'
         : 'Stock subido: lo ven todas las PCs', 'ok');
       return true;
     } catch (e) {
-      if (!reintento) U.toast('No se pudo subir el stock: queda en esta PC y se sube solo ' +
-                              'apenas la base conteste (' + e.message + ')', 'err');
-      marcarStockSinSubir(true);
+      /* Si la base rechazó el permiso, nube.js ya intentó renovar la sesión y,
+         al no poder, la cerró: por eso alcanza con mirar si sigue abierta. */
+      const motivo = N.conSesion() ? 'red' : 'sesion';
+      if (!reintento) {
+        U.toast(motivo === 'sesion'
+          ? 'No se pudo subir el stock: la sesión venció. Queda en esta PC; iniciá sesión y se sube solo.'
+          : 'No se pudo subir el stock: queda en esta PC y se sube solo apenas la base conteste (' +
+            e.message + ')', 'err');
+      }
+      marcarStockSinSubir(motivo);
+      refrescarPorSesionSinReintento();
       return false;
     }
+  }
+
+  /* Si la sesión se cayó en el intento, la pantalla tiene que pasar a modo
+     lectura ya, no recién en la próxima recarga. */
+  function refrescarPorSesionSinReintento() {
+    if (!VLM.nube.conSesion()) { pintarNube(); render(); }
   }
 
   function wireNube() {
