@@ -1172,6 +1172,38 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   border-color: color-mix(in srgb, var(--ok) 32%, transparent);
 }
 
+/* ---------- pantallas del modo TV ---------- */
+/* Filas altas y clickeables en toda su superficie: se tocan en la PC del
+   depósito, muchas veces sin mouse fino. */
+.tv-lista { display: flex; flex-direction: column; gap: 8px; }
+.tv-item {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 11px;
+  align-items: start;
+  padding: 11px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color .12s, opacity .12s;
+}
+.tv-item:hover { border-color: var(--border); }
+.tv-item input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--accent); }
+.tv-item-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tv-item-txt strong { font-size: 13.5px; }
+.tv-item-txt > span { font-size: 12px; line-height: 1.5; color: var(--muted); }
+/* desmarcada: se ve apagada pero se sigue leyendo, para saber qué te estás perdiendo */
+.tv-item.es-off { border-left-color: var(--border); opacity: .55; }
+.tv-item:has(input:disabled) { cursor: default; }
+
+kbd {
+  padding: 1px 6px; border-radius: 4px;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
 /* ---------- leyenda de umbrales ---------- */
 .cfg-leyenda {
   display: flex; gap: 18px; flex-wrap: wrap;

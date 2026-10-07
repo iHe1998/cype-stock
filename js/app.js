@@ -1542,8 +1542,7 @@ VLM.app = (function () {
   const CAMPOS_CFG = [
     ['cfgPctCritico', 'pctCritico', 'int'],
     ['cfgPctBajo', 'pctBajo', 'int'],
-    ['cfgTvSegundos', 'tvSegundos', 'int'],
-    ['cfgTvSoloCriticos', 'tvSoloCriticos', 'bool']
+    ['cfgTvSegundos', 'tvSegundos', 'int']
   ];
 
   function abrirSettings() {
@@ -1553,11 +1552,37 @@ VLM.app = (function () {
       else el.value = S.state.cfg[clave];
     });
     $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
+    pintarTvPantallas();
     pintarReglasEditor();
     pintarLabsEditor();
+    // pintarNube() termina en aplicarBloqueo(): va último, que si no las
+    // listas que se acaban de dibujar quedan editables sin sesión
     pintarNube();
     mostrarSeccion(seccionCfg);
     $('#modalSettings').hidden = false;
+  }
+
+  /* ---------- pantallas del modo TV ---------- */
+
+  /**
+   * La lista de casilleros sale de tv.js, no de un listado acá: agregar una
+   * pantalla nueva allá tiene que alcanzar para que aparezca para marcar.
+   *
+   * Se guarda al revés de como se lee —`false` para las desmarcadas— así una
+   * pantalla que se agregue más adelante aparece sola en las PCs que ya
+   * tienen una configuración guardada.
+   */
+  function pintarTvPantallas() {
+    const marcas = S.state.cfg.tvPantallas || {};
+    $('#cfgTvPantallas').innerHTML = VLM.tv.pantallas().map(p => {
+      const on = marcas[p.id] !== false;
+      return '<label class="tv-item' + (on ? '' : ' es-off') + '">' +
+        '<input type="checkbox" data-pantalla="' + U.esc(p.id) + '"' + (on ? ' checked' : '') + '>' +
+        '<span class="tv-item-txt"><strong>' + U.esc(p.nombre) + '</strong>' +
+        '<span>' + U.esc(p.desc) +
+        (p.automatica ? ' Se saltea sola si no hay nada que mostrar.' : '') +
+        '</span></span></label>';
+    }).join('');
   }
 
   /* ---------- reglas de posición ---------- */
@@ -1827,6 +1852,25 @@ VLM.app = (function () {
         if (tipo !== 'bool' && (!isFinite(v) || v < 0)) { e.target.value = S.state.cfg[clave]; return; }
         S.setCfg({ [clave]: v });
       });
+    });
+
+    /* Delegado: los casilleros se vuelven a dibujar cada vez que se abre
+       Configuración, así que enganchar cada uno los dejaría sin escuchar. */
+    $('#cfgTvPantallas').addEventListener('change', e => {
+      const id = e.target.dataset.pantalla;
+      if (!id) return;
+      const marcas = Object.assign({}, S.state.cfg.tvPantallas || {});
+      if (e.target.checked) delete marcas[id]; else marcas[id] = false;
+      // sin ninguna marcada la tele no tendría nada que mostrar
+      if (!VLM.tv.pantallas().some(p => marcas[p.id] !== false)) {
+        e.target.checked = true;
+        U.toast('Tiene que quedar al menos una pantalla', 'err');
+        return;
+      }
+      S.setCfg({ tvPantallas: marcas });
+      // se apaga la fila en vez de redibujar la lista: redibujarla le saca el
+      // foco al casillero que acabás de tocar
+      e.target.closest('.tv-item').classList.toggle('es-off', !e.target.checked);
     });
 
     $('#btnAddRegla').addEventListener('click', agregarRegla);

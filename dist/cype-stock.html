@@ -1181,6 +1181,38 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   border-color: color-mix(in srgb, var(--ok) 32%, transparent);
 }
 
+/* ---------- pantallas del modo TV ---------- */
+/* Filas altas y clickeables en toda su superficie: se tocan en la PC del
+   depósito, muchas veces sin mouse fino. */
+.tv-lista { display: flex; flex-direction: column; gap: 8px; }
+.tv-item {
+  display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 11px;
+  align-items: start;
+  padding: 11px 13px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color .12s, opacity .12s;
+}
+.tv-item:hover { border-color: var(--border); }
+.tv-item input { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--accent); }
+.tv-item-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tv-item-txt strong { font-size: 13.5px; }
+.tv-item-txt > span { font-size: 12px; line-height: 1.5; color: var(--muted); }
+/* desmarcada: se ve apagada pero se sigue leyendo, para saber qué te estás perdiendo */
+.tv-item.es-off { border-left-color: var(--border); opacity: .55; }
+.tv-item:has(input:disabled) { cursor: default; }
+
+kbd {
+  padding: 1px 6px; border-radius: 4px;
+  font-family: inherit; font-size: 11px; font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
 /* ---------- leyenda de umbrales ---------- */
 .cfg-leyenda {
   display: flex; gap: 18px; flex-wrap: wrap;
@@ -1813,16 +1845,22 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
             <p>Cómo rota la pantalla del depósito cuando se pone en modo TV.</p>
           </header>
           <div class="cfg-grupo">
+            <h4>Qué pantallas se muestran</h4>
+            <p class="cfg-ayuda">Desmarcá las que no quieras ver y salen de la rotación. La lista
+              vale para <strong>todas las PCs</strong>: es la misma pantalla en todos lados.</p>
+            <div class="tv-lista" id="cfgTvPantallas"></div>
+          </div>
+
+          <div class="cfg-grupo">
+            <h4>Ritmo</h4>
             <div class="cfg-grid">
               <label class="field">
                 <span>Segundos por pantalla</span>
                 <input type="number" id="cfgTvSegundos" min="5" max="120" step="1">
               </label>
-              <label class="field field-check">
-                <input type="checkbox" id="cfgTvSoloCriticos">
-                <span>Priorizar sólo productos críticos</span>
-              </label>
             </div>
+            <p class="cfg-ayuda">En la tele: <kbd>→</kbd> y <kbd>←</kbd> pasan de pantalla,
+              <kbd>espacio</kbd> pausa la rotación y <kbd>Esc</kbd> sale.</p>
           </div>
         </section>
 
@@ -1947,7 +1985,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 05/10/2026 21:35 - e6d291c</span>
+      <span class="muted small" id="appVersion">compilado 07/10/2026 17:14 - 519c5d2</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -3068,7 +3106,9 @@ VLM.store = (function () {
     pctCritico:    10,   // stock <= 10% del máximo => CRÍTICO
     pctBajo:       25,   // stock <= 25% del máximo => BAJO
     tvSegundos:    20,
-    tvSoloCriticos: false,
+    // qué pantallas rota el modo TV: id de tv.js -> false para desmarcarla.
+    // Lo que no está acá se muestra, así una pantalla nueva aparece sola.
+    tvPantallas:   {},
     // qué hacer con laboratorios que no están en el catálogo:
     // 'excluir' los deja fuera de KPIs y vistas (pero se informa cuántos son),
     // 'incluir' los muestra como no gestionados.
@@ -6570,17 +6610,51 @@ VLM.tv = (function () {
 
   /* ------------------------------------------------------------
      Definición de pantallas
+
+     El `id` es lo que se guarda en la configuración para saber qué pantallas
+     están marcadas, así que no se cambia: renombrar uno equivale a dejar la
+     pantalla sin marcar en todas las PCs. El nombre y la descripción salen de
+     acá también para la lista de Configuración, para que no haya dos listas
+     de pantallas que se vayan separando.
      ------------------------------------------------------------ */
   const SLIDES = [
-    { nombre: 'Resumen general', render: slideResumen },
-    { nombre: 'Reponer ahora',   render: slideCriticos,
+    { id: 'resumen', nombre: 'Resumen general', render: slideResumen,
+      desc: 'Los números del momento y dos gráficos: estado del stock y stock por laboratorio.' },
+    { id: 'criticos', nombre: 'Reponer ahora', render: slideCriticos,
+      desc: 'Los 8 más urgentes con su posición y cuánto reponer.',
       saltarSi: d => A.topUrgentes(d.items, 1).length === 0 },
-    { nombre: 'Cadena de frío',  render: slideFrio,
+    { id: 'frio', nombre: 'Cadena de frío', render: slideFrio,
+      desc: 'Lo mismo acotado a 2 a 8 °C.',
       saltarSi: d => d.items.filter(p => p.conservacion === 'frio').length === 0 },
-    { nombre: 'Ambiente',        render: slideAmbiente,
+    { id: 'ambiente', nombre: 'Ambiente', render: slideAmbiente,
+      desc: 'Lo mismo acotado a 15 a 25 °C.',
       saltarSi: d => d.items.filter(p => p.conservacion === 'ambiente').length === 0 },
-    { nombre: 'Laboratorios',    render: slideLabs }
+    { id: 'labs', nombre: 'Laboratorios', render: slideLabs,
+      desc: 'Una tarjeta por laboratorio con sus unidades y su barra de estado.' }
   ];
+
+  /** Para la lista de casilleros de Configuración. Sin los render ni los saltarSi. */
+  function pantallas() {
+    return SLIDES.map(s => ({ id: s.id, nombre: s.nombre, desc: s.desc, automatica: !!s.saltarSi }));
+  }
+
+  /**
+   * Qué pantallas se muestran, en orden.
+   *
+   * Dos filtros encima de la lista: lo que se marcó en Configuración y lo que
+   * no tiene nada que mostrar ahora mismo (`saltarSi`). Cada filtro se aplica
+   * sólo si deja algo: desmarcar todo, o un día sin nada en frío ni ambiente,
+   * dejaría la tele del depósito en blanco sin que nadie entienda por qué.
+   */
+  function visibles() {
+    const marcas = (datos && datos.cfg && datos.cfg.tvPantallas) || {};
+    // ausente = marcada: una pantalla nueva aparece sola, sin tener que ir a
+    // buscarla a Configuración en cada PC
+    const marcadas = SLIDES.filter(s => marcas[s.id] !== false);
+    const base = marcadas.length ? marcadas : SLIDES;
+    const conDatos = base.filter(s => !(s.saltarSi && s.saltarSi(datos)));
+    return (conDatos.length ? conDatos : base).map(s => SLIDES.indexOf(s));
+  }
 
   /* ------------------------------------------------------------
      Ciclo de vida
@@ -6589,7 +6663,7 @@ VLM.tv = (function () {
     if (!items.length) { U.toast('Cargá datos antes de usar el modo TV', 'err'); return; }
     datos = { items, cfg, filtroLab: filtroLab || null };
     activo = true;
-    idx = 0;
+    idx = visibles()[0];
     // para volver acá si la página se recarga sola por una versión nueva
     try { sessionStorage.setItem('vlm.tv', '1'); } catch (e) {}
     C.destruirTodos();
@@ -6639,13 +6713,22 @@ VLM.tv = (function () {
     else programar();
   }
 
+  /* La rotación va por la lista de visibles, no por SLIDES: así desmarcar una
+     pantalla la saca del ciclo en vez de mostrarla un rato en blanco. Si la
+     que está puesta ya no está en la lista —la acabaron de desmarcar—, se
+     arranca de nuevo por la primera. */
   function avanzar(paso) {
-    const n = SLIDES.length;
-    let intentos = 0;
-    do {
-      idx = (idx + paso + n) % n;
-      intentos++;
-    } while (SLIDES[idx].saltarSi && SLIDES[idx].saltarSi(datos) && intentos < n);
+    const vis = visibles();
+    const pos = vis.indexOf(idx);
+    if (pos > -1) {
+      idx = vis[(pos + paso + vis.length) % vis.length];
+    } else {
+      // la que estaba puesta se acaba de desmarcar: se sigue por la que le
+      // toca, sin volver al principio de la rotación
+      const orden = paso < 0 ? vis.slice().reverse() : vis;
+      const sigue = orden.filter(i => paso < 0 ? i < idx : i > idx);
+      idx = sigue.length ? sigue[0] : orden[0];
+    }
     pintar();
     programar();
   }
@@ -6692,10 +6775,17 @@ VLM.tv = (function () {
     el.classList.toggle('es-general', !lab);
   }
 
-  /** Redibuja con datos nuevos sin cortar la rotación. */
+  /**
+   * Redibuja con datos nuevos sin cortar la rotación.
+   *
+   * La configuración puede haber llegado de otra PC: si la pantalla que está
+   * puesta se acaba de desmarcar, pasa a la siguiente en vez de quedarse ahí
+   * hasta que se cumpla el tiempo.
+   */
   function refrescar(items, cfg, filtroLab) {
     if (!activo) return;
     datos = { items, cfg, filtroLab: filtroLab || null };
+    if (visibles().indexOf(idx) === -1) { avanzar(1); return; }
     pintar();
   }
 
@@ -6826,7 +6916,7 @@ VLM.tv = (function () {
       }).join('') + '</div>';
   }
 
-  return { entrar, salir, refrescar, get activo() { return activo; } };
+  return { entrar, salir, refrescar, pantallas, get activo() { return activo; } };
 })();
 
 </script>
@@ -8375,8 +8465,7 @@ VLM.app = (function () {
   const CAMPOS_CFG = [
     ['cfgPctCritico', 'pctCritico', 'int'],
     ['cfgPctBajo', 'pctBajo', 'int'],
-    ['cfgTvSegundos', 'tvSegundos', 'int'],
-    ['cfgTvSoloCriticos', 'tvSoloCriticos', 'bool']
+    ['cfgTvSegundos', 'tvSegundos', 'int']
   ];
 
   function abrirSettings() {
@@ -8386,11 +8475,37 @@ VLM.app = (function () {
       else el.value = S.state.cfg[clave];
     });
     $('#cfgIncluirNoListados').checked = S.state.cfg.labsNoListados === 'incluir';
+    pintarTvPantallas();
     pintarReglasEditor();
     pintarLabsEditor();
+    // pintarNube() termina en aplicarBloqueo(): va último, que si no las
+    // listas que se acaban de dibujar quedan editables sin sesión
     pintarNube();
     mostrarSeccion(seccionCfg);
     $('#modalSettings').hidden = false;
+  }
+
+  /* ---------- pantallas del modo TV ---------- */
+
+  /**
+   * La lista de casilleros sale de tv.js, no de un listado acá: agregar una
+   * pantalla nueva allá tiene que alcanzar para que aparezca para marcar.
+   *
+   * Se guarda al revés de como se lee —`false` para las desmarcadas— así una
+   * pantalla que se agregue más adelante aparece sola en las PCs que ya
+   * tienen una configuración guardada.
+   */
+  function pintarTvPantallas() {
+    const marcas = S.state.cfg.tvPantallas || {};
+    $('#cfgTvPantallas').innerHTML = VLM.tv.pantallas().map(p => {
+      const on = marcas[p.id] !== false;
+      return '<label class="tv-item' + (on ? '' : ' es-off') + '">' +
+        '<input type="checkbox" data-pantalla="' + U.esc(p.id) + '"' + (on ? ' checked' : '') + '>' +
+        '<span class="tv-item-txt"><strong>' + U.esc(p.nombre) + '</strong>' +
+        '<span>' + U.esc(p.desc) +
+        (p.automatica ? ' Se saltea sola si no hay nada que mostrar.' : '') +
+        '</span></span></label>';
+    }).join('');
   }
 
   /* ---------- reglas de posición ---------- */
@@ -8660,6 +8775,25 @@ VLM.app = (function () {
         if (tipo !== 'bool' && (!isFinite(v) || v < 0)) { e.target.value = S.state.cfg[clave]; return; }
         S.setCfg({ [clave]: v });
       });
+    });
+
+    /* Delegado: los casilleros se vuelven a dibujar cada vez que se abre
+       Configuración, así que enganchar cada uno los dejaría sin escuchar. */
+    $('#cfgTvPantallas').addEventListener('change', e => {
+      const id = e.target.dataset.pantalla;
+      if (!id) return;
+      const marcas = Object.assign({}, S.state.cfg.tvPantallas || {});
+      if (e.target.checked) delete marcas[id]; else marcas[id] = false;
+      // sin ninguna marcada la tele no tendría nada que mostrar
+      if (!VLM.tv.pantallas().some(p => marcas[p.id] !== false)) {
+        e.target.checked = true;
+        U.toast('Tiene que quedar al menos una pantalla', 'err');
+        return;
+      }
+      S.setCfg({ tvPantallas: marcas });
+      // se apaga la fila en vez de redibujar la lista: redibujarla le saca el
+      // foco al casillero que acabás de tocar
+      e.target.closest('.tv-item').classList.toggle('es-off', !e.target.checked);
     });
 
     $('#btnAddRegla').addEventListener('click', agregarRegla);

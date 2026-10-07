@@ -25,7 +25,9 @@ VLM.store = (function () {
     pctCritico:    10,   // stock <= 10% del máximo => CRÍTICO
     pctBajo:       25,   // stock <= 25% del máximo => BAJO
     tvSegundos:    20,
-    tvSoloCriticos: false,
+    // qué pantallas rota el modo TV: id de tv.js -> false para desmarcarla.
+    // Lo que no está acá se muestra, así una pantalla nueva aparece sola.
+    tvPantallas:   {},
     // qué hacer con laboratorios que no están en el catálogo:
     // 'excluir' los deja fuera de KPIs y vistas (pero se informa cuántos son),
     // 'incluir' los muestra como no gestionados.

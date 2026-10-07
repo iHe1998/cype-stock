@@ -354,16 +354,22 @@
             <p>Cómo rota la pantalla del depósito cuando se pone en modo TV.</p>
           </header>
           <div class="cfg-grupo">
+            <h4>Qué pantallas se muestran</h4>
+            <p class="cfg-ayuda">Desmarcá las que no quieras ver y salen de la rotación. La lista
+              vale para <strong>todas las PCs</strong>: es la misma pantalla en todos lados.</p>
+            <div class="tv-lista" id="cfgTvPantallas"></div>
+          </div>
+
+          <div class="cfg-grupo">
+            <h4>Ritmo</h4>
             <div class="cfg-grid">
               <label class="field">
                 <span>Segundos por pantalla</span>
                 <input type="number" id="cfgTvSegundos" min="5" max="120" step="1">
               </label>
-              <label class="field field-check">
-                <input type="checkbox" id="cfgTvSoloCriticos">
-                <span>Priorizar sólo productos críticos</span>
-              </label>
             </div>
+            <p class="cfg-ayuda">En la tele: <kbd>→</kbd> y <kbd>←</kbd> pasan de pantalla,
+              <kbd>espacio</kbd> pausa la rotación y <kbd>Esc</kbd> sale.</p>
           </div>
         </section>
 
