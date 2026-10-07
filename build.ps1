@@ -74,7 +74,10 @@ if (-not $commit) { $commit = '?' }
 # El texto a reemplazar va sin acentos a proposito: PowerShell 5.1 lee los
 # .ps1 como ANSI, no como UTF-8, y un literal con acentos no matchearia el
 # del HTML (que si es UTF-8).
-$sello = "compilado $fecha - $commit"
+# "sobre" y no "-": el commit es el que estaba cuando se compilo, y el commit
+# que publica esta compilada viene despues. Nombrarlo a secas hacia creer que
+# el sitio estaba una version atras de la que tenia.
+$sello = "compilado $fecha (sobre $commit)"
 $marca = '>build local<'
 if ($html -notlike "*$marca*") { throw "No se encontro la marca de version ($marca) en index.html" }
 $html = $html.Replace($marca, ">$sello<")

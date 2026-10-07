@@ -107,10 +107,18 @@ VLM.app = (function () {
 
     const firma = (v.commit || '') + ' · ' + (v.compilado || '');
     if (firma === ' · ') return;
-    // en la web el pie dice "build local" porque el sello lo pone el build
-    // del archivo suelto; acá sí se sabe qué versión está corriendo
+    /* En la web el pie dice "build local" porque el sello lo pone el build del
+       archivo suelto; acá sí se sabe qué versión está corriendo.
+
+       Va la fecha y hora, no el commit: la compilada pasa ANTES del commit que
+       la publica, así que el commit anotado es siempre el anterior. Decía
+       "e6d291c" mientras corría el siguiente, que es justo lo que no deja
+       contestar «¿esto que acabo de subir ya está arriba?». */
     const pie = $('#appVersion');
-    if (pie && pie.textContent === 'build local') pie.textContent = 'web · ' + firma;
+    if (pie && pie.textContent === 'build local') {
+      pie.textContent = 'web · ' + (v.compilado || '');
+      if (v.commit) pie.title = 'compilado sobre ' + v.commit;
+    }
     if (versionVista === null) { versionVista = firma; return; }
     if (firma === versionVista) return;
     versionVista = firma;
