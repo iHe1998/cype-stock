@@ -846,8 +846,31 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .tv-exit { opacity: .35; }
 .tv-exit:hover { opacity: 1; }
 .tv-body { flex: 1; min-height: 0; padding: 2.2vh 0; display: flex; flex-direction: column; }
+/* Barra de avance de la rotación.
+
+   El movimiento lo hace una transición de CSS y no un temporizador (ver
+   tv.js): el navegador la interpola cuadro por cuadro en vez de moverla a
+   saltos. El resplandor es lo que la hace visible desde lejos en una tele
+   grande sin tener que engordarla. */
 .tv-progress { height: 4px; background: var(--surface-2); flex: none; }
-.tv-progress-bar { height: 100%; background: var(--accent); width: 0; }
+.tv-progress-bar {
+  position: relative;
+  height: 100%; width: 0;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--accent) 50%, transparent), var(--accent));
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--accent) 50%, transparent),
+              0 0 26px 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+/* el filo de adelante, un poco más vivo que el resto de la barra */
+.tv-progress-bar::after {
+  content: '';
+  position: absolute; top: -2px; right: 0;
+  width: 2px; height: calc(100% + 4px);
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--accent) 30%, #fff);
+  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--accent) 70%, transparent);
+}
 
 .tv h2 { font-size: clamp(20px, 2vw, 40px); margin-bottom: 1.6vh; }
 

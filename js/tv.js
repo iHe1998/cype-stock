@@ -14,7 +14,8 @@ VLM.tv = (function () {
   let idx = 0;
   let timerSlide = null;
   let timerReloj = null;
-  let timerBarra = null;
+  let finEn = 0;      // cuándo le toca pasar de pantalla, para poder pausar
+  let restante = 0;   // lo que faltaba en el momento de pausar
   let datos = null;   // { items, cfg }
 
   /* ------------------------------------------------------------
@@ -91,7 +92,6 @@ VLM.tv = (function () {
     try { sessionStorage.removeItem('vlm.tv'); } catch (e) {}
     clearTimeout(timerSlide);
     clearInterval(timerReloj);
-    clearInterval(timerBarra);
     document.removeEventListener('keydown', teclas);
     $('#tvMode').hidden = true;
     $('#tvBody').innerHTML = '';
@@ -115,11 +115,19 @@ VLM.tv = (function () {
     else if (e.key === ' ') { e.preventDefault(); pausarReanudar(); }
   }
 
+  /* Pausar congela la barra donde está y reanudar sigue por lo que faltaba.
+     Antes la mandaba al 100%, que se leía como «ya termina» justo cuando lo
+     que acababa de hacer era frenarla. */
   let pausado = false;
   function pausarReanudar() {
     pausado = !pausado;
-    if (pausado) { clearTimeout(timerSlide); clearInterval(timerBarra); $('#tvBar').style.width = '100%'; }
-    else programar();
+    if (pausado) {
+      clearTimeout(timerSlide);
+      restante = Math.max(0, finEn - Date.now());
+      congelarBarra();
+    } else {
+      programar(restante);
+    }
   }
 
   /* La rotación va por la lista de visibles, no por SLIDES: así desmarcar una
@@ -142,19 +150,37 @@ VLM.tv = (function () {
     programar();
   }
 
-  function programar() {
+  function programar(desdeRestante) {
     clearTimeout(timerSlide);
-    clearInterval(timerBarra);
     if (pausado) return;
-    const ms = (datos.cfg.tvSegundos || 20) * 1000;
+    const total = (datos.cfg.tvSegundos || 20) * 1000;
+    const falta = desdeRestante || total;
+    finEn = Date.now() + falta;
+    animarBarra(falta, 1 - falta / total);
+    timerSlide = setTimeout(() => avanzar(1), falta);
+  }
+
+  /**
+   * La barra la mueve el navegador, no un temporizador.
+   *
+   * Antes se le reescribía el ancho cada 120 ms: a 20 segundos eso son saltos
+   * de medio por ciento, y en una tele grande se ven como tirones. Con una
+   * transición de CSS la interpola el navegador, cuadro por cuadro.
+   */
+  function animarBarra(ms, desde) {
     const bar = $('#tvBar');
-    const t0 = Date.now();
-    bar.style.width = '0%';
-    timerBarra = setInterval(() => {
-      const p = Math.min(100, (Date.now() - t0) / ms * 100);
-      bar.style.width = p + '%';
-    }, 120);
-    timerSlide = setTimeout(() => avanzar(1), ms);
+    bar.style.transition = 'none';
+    bar.style.width = (desde * 100) + '%';
+    void bar.offsetWidth;   // sin esto el navegador junta las dos escrituras
+    bar.style.transition = 'width ' + ms + 'ms linear';
+    bar.style.width = '100%';
+  }
+
+  function congelarBarra() {
+    const bar = $('#tvBar');
+    const ancho = getComputedStyle(bar).width;
+    bar.style.transition = 'none';
+    bar.style.width = ancho;
   }
 
   function reloj() {
