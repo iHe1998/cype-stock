@@ -203,43 +203,6 @@ VLM.charts = (function () {
   }
 
   /* ------------------------------------------------------------
-     3. Picking vs altura por laboratorio (barras apiladas)
-     ------------------------------------------------------------ */
-  function pickingVsAltura(canvas, labs, tv) {
-    const t = tema();
-    const top = labs.slice(0, tv ? 8 : 12).map(l => ({
-      nombre: l.nombre,
-      picking: l.productos.reduce((s, p) => s + (p.stockPicking || 0), 0),
-      altura:  l.productos.reduce((s, p) => s + (p.stockAltura || 0), 0)
-    }));
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.x.stacked = true;
-    o.scales.y.stacked = true;
-    o.scales.y.grid.display = false;
-    o.scales.x.ticks.callback = v => U.fmtCompact(v);
-    o.plugins.legend = {
-      display: true, position: 'top',
-      labels: { color: t.muted, font: { size: tv ? 16 : 11 }, boxWidth: 9, boxHeight: 9,
-                usePointStyle: true, pointStyle: 'circle', padding: 12 }
-    };
-    o.plugins.tooltip.callbacks = { label: c => c.dataset.label + ': ' + U.fmt(c.parsed.x) + ' u' };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(l => recortar(l.nombre, 18)),
-        datasets: [
-          { label: 'Picking', data: top.map(l => l.picking), backgroundColor: t.accent,
-            borderRadius: 3, barThickness: tv ? 24 : 16 },
-          { label: 'Altura', data: top.map(l => l.altura), backgroundColor: t.agotado,
-            borderRadius: 3, barThickness: tv ? 24 : 16 }
-        ]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
      6. Estados apilados por laboratorio
      ------------------------------------------------------------ */
   function estadosPorLab(canvas, labs, tv) {
@@ -279,6 +242,6 @@ VLM.charts = (function () {
 
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, stockPorArticulo, estados, pickingVsAltura, estadosPorLab
+    stockPorLab, stockPorArticulo, estados, estadosPorLab
   };
 })();

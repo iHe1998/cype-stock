@@ -196,9 +196,8 @@ VLM.views = (function () {
       '<span class="muted small">' + labs.length + ' laboratorios · ' + items.length + ' SKU</span>' +
       '</div>';
 
-    html += '<div class="grid grid-2" style="margin-bottom:18px">' +
+    html += '<div style="margin-bottom:18px">' +
       cardChart('Estados por laboratorio', 'cantidad de SKU', 'chLabEstados', 340) +
-      cardChart('Picking vs altura', 'unidades por laboratorio', 'chLabConsumo', 340) +
       '</div>';
 
     // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente
@@ -209,7 +208,6 @@ VLM.views = (function () {
 
     el.innerHTML = html;
     C.estadosPorLab($('#chLabEstados', el), labs);
-    C.pickingVsAltura($('#chLabConsumo', el), labs);
 
     const buscar = $('#labSearch', el);
     buscar.addEventListener('input', U.debounce(() => {

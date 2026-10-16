@@ -2008,7 +2008,7 @@ kbd {
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 09/10/2026 13:59 (sobre b6cf62a)</span>
+      <span class="muted small" id="appVersion">compilado 16/10/2026 19:13 (sobre e2aa74f)</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -5426,43 +5426,6 @@ VLM.charts = (function () {
   }
 
   /* ------------------------------------------------------------
-     3. Picking vs altura por laboratorio (barras apiladas)
-     ------------------------------------------------------------ */
-  function pickingVsAltura(canvas, labs, tv) {
-    const t = tema();
-    const top = labs.slice(0, tv ? 8 : 12).map(l => ({
-      nombre: l.nombre,
-      picking: l.productos.reduce((s, p) => s + (p.stockPicking || 0), 0),
-      altura:  l.productos.reduce((s, p) => s + (p.stockAltura || 0), 0)
-    }));
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.x.stacked = true;
-    o.scales.y.stacked = true;
-    o.scales.y.grid.display = false;
-    o.scales.x.ticks.callback = v => U.fmtCompact(v);
-    o.plugins.legend = {
-      display: true, position: 'top',
-      labels: { color: t.muted, font: { size: tv ? 16 : 11 }, boxWidth: 9, boxHeight: 9,
-                usePointStyle: true, pointStyle: 'circle', padding: 12 }
-    };
-    o.plugins.tooltip.callbacks = { label: c => c.dataset.label + ': ' + U.fmt(c.parsed.x) + ' u' };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(l => recortar(l.nombre, 18)),
-        datasets: [
-          { label: 'Picking', data: top.map(l => l.picking), backgroundColor: t.accent,
-            borderRadius: 3, barThickness: tv ? 24 : 16 },
-          { label: 'Altura', data: top.map(l => l.altura), backgroundColor: t.agotado,
-            borderRadius: 3, barThickness: tv ? 24 : 16 }
-        ]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
      6. Estados apilados por laboratorio
      ------------------------------------------------------------ */
   function estadosPorLab(canvas, labs, tv) {
@@ -5502,7 +5465,7 @@ VLM.charts = (function () {
 
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, stockPorArticulo, estados, pickingVsAltura, estadosPorLab
+    stockPorLab, stockPorArticulo, estados, estadosPorLab
   };
 })();
 
@@ -5706,9 +5669,8 @@ VLM.views = (function () {
       '<span class="muted small">' + labs.length + ' laboratorios · ' + items.length + ' SKU</span>' +
       '</div>';
 
-    html += '<div class="grid grid-2" style="margin-bottom:18px">' +
+    html += '<div style="margin-bottom:18px">' +
       cardChart('Estados por laboratorio', 'cantidad de SKU', 'chLabEstados', 340) +
-      cardChart('Picking vs altura', 'unidades por laboratorio', 'chLabConsumo', 340) +
       '</div>';
 
     // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente
@@ -5719,7 +5681,6 @@ VLM.views = (function () {
 
     el.innerHTML = html;
     C.estadosPorLab($('#chLabEstados', el), labs);
-    C.pickingVsAltura($('#chLabConsumo', el), labs);
 
     const buscar = $('#labSearch', el);
     buscar.addEventListener('input', U.debounce(() => {
