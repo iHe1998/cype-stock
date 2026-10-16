@@ -258,7 +258,8 @@
         <section class="cfg-sec" data-sec="cuenta">
           <header class="cfg-sec-head">
             <h3>Cuenta y acceso</h3>
-            <p>Iniciá sesión con una cuenta aprobada para modificar las configuraciones.</p>
+            <!-- se oculta con la sesión iniciada: ahí ya no hay nada que pedir -->
+            <p id="cfgCuentaAyuda">Iniciá sesión con una cuenta aprobada para modificar las configuraciones.</p>
           </header>
 
           <div class="cfg-grupo">
@@ -275,46 +276,6 @@
               <button class="btn btn-primary" id="btnNubeEntrar">Iniciar sesión</button>
             </div>
           </div>
-
-          <div class="cfg-grupo">
-            <h4>Quién puede qué</h4>
-            <ul class="cfg-permisos">
-              <li>
-                <span class="perm-tag">Sin sesión</span>
-                <span>Ve el panel entero, el inventario y la reposición. No puede cambiar nada:
-                  es el modo de la pantalla del depósito.</span>
-              </li>
-              <li>
-                <span class="perm-tag perm-ok">Cuenta autorizada</span>
-                <span>Importa la planilla, carga los máximos y edita umbrales, reglas y
-                  laboratorios. Lo que cambia, lo ven todas las PCs.</span>
-              </li>
-            </ul>
-          </div>
-
-          <!-- La conexión no se muestra de entrada: viene de config.js y ya está
-               andando. Tenerla a la vista era dejar la clave proyectada en una
-               reunión por dos campos que casi nunca se tocan. -->
-          <details class="cfg-avanzado">
-            <summary>Conexión a la base</summary>
-            <div class="cfg-grupo">
-              <p class="cfg-ayuda">Sólo hace falta tocar esto para apuntar a otra base. Lo que se
-                guarde acá vale <strong>en esta PC</strong> y manda sobre la conexión del repositorio.</p>
-              <div class="cfg-grid cfg-grid-ancha">
-                <label class="field">
-                  <span>URL del proyecto</span>
-                  <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
-                </label>
-                <label class="field">
-                  <span>Clave anónima (anon)</span>
-                  <input type="password" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false" autocomplete="off">
-                </label>
-              </div>
-              <div class="cfg-actions">
-                <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
-              </div>
-            </div>
-          </details>
         </section>
 
         <!-- ---------- umbrales ---------- -->

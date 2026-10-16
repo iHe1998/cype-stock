@@ -1011,13 +1011,9 @@ VLM.app = (function () {
 
   /* Controles que siguen activos aunque no haya sesión.
      - los de entrar, porque son justamente cómo se desbloquea;
-     - los de conexión, que son la salida de emergencia si la base a la que
-       apunta esta PC está mal o caída: son locales y no cambian nada de lo
-       que ven los demás;
      - los de sólo lectura: traer de la base y exportar el CSV. */
   const SIN_BLOQUEO = ['cfgNubeMail', 'cfgNubePass', 'btnNubeEntrar', 'btnNubeSalir',
                        'btnIrCuenta',
-                       'cfgNubeUrl', 'cfgNubeKey', 'btnNubeGuardar',
                        // sacar una copia no cambia nada: que pueda cualquiera
                        'btnNubeBajar', 'btnExportMax'];
 
@@ -1078,10 +1074,11 @@ VLM.app = (function () {
   function pintarNube() {
     const N = VLM.nube;
     const est = $('#nubeEstado');
-    const d = N.datos();
-    if (d) { $('#cfgNubeUrl').value = d.url; $('#cfgNubeKey').value = d.anonKey; }
 
-    $('#nubeLogin').hidden = !(N.configurada() && !N.conSesion());
+    // la frase de arriba pide iniciar sesión: va sólo cuando se puede y falta
+    const pideSesion = N.configurada() && !N.conSesion();
+    $('#nubeLogin').hidden = !pideSesion;
+    $('#cfgCuentaAyuda').hidden = !pideSesion;
     $('#btnNubeSubir').disabled = !N.conSesion();
     $('#btnNubeSubirStock').disabled = !N.conSesion();
 
@@ -1091,7 +1088,7 @@ VLM.app = (function () {
         '<svg viewBox="0 0 24 24" class="ico"><path d="M17 18H7a4 4 0 0 1-.5-8 6 6 0 0 1 11.2-1.8A3.5 3.5 0 0 1 21 13.5"/>' +
         '<path d="M3 3l18 18"/></svg>' +
         '<div class="cuenta-txt"><strong>Sin base conectada</strong>' +
-        '<span>Todo queda en esta PC. Se configura en «Conexión a la base».</span></div>';
+        '<span>Todo queda en esta PC. La conexión se define en js/config.js.</span></div>';
     } else if (N.conSesion()) {
       const mail = N.email() || '';
       est.className = 'cuenta-box es-ok';
@@ -1106,8 +1103,8 @@ VLM.app = (function () {
       est.innerHTML =
         '<svg viewBox="0 0 24 24" class="ico"><rect x="4" y="11" width="16" height="10" rx="2"/>' +
         '<path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' +
-        '<div class="cuenta-txt"><strong>Modo lectura</strong>' +
-        '<span>Entrá con una cuenta autorizada para poder cambiar la configuración.</span></div>';
+        // sin segunda línea: lo que hay que hacer ya lo dice la frase de arriba
+        '<div class="cuenta-txt"><strong>Modo lectura</strong></div>';
     }
     // el estado de la sesión define qué se puede tocar en toda la pantalla
     aplicarBloqueo();
@@ -1510,15 +1507,6 @@ VLM.app = (function () {
     const N = VLM.nube;
     // otra pestaña inició o cerró sesión: esta pantalla tiene que mostrarlo ya
     N.alCambiarSesion(refrescarPorSesion);
-
-    $('#btnNubeGuardar').addEventListener('click', async () => {
-      N.setConfig($('#cfgNubeUrl').value, $('#cfgNubeKey').value);
-      // conectar o desconectar también cambia quién puede editar
-      refrescarPorSesion();
-      if (!N.configurada()) { U.toast('Conexión borrada: los máximos vuelven a ser locales'); return; }
-      U.toast('Conexión guardada');
-      await bajarDeNube();
-    });
 
     $('#btnNubeBajar').addEventListener('click', () => bajarDeNube());
 

@@ -25,7 +25,7 @@
 window.VLM = window.VLM || {};
 
 VLM.nube = (function () {
-  const KEY_CFG  = 'vlm.nube.v1';
+  const KEY_CFG  = 'vlm.nube.v1';   // ya no se usa: sólo para borrar lo viejo
   const KEY_SESS = 'vlm.nube.sesion.v1';
   const TABLA        = 'maximos';
   const TABLA_STOCK  = 'stock';
@@ -34,22 +34,24 @@ VLM.nube = (function () {
   let cfg = null;      // { url, anonKey }
   let sesion = null;   // { access_token, refresh_token, email }
 
+  /**
+   * La conexión sale SIEMPRE de config.js, igual para todas las PCs.
+   *
+   * Antes se podía cargar otra a mano en Configuración y la del navegador
+   * mandaba. Esa pantalla ya no está, así que una conexión guardada así
+   * quedaría atando a esa PC a otra base —o a una vieja, si algún día se
+   * muda— sin ningún lugar de dónde sacarla. Por eso se ignora y se borra.
+   * Cambiar de base es cambiar config.js y publicar: lo toman todas solas.
+   */
   function cargar() {
-    try { cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null'); } catch (e) { cfg = null; }
-    /* Sin nada guardado en este navegador se usa lo que venga en
-       config.js, que es lo que hace que una PC nueva funcione sin que
-       nadie le cargue nada. Lo del navegador manda por si alguien
-       necesita apuntar a otra base. */
-    if (!cfg || !cfg.url || !cfg.anonKey) {
-      const d = (VLM.config && VLM.config.supabase) || {};
-      if (d.url && d.anonKey) cfg = { url: String(d.url).replace(/\/+$/, ''), anonKey: d.anonKey, porDefecto: true };
-    }
+    try { localStorage.removeItem(KEY_CFG); } catch (e) {}
+    const d = (VLM.config && VLM.config.supabase) || {};
+    cfg = (d.url && d.anonKey)
+      ? { url: String(d.url).replace(/\/+$/, ''), anonKey: d.anonKey }
+      : null;
     try { sesion = JSON.parse(localStorage.getItem(KEY_SESS) || 'null'); } catch (e) { sesion = null; }
     return cfg;
   }
-
-  /** ¿La conexión vino de config.js y no de esta PC? */
-  function esPorDefecto() { return !!(cfg && cfg.porDefecto); }
 
   /**
    * ¿Se pueden tocar las configuraciones?
@@ -70,15 +72,6 @@ VLM.nube = (function () {
   function configurada() { return !!(cfg && cfg.url && cfg.anonKey); }
   function conSesion()   { return !!(sesion && sesion.access_token); }
   function email()       { return sesion ? sesion.email : null; }
-  function datos()       { return cfg ? { url: cfg.url, anonKey: cfg.anonKey } : null; }
-
-  function setConfig(url, anonKey) {
-    url = String(url || '').trim().replace(/\/+$/, '');
-    anonKey = String(anonKey || '').trim();
-    if (!url || !anonKey) { cfg = null; try { localStorage.removeItem(KEY_CFG); } catch (e) {} return; }
-    cfg = { url, anonKey };
-    try { localStorage.setItem(KEY_CFG, JSON.stringify(cfg)); } catch (e) {}
-  }
 
   function guardarSesion(s) {
     sesion = s;
@@ -322,7 +315,7 @@ VLM.nube = (function () {
   cargar();
 
   return {
-    cargar, configurada, conSesion, esPorDefecto, puedeEditar, email, datos, setConfig,
+    cargar, configurada, conSesion, puedeEditar, email,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
     fechaStock, bajarStock, subirStock,
     bajarConfig, subirConfig,

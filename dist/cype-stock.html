@@ -1185,25 +1185,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   margin-top: 14px;
 }
 
-.cfg-permisos { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-.cfg-permisos li {
-  display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 12px;
-  align-items: start;
-  font-size: 12.5px; line-height: 1.55; color: var(--text-2);
-}
-.perm-tag {
-  justify-self: start;
-  padding: 3px 9px; border-radius: 999px;
-  font-size: 11px; font-weight: 650; white-space: nowrap;
-  color: var(--muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-.perm-tag.perm-ok {
-  color: var(--ok); background: var(--ok-dim);
-  border-color: color-mix(in srgb, var(--ok) 32%, transparent);
-}
-
 /* ---------- pantallas del modo TV ---------- */
 /* Filas altas y clickeables en toda su superficie: se tocan en la PC del
    depósito, muchas veces sin mouse fino. */
@@ -1247,25 +1228,6 @@ kbd {
 .cfg-leyenda .lg-bajo { background: var(--warn-fill, var(--warn)); }
 .cfg-leyenda .lg-ok   { background: var(--ok-fill, var(--ok)); }
 
-/* ---------- conexión (plegada) ---------- */
-/* Viene de config.js y ya funciona: tenerla desplegada era dejar la clave a la
-   vista de cualquiera que mire la pantalla, para algo que casi nunca se toca. */
-.cfg-avanzado { margin-top: 4px; }
-.cfg-avanzado > summary {
-  cursor: pointer; list-style: none;
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 2px;
-  font-size: 12px; font-weight: 600; color: var(--muted);
-}
-.cfg-avanzado > summary::-webkit-details-marker { display: none; }
-.cfg-avanzado > summary::before { content: "▸"; font-size: 10px; transition: transform .12s; }
-.cfg-avanzado[open] > summary::before { transform: rotate(90deg); }
-.cfg-avanzado > summary:hover { color: var(--text-2); }
-/* El navegador oculta el contenido plegado con un display:none propio, pero es
-   de su hoja de estilos: cualquier display que pongamos nosotros le gana y los
-   campos quedaban a la vista igual con el bloque cerrado. */
-.cfg-avanzado:not([open]) > *:not(summary) { display: none; }
-
 /* ---------- modo lectura ---------- */
 .cfg-bloqueo {
   display: flex; align-items: center; gap: 12px;
@@ -1298,7 +1260,6 @@ kbd {
   .cfg-nav-item .ico { width: 18px; height: 18px; }
   .cfg-nav-item.is-sel span { display: inline; }
   .cfg-login { grid-template-columns: 1fr; }
-  .cfg-permisos li { grid-template-columns: 1fr; gap: 5px; }
 }
 
 /* ============================================================
@@ -1772,7 +1733,8 @@ kbd {
         <section class="cfg-sec" data-sec="cuenta">
           <header class="cfg-sec-head">
             <h3>Cuenta y acceso</h3>
-            <p>Iniciá sesión con una cuenta aprobada para modificar las configuraciones.</p>
+            <!-- se oculta con la sesión iniciada: ahí ya no hay nada que pedir -->
+            <p id="cfgCuentaAyuda">Iniciá sesión con una cuenta aprobada para modificar las configuraciones.</p>
           </header>
 
           <div class="cfg-grupo">
@@ -1789,46 +1751,6 @@ kbd {
               <button class="btn btn-primary" id="btnNubeEntrar">Iniciar sesión</button>
             </div>
           </div>
-
-          <div class="cfg-grupo">
-            <h4>Quién puede qué</h4>
-            <ul class="cfg-permisos">
-              <li>
-                <span class="perm-tag">Sin sesión</span>
-                <span>Ve el panel entero, el inventario y la reposición. No puede cambiar nada:
-                  es el modo de la pantalla del depósito.</span>
-              </li>
-              <li>
-                <span class="perm-tag perm-ok">Cuenta autorizada</span>
-                <span>Importa la planilla, carga los máximos y edita umbrales, reglas y
-                  laboratorios. Lo que cambia, lo ven todas las PCs.</span>
-              </li>
-            </ul>
-          </div>
-
-          <!-- La conexión no se muestra de entrada: viene de config.js y ya está
-               andando. Tenerla a la vista era dejar la clave proyectada en una
-               reunión por dos campos que casi nunca se tocan. -->
-          <details class="cfg-avanzado">
-            <summary>Conexión a la base</summary>
-            <div class="cfg-grupo">
-              <p class="cfg-ayuda">Sólo hace falta tocar esto para apuntar a otra base. Lo que se
-                guarde acá vale <strong>en esta PC</strong> y manda sobre la conexión del repositorio.</p>
-              <div class="cfg-grid cfg-grid-ancha">
-                <label class="field">
-                  <span>URL del proyecto</span>
-                  <input type="text" id="cfgNubeUrl" placeholder="https://xxxx.supabase.co" spellcheck="false">
-                </label>
-                <label class="field">
-                  <span>Clave anónima (anon)</span>
-                  <input type="password" id="cfgNubeKey" placeholder="eyJhbGciOi…" spellcheck="false" autocomplete="off">
-                </label>
-              </div>
-              <div class="cfg-actions">
-                <button class="btn" id="btnNubeGuardar">Guardar conexión</button>
-              </div>
-            </div>
-          </details>
         </section>
 
         <!-- ---------- umbrales ---------- -->
@@ -2006,7 +1928,7 @@ kbd {
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 16/10/2026 20:28 (sobre 9a639cc)</span>
+      <span class="muted small" id="appVersion">compilado 16/10/2026 20:35 (sobre 0892634)</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -2384,7 +2306,7 @@ VLM.util = (function () {
 window.VLM = window.VLM || {};
 
 VLM.nube = (function () {
-  const KEY_CFG  = 'vlm.nube.v1';
+  const KEY_CFG  = 'vlm.nube.v1';   // ya no se usa: sólo para borrar lo viejo
   const KEY_SESS = 'vlm.nube.sesion.v1';
   const TABLA        = 'maximos';
   const TABLA_STOCK  = 'stock';
@@ -2393,22 +2315,24 @@ VLM.nube = (function () {
   let cfg = null;      // { url, anonKey }
   let sesion = null;   // { access_token, refresh_token, email }
 
+  /**
+   * La conexión sale SIEMPRE de config.js, igual para todas las PCs.
+   *
+   * Antes se podía cargar otra a mano en Configuración y la del navegador
+   * mandaba. Esa pantalla ya no está, así que una conexión guardada así
+   * quedaría atando a esa PC a otra base —o a una vieja, si algún día se
+   * muda— sin ningún lugar de dónde sacarla. Por eso se ignora y se borra.
+   * Cambiar de base es cambiar config.js y publicar: lo toman todas solas.
+   */
   function cargar() {
-    try { cfg = JSON.parse(localStorage.getItem(KEY_CFG) || 'null'); } catch (e) { cfg = null; }
-    /* Sin nada guardado en este navegador se usa lo que venga en
-       config.js, que es lo que hace que una PC nueva funcione sin que
-       nadie le cargue nada. Lo del navegador manda por si alguien
-       necesita apuntar a otra base. */
-    if (!cfg || !cfg.url || !cfg.anonKey) {
-      const d = (VLM.config && VLM.config.supabase) || {};
-      if (d.url && d.anonKey) cfg = { url: String(d.url).replace(/\/+$/, ''), anonKey: d.anonKey, porDefecto: true };
-    }
+    try { localStorage.removeItem(KEY_CFG); } catch (e) {}
+    const d = (VLM.config && VLM.config.supabase) || {};
+    cfg = (d.url && d.anonKey)
+      ? { url: String(d.url).replace(/\/+$/, ''), anonKey: d.anonKey }
+      : null;
     try { sesion = JSON.parse(localStorage.getItem(KEY_SESS) || 'null'); } catch (e) { sesion = null; }
     return cfg;
   }
-
-  /** ¿La conexión vino de config.js y no de esta PC? */
-  function esPorDefecto() { return !!(cfg && cfg.porDefecto); }
 
   /**
    * ¿Se pueden tocar las configuraciones?
@@ -2429,15 +2353,6 @@ VLM.nube = (function () {
   function configurada() { return !!(cfg && cfg.url && cfg.anonKey); }
   function conSesion()   { return !!(sesion && sesion.access_token); }
   function email()       { return sesion ? sesion.email : null; }
-  function datos()       { return cfg ? { url: cfg.url, anonKey: cfg.anonKey } : null; }
-
-  function setConfig(url, anonKey) {
-    url = String(url || '').trim().replace(/\/+$/, '');
-    anonKey = String(anonKey || '').trim();
-    if (!url || !anonKey) { cfg = null; try { localStorage.removeItem(KEY_CFG); } catch (e) {} return; }
-    cfg = { url, anonKey };
-    try { localStorage.setItem(KEY_CFG, JSON.stringify(cfg)); } catch (e) {}
-  }
 
   function guardarSesion(s) {
     sesion = s;
@@ -2681,7 +2596,7 @@ VLM.nube = (function () {
   cargar();
 
   return {
-    cargar, configurada, conSesion, esPorDefecto, puedeEditar, email, datos, setConfig,
+    cargar, configurada, conSesion, puedeEditar, email,
     entrar, salir, bajarMaximos, subirMaximos, borrarMaximo,
     fechaStock, bajarStock, subirStock,
     bajarConfig, subirConfig,
@@ -7942,13 +7857,9 @@ VLM.app = (function () {
 
   /* Controles que siguen activos aunque no haya sesión.
      - los de entrar, porque son justamente cómo se desbloquea;
-     - los de conexión, que son la salida de emergencia si la base a la que
-       apunta esta PC está mal o caída: son locales y no cambian nada de lo
-       que ven los demás;
      - los de sólo lectura: traer de la base y exportar el CSV. */
   const SIN_BLOQUEO = ['cfgNubeMail', 'cfgNubePass', 'btnNubeEntrar', 'btnNubeSalir',
                        'btnIrCuenta',
-                       'cfgNubeUrl', 'cfgNubeKey', 'btnNubeGuardar',
                        // sacar una copia no cambia nada: que pueda cualquiera
                        'btnNubeBajar', 'btnExportMax'];
 
@@ -8009,10 +7920,11 @@ VLM.app = (function () {
   function pintarNube() {
     const N = VLM.nube;
     const est = $('#nubeEstado');
-    const d = N.datos();
-    if (d) { $('#cfgNubeUrl').value = d.url; $('#cfgNubeKey').value = d.anonKey; }
 
-    $('#nubeLogin').hidden = !(N.configurada() && !N.conSesion());
+    // la frase de arriba pide iniciar sesión: va sólo cuando se puede y falta
+    const pideSesion = N.configurada() && !N.conSesion();
+    $('#nubeLogin').hidden = !pideSesion;
+    $('#cfgCuentaAyuda').hidden = !pideSesion;
     $('#btnNubeSubir').disabled = !N.conSesion();
     $('#btnNubeSubirStock').disabled = !N.conSesion();
 
@@ -8022,7 +7934,7 @@ VLM.app = (function () {
         '<svg viewBox="0 0 24 24" class="ico"><path d="M17 18H7a4 4 0 0 1-.5-8 6 6 0 0 1 11.2-1.8A3.5 3.5 0 0 1 21 13.5"/>' +
         '<path d="M3 3l18 18"/></svg>' +
         '<div class="cuenta-txt"><strong>Sin base conectada</strong>' +
-        '<span>Todo queda en esta PC. Se configura en «Conexión a la base».</span></div>';
+        '<span>Todo queda en esta PC. La conexión se define en js/config.js.</span></div>';
     } else if (N.conSesion()) {
       const mail = N.email() || '';
       est.className = 'cuenta-box es-ok';
@@ -8037,8 +7949,8 @@ VLM.app = (function () {
       est.innerHTML =
         '<svg viewBox="0 0 24 24" class="ico"><rect x="4" y="11" width="16" height="10" rx="2"/>' +
         '<path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>' +
-        '<div class="cuenta-txt"><strong>Modo lectura</strong>' +
-        '<span>Entrá con una cuenta autorizada para poder cambiar la configuración.</span></div>';
+        // sin segunda línea: lo que hay que hacer ya lo dice la frase de arriba
+        '<div class="cuenta-txt"><strong>Modo lectura</strong></div>';
     }
     // el estado de la sesión define qué se puede tocar en toda la pantalla
     aplicarBloqueo();
@@ -8441,15 +8353,6 @@ VLM.app = (function () {
     const N = VLM.nube;
     // otra pestaña inició o cerró sesión: esta pantalla tiene que mostrarlo ya
     N.alCambiarSesion(refrescarPorSesion);
-
-    $('#btnNubeGuardar').addEventListener('click', async () => {
-      N.setConfig($('#cfgNubeUrl').value, $('#cfgNubeKey').value);
-      // conectar o desconectar también cambia quién puede editar
-      refrescarPorSesion();
-      if (!N.configurada()) { U.toast('Conexión borrada: los máximos vuelven a ser locales'); return; }
-      U.toast('Conexión guardada');
-      await bajarDeNube();
-    });
 
     $('#btnNubeBajar').addEventListener('click', () => bajarDeNube());
 

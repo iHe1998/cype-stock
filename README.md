@@ -518,18 +518,19 @@ VLM.config = {
 };
 ```
 
-Lo que se cargue a mano en ⚙ Configuración manda sobre eso, por si alguna PC necesita
-apuntar a otra base.
+Es la **única** fuente de la conexión: no hay forma de cargar otra a mano desde el panel,
+así que todas las PCs miran siempre la misma base. Mudarse a otra es cambiar
+`js/config.js` y publicar; cada PC la toma sola la próxima vez que recarga. (Las versiones
+anteriores dejaban guardar una conexión propia en el navegador; el panel la borra al abrir.)
 
 > Va la clave **anon**, que Supabase publica en el cliente a propósito: con ella sólo se
 > puede hacer lo que permitan las políticas RLS, o sea leer. **Nunca** la `service_role`,
 > que saltea todas las políticas. Y tener presente que el sitio es público: quien lo abra
 > podrá leer los máximos. Escribir sigue necesitando sesión.
 
-### Conectar una sola PC
+### Forzar la sincronización a mano
 
-En **⚙ Configuración → Máximos compartidos** se pegan la **URL del proyecto** y la **clave
-anon** (Supabase → Project Settings → API), y listo. Los botones:
+En **⚙ Configuración → Stock y máximos** están los botones:
 
 - **Traer de la base** — baja el stock y los máximos, y pisa lo local.
 - **Subir máximos** / **Subir stock** — mandan lo local a la base. Necesitan sesión.

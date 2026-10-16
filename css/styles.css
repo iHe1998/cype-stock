@@ -1176,25 +1176,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
   margin-top: 14px;
 }
 
-.cfg-permisos { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-.cfg-permisos li {
-  display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 12px;
-  align-items: start;
-  font-size: 12.5px; line-height: 1.55; color: var(--text-2);
-}
-.perm-tag {
-  justify-self: start;
-  padding: 3px 9px; border-radius: 999px;
-  font-size: 11px; font-weight: 650; white-space: nowrap;
-  color: var(--muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
-}
-.perm-tag.perm-ok {
-  color: var(--ok); background: var(--ok-dim);
-  border-color: color-mix(in srgb, var(--ok) 32%, transparent);
-}
-
 /* ---------- pantallas del modo TV ---------- */
 /* Filas altas y clickeables en toda su superficie: se tocan en la PC del
    depósito, muchas veces sin mouse fino. */
@@ -1238,25 +1219,6 @@ kbd {
 .cfg-leyenda .lg-bajo { background: var(--warn-fill, var(--warn)); }
 .cfg-leyenda .lg-ok   { background: var(--ok-fill, var(--ok)); }
 
-/* ---------- conexión (plegada) ---------- */
-/* Viene de config.js y ya funciona: tenerla desplegada era dejar la clave a la
-   vista de cualquiera que mire la pantalla, para algo que casi nunca se toca. */
-.cfg-avanzado { margin-top: 4px; }
-.cfg-avanzado > summary {
-  cursor: pointer; list-style: none;
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 2px;
-  font-size: 12px; font-weight: 600; color: var(--muted);
-}
-.cfg-avanzado > summary::-webkit-details-marker { display: none; }
-.cfg-avanzado > summary::before { content: "▸"; font-size: 10px; transition: transform .12s; }
-.cfg-avanzado[open] > summary::before { transform: rotate(90deg); }
-.cfg-avanzado > summary:hover { color: var(--text-2); }
-/* El navegador oculta el contenido plegado con un display:none propio, pero es
-   de su hoja de estilos: cualquier display que pongamos nosotros le gana y los
-   campos quedaban a la vista igual con el bloque cerrado. */
-.cfg-avanzado:not([open]) > *:not(summary) { display: none; }
-
 /* ---------- modo lectura ---------- */
 .cfg-bloqueo {
   display: flex; align-items: center; gap: 12px;
@@ -1289,7 +1251,6 @@ kbd {
   .cfg-nav-item .ico { width: 18px; height: 18px; }
   .cfg-nav-item.is-sel span { display: inline; }
   .cfg-login { grid-template-columns: 1fr; }
-  .cfg-permisos li { grid-template-columns: 1fr; gap: 5px; }
 }
 
 /* ============================================================
