@@ -129,21 +129,7 @@ VLM.views = (function () {
 
     /* --- gráficos --- */
     html += '<h3 class="section-title">Situación del stock</h3>';
-    /* El corte principal es el artículo: adentro del VLM la ubicación no
-       distingue nada, todos comparten VLMVENTA01 o VLMVENTA02.
-
-       Los que están sólo en reserva ya quedaron afuera antes de llegar acá
-       (ver app.itemsVisibles); se los nombra para que el total cierre con lo
-       que dice la planilla. */
-    const soloReserva = contarSoloReserva();
-    const topArt = Math.min(items.length, 15);
-    html += cardChart('Stock por artículo',
-        (topArt < items.length
-          ? 'unidades en picking · los ' + topArt + ' de mayor stock, de ' + items.length
-          : 'unidades en picking') +
-        (soloReserva ? ' · ' + soloReserva + ' sólo en reserva, fuera del panel' : ''),
-        'chArtStock', Math.max(280, topArt * 24 + 50));
-    html += '<div class="grid grid-2" style="margin-top:14px">' +
+    html += '<div class="grid grid-2">' +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
       '</div>';
@@ -162,7 +148,6 @@ VLM.views = (function () {
     el.innerHTML = html;
 
     /* --- montaje de gráficos --- */
-    C.stockPorArticulo($('#chArtStock', el), items);
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
   }

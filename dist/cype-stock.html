@@ -1928,7 +1928,7 @@ kbd {
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 16/10/2026 20:35 (sobre 0892634)</span>
+      <span class="muted small" id="appVersion">compilado 23/10/2026 19:42 (sobre dc83063)</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -5250,44 +5250,6 @@ VLM.charts = (function () {
   }
 
   /* ------------------------------------------------------------
-     1b. Stock por artículo
-     Adentro del VLM la ubicación no distingue nada: todos los artículos
-     comparten VLMVENTA01 o VLMVENTA02. El corte útil es el artículo.
-     ------------------------------------------------------------ */
-  function stockPorArticulo(canvas, items, tv, n) {
-    const t = tema();
-    const top = items.slice()
-      .sort((a, b) => (b.stockPicking !== undefined ? b.stockPicking : b.stock) -
-                      (a.stockPicking !== undefined ? a.stockPicking : a.stock))
-      .slice(0, n || (tv ? 10 : 15));
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.x.ticks.callback = v => U.fmtCompact(v);
-    o.plugins.tooltip.callbacks = {
-      title: c => {
-        const p = top[c[0].dataIndex];
-        return p.descripcion === p.codigo ? p.codigo : p.codigo + ' · ' + p.descripcion;
-      },
-      label: c => U.fmt(c.parsed.x) + ' unidades' +
-        (top[c.dataIndex].ocupacion !== null && top[c.dataIndex].ocupacion !== undefined
-          ? ' · ' + Math.round(top[c.dataIndex].ocupacion * 100) + '% de su capacidad' : '')
-    };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(p => recortar(p.descripcion || p.codigo, tv ? 28 : 34)),
-        datasets: [{
-          data: top.map(p => p.stockPicking !== undefined ? p.stockPicking : p.stock),
-          backgroundColor: top.map(p => colorEstado(p.estado, t)),
-          borderRadius: 4,
-          barThickness: tv ? 20 : 14
-        }]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
      2. Distribución de estados (dona)
      ------------------------------------------------------------ */
   function estados(canvas, res, tv) {
@@ -5371,14 +5333,9 @@ VLM.charts = (function () {
     });
   }
 
-  function recortar(s, n) {
-    s = String(s || '');
-    return s.length > n ? s.slice(0, n - 1) + '…' : s;
-  }
-
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, stockPorArticulo, estados, estadosPorLab
+    stockPorLab, estados, estadosPorLab
   };
 })();
 
@@ -5515,21 +5472,7 @@ VLM.views = (function () {
 
     /* --- gráficos --- */
     html += '<h3 class="section-title">Situación del stock</h3>';
-    /* El corte principal es el artículo: adentro del VLM la ubicación no
-       distingue nada, todos comparten VLMVENTA01 o VLMVENTA02.
-
-       Los que están sólo en reserva ya quedaron afuera antes de llegar acá
-       (ver app.itemsVisibles); se los nombra para que el total cierre con lo
-       que dice la planilla. */
-    const soloReserva = contarSoloReserva();
-    const topArt = Math.min(items.length, 15);
-    html += cardChart('Stock por artículo',
-        (topArt < items.length
-          ? 'unidades en picking · los ' + topArt + ' de mayor stock, de ' + items.length
-          : 'unidades en picking') +
-        (soloReserva ? ' · ' + soloReserva + ' sólo en reserva, fuera del panel' : ''),
-        'chArtStock', Math.max(280, topArt * 24 + 50));
-    html += '<div class="grid grid-2" style="margin-top:14px">' +
+    html += '<div class="grid grid-2">' +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
       cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
       '</div>';
@@ -5548,7 +5491,6 @@ VLM.views = (function () {
     el.innerHTML = html;
 
     /* --- montaje de gráficos --- */
-    C.stockPorArticulo($('#chArtStock', el), items);
     C.stockPorLab($('#chLabStock', el), labs);
     C.estados($('#chEstados', el), res);
   }

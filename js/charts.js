@@ -114,44 +114,6 @@ VLM.charts = (function () {
   }
 
   /* ------------------------------------------------------------
-     1b. Stock por artículo
-     Adentro del VLM la ubicación no distingue nada: todos los artículos
-     comparten VLMVENTA01 o VLMVENTA02. El corte útil es el artículo.
-     ------------------------------------------------------------ */
-  function stockPorArticulo(canvas, items, tv, n) {
-    const t = tema();
-    const top = items.slice()
-      .sort((a, b) => (b.stockPicking !== undefined ? b.stockPicking : b.stock) -
-                      (a.stockPicking !== undefined ? a.stockPicking : a.stock))
-      .slice(0, n || (tv ? 10 : 15));
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.x.ticks.callback = v => U.fmtCompact(v);
-    o.plugins.tooltip.callbacks = {
-      title: c => {
-        const p = top[c[0].dataIndex];
-        return p.descripcion === p.codigo ? p.codigo : p.codigo + ' · ' + p.descripcion;
-      },
-      label: c => U.fmt(c.parsed.x) + ' unidades' +
-        (top[c.dataIndex].ocupacion !== null && top[c.dataIndex].ocupacion !== undefined
-          ? ' · ' + Math.round(top[c.dataIndex].ocupacion * 100) + '% de su capacidad' : '')
-    };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(p => recortar(p.descripcion || p.codigo, tv ? 28 : 34)),
-        datasets: [{
-          data: top.map(p => p.stockPicking !== undefined ? p.stockPicking : p.stock),
-          backgroundColor: top.map(p => colorEstado(p.estado, t)),
-          borderRadius: 4,
-          barThickness: tv ? 20 : 14
-        }]
-      },
-      options: o
-    });
-  }
-
-  /* ------------------------------------------------------------
      2. Distribución de estados (dona)
      ------------------------------------------------------------ */
   function estados(canvas, res, tv) {
@@ -235,13 +197,8 @@ VLM.charts = (function () {
     });
   }
 
-  function recortar(s, n) {
-    s = String(s || '');
-    return s.length > n ? s.slice(0, n - 1) + '…' : s;
-  }
-
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, stockPorArticulo, estados, estadosPorLab
+    stockPorLab, estados, estadosPorLab
   };
 })();
