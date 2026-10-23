@@ -121,7 +121,7 @@ pantalla inicial podés **descargar la plantilla en `.xlsx`**.
 ## Laboratorios, ámbito y conservación
 
 Los productos se clasifican en dos dimensiones independientes, que se combinan
-en cuatro cuadrantes: **VLM · Frío**, **VLM · Ambiente**, **Fuera · Frío**, **Fuera · Ambiente**.
+en cuatro cuadrantes: **VLM · Frío**, **VLM · Ambiente**, **Picking · Frío**, **Picking · Ambiente**.
 La barra superior filtra por cualquiera de las dos, más un tercer filtro por
 **laboratorio**, y los tres afectan a todas las vistas — el resumen y sus gráficos
 incluidos, así que se puede mirar el panel de un solo laboratorio. El desplegable muestra

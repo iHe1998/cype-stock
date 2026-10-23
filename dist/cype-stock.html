@@ -1543,7 +1543,7 @@ kbd {
   <div class="seg" data-key="filtroAmbito">
     <button class="seg-btn is-active" data-val="">Todo</button>
     <button class="seg-btn" data-val="vlm">VLM</button>
-    <button class="seg-btn" data-val="externo">Fuera del VLM</button>
+    <button class="seg-btn" data-val="externo">Picking</button>
   </div>
   <span class="zonebar-sep"></span>
   <div class="seg" data-key="filtroZona">
@@ -1831,7 +1831,7 @@ kbd {
           <header class="cfg-sec-head">
             <h3>Laboratorios</h3>
             <p>Acá se define <strong>cuáles</strong> se procesan y cómo se llaman, nada más. Si el
-              artículo está dentro del VLM o fuera, y si es frío o ambiente, lo decide
+              artículo está en el VLM o en Picking, y si es frío o ambiente, lo decide
               <strong>cada SKU según sus ubicaciones</strong>: un mismo laboratorio tiene artículos
               de los dos tipos.</p>
           </header>
@@ -1928,7 +1928,7 @@ kbd {
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 23/10/2026 19:42 (sobre dc83063)</span>
+      <span class="muted small" id="appVersion">compilado 23/10/2026 20:11 (sobre de0ad8d)</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -2621,8 +2621,8 @@ VLM.labs = (function () {
   /* ---------------- constantes de presentación ---------------- */
 
   const AMBITOS = {
-    vlm:     { label: 'VLM',            corto: 'VLM',   desc: 'Dentro de la torre de picking' },
-    externo: { label: 'Fuera del VLM',  corto: 'Fuera', desc: 'Almacenado fuera de la torre' }
+    vlm:     { label: 'VLM',     corto: 'VLM',     desc: 'Dentro de la torre de picking' },
+    externo: { label: 'Picking', corto: 'Picking', desc: 'Picking fuera de la torre' }
   };
 
   const ZONAS = {
@@ -4192,7 +4192,9 @@ VLM.asistente = (function () {
 
   const AMBITO = {
     vlm:     ['vlm', 'torre', 'en la torre', 'modula'],
-    externo: ['externo', 'externos', 'fuera del vlm', 'fuera de la torre', 'afuera', 'fuera', 'pasillo']
+    // "picking" es como se llama ahora en el panel; los nombres viejos siguen
+    // entendiéndose, que es lo que la gente va a escribir por costumbre
+    externo: ['picking', 'externo', 'externos', 'fuera del vlm', 'fuera de la torre', 'afuera', 'fuera', 'pasillo']
   };
 
   const CAMPO = {
@@ -4448,7 +4450,7 @@ VLM.asistente = (function () {
     if (z) { filtros.zona = z.valor; resto = z.resto; partes.push(z.valor === 'frio' ? 'de frío' : 'de ambiente'); }
 
     const a = extraer(resto, AMBITO);
-    if (a) { filtros.ambito = a.valor; resto = a.resto; partes.push(a.valor === 'vlm' ? 'dentro del VLM' : 'fuera del VLM'); }
+    if (a) { filtros.ambito = a.valor; resto = a.resto; partes.push(a.valor === 'vlm' ? 'dentro del VLM' : 'en Picking'); }
 
     /* Un campo suelto sin número —"máximos de Roche"— no cambia nada: es una
        búsqueda que además dice qué columna mirar. */
@@ -5078,7 +5080,7 @@ VLM.analytics = (function () {
 
   /**
    * Agrupa en los cuatro cuadrantes ámbito × conservación
-   * (VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente).
+   * (VLM·Frío, VLM·Ambiente, Picking·Frío, Picking·Ambiente).
    * Devuelve sólo los grupos que tienen productos.
    */
   function porGrupo(items, cfg) {
@@ -5376,7 +5378,7 @@ VLM.views = (function () {
     return '<span class="zchip z-' + zona + '" title="' + z.desc + '">' + z.icono + ' ' + z.corto + '</span>';
   }
 
-  /** Chip de ámbito (VLM / Fuera). */
+  /** Chip de ámbito (VLM / Picking). */
   function achip(ambito) {
     const a = VLM.labs.AMBITOS[ambito];
     if (!a) return '';
@@ -5528,7 +5530,7 @@ VLM.views = (function () {
       cardChart('Estados por laboratorio', 'cantidad de SKU', 'chLabEstados', 340) +
       '</div>';
 
-    // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente
+    // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Picking·Frío, Picking·Ambiente
     html += '<div id="labGrid">' + grupos.map(g =>
       grupoHead(g) +
       '<div class="lab-grid">' + g.labs.map(l => labCard(l, cfg, g.zona)).join('') + '</div>'
@@ -8411,7 +8413,7 @@ VLM.app = (function () {
           sel('accion', r.accion || 'usar', { usar: 'Usar', ignorar: 'Ignorar' }) +
           sel('tipo', r.tipo || '', { '': '—', picking: 'Picking', altura: 'Altura' }, ign) +
           sel('zona', r.zona || '', { '': '—', frio: '❄ Frío', ambiente: '🌡 Ambiente' }, ign) +
-          sel('ambito', r.ambito || '', { '': '—', vlm: 'VLM', externo: 'Fuera' }, ign) +
+          sel('ambito', r.ambito || '', { '': '—', vlm: 'VLM', externo: 'Picking' }, ign) +
           '<div class="regla-acciones">' +
             '<button class="btn btn-icon regla-sube" title="Subir: gana antes"' +
               (i === 0 ? ' disabled' : '') + '>' +

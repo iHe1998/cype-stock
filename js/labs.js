@@ -13,8 +13,8 @@ VLM.labs = (function () {
   /* ---------------- constantes de presentación ---------------- */
 
   const AMBITOS = {
-    vlm:     { label: 'VLM',            corto: 'VLM',   desc: 'Dentro de la torre de picking' },
-    externo: { label: 'Fuera del VLM',  corto: 'Fuera', desc: 'Almacenado fuera de la torre' }
+    vlm:     { label: 'VLM',     corto: 'VLM',     desc: 'Dentro de la torre de picking' },
+    externo: { label: 'Picking', corto: 'Picking', desc: 'Picking fuera de la torre' }
   };
 
   const ZONAS = {

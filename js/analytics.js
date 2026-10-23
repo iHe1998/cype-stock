@@ -207,7 +207,7 @@ VLM.analytics = (function () {
 
   /**
    * Agrupa en los cuatro cuadrantes ámbito × conservación
-   * (VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente).
+   * (VLM·Frío, VLM·Ambiente, Picking·Frío, Picking·Ambiente).
    * Devuelve sólo los grupos que tienen productos.
    */
   function porGrupo(items, cfg) {

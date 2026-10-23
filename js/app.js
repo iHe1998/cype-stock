@@ -1623,7 +1623,7 @@ VLM.app = (function () {
           sel('accion', r.accion || 'usar', { usar: 'Usar', ignorar: 'Ignorar' }) +
           sel('tipo', r.tipo || '', { '': '—', picking: 'Picking', altura: 'Altura' }, ign) +
           sel('zona', r.zona || '', { '': '—', frio: '❄ Frío', ambiente: '🌡 Ambiente' }, ign) +
-          sel('ambito', r.ambito || '', { '': '—', vlm: 'VLM', externo: 'Fuera' }, ign) +
+          sel('ambito', r.ambito || '', { '': '—', vlm: 'VLM', externo: 'Picking' }, ign) +
           '<div class="regla-acciones">' +
             '<button class="btn btn-icon regla-sube" title="Subir: gana antes"' +
               (i === 0 ? ' disabled' : '') + '>' +

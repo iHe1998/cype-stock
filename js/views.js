@@ -33,7 +33,7 @@ VLM.views = (function () {
     return '<span class="zchip z-' + zona + '" title="' + z.desc + '">' + z.icono + ' ' + z.corto + '</span>';
   }
 
-  /** Chip de ámbito (VLM / Fuera). */
+  /** Chip de ámbito (VLM / Picking). */
   function achip(ambito) {
     const a = VLM.labs.AMBITOS[ambito];
     if (!a) return '';
@@ -185,7 +185,7 @@ VLM.views = (function () {
       cardChart('Estados por laboratorio', 'cantidad de SKU', 'chLabEstados', 340) +
       '</div>';
 
-    // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Fuera·Frío, Fuera·Ambiente
+    // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Picking·Frío, Picking·Ambiente
     html += '<div id="labGrid">' + grupos.map(g =>
       grupoHead(g) +
       '<div class="lab-grid">' + g.labs.map(l => labCard(l, cfg, g.zona)).join('') + '</div>'

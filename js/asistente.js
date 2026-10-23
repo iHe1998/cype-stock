@@ -44,7 +44,9 @@ VLM.asistente = (function () {
 
   const AMBITO = {
     vlm:     ['vlm', 'torre', 'en la torre', 'modula'],
-    externo: ['externo', 'externos', 'fuera del vlm', 'fuera de la torre', 'afuera', 'fuera', 'pasillo']
+    // "picking" es como se llama ahora en el panel; los nombres viejos siguen
+    // entendiéndose, que es lo que la gente va a escribir por costumbre
+    externo: ['picking', 'externo', 'externos', 'fuera del vlm', 'fuera de la torre', 'afuera', 'fuera', 'pasillo']
   };
 
   const CAMPO = {
@@ -300,7 +302,7 @@ VLM.asistente = (function () {
     if (z) { filtros.zona = z.valor; resto = z.resto; partes.push(z.valor === 'frio' ? 'de frío' : 'de ambiente'); }
 
     const a = extraer(resto, AMBITO);
-    if (a) { filtros.ambito = a.valor; resto = a.resto; partes.push(a.valor === 'vlm' ? 'dentro del VLM' : 'fuera del VLM'); }
+    if (a) { filtros.ambito = a.valor; resto = a.resto; partes.push(a.valor === 'vlm' ? 'dentro del VLM' : 'en Picking'); }
 
     /* Un campo suelto sin número —"máximos de Roche"— no cambia nada: es una
        búsqueda que además dice qué columna mirar. */
