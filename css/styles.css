@@ -86,44 +86,125 @@
       un color aparte para los bloques (--*-fill), más suave.
    --------------------------------------------------------------- */
 [data-theme="light"] {
-  --bg:          #e9edf3;
-  --bg-grad:     radial-gradient(1200px 600px at 20% -10%, #dfe6ef 0%, transparent 60%);
-  --surface:     #f8fafd;
-  --surface-2:   #eef2f8;
-  --surface-3:   #e2e8f1;
-  --border:      #c2cddc;
-  --border-soft: #dae1ec;
-  --text:        #101722;
-  --text-2:      #34435a;
-  --muted:       #4b5a70;
-  --accent:      #0a5c88;
-  --accent-dim:  #d5e8f5;
-  --ok:          #146c39;
-  --ok-dim:      #dcefe2;
-  --warn:        #8a4408;
-  --warn-dim:    #f6e6cb;
-  --crit:        #ac1b1b;
-  --crit-dim:    #f7dedd;
-  --info:        #5b2ec0;
-  --info-dim:    #e3dcf7;
-  --agotado:     #3a4656;
-  --agotado-dim: #dae0e9;
-  --agotado-txt: #1c2632;
-  --frio:        #0a5e73;
-  --frio-dim:    #d0e8f0;
-  --ambiente:    #85450a;
-  --ambiente-dim:#f2e2ca;
+  /* Superficies: tarjeta blanca sobre página apenas gris. Antes los dos
+     valores eran casi iguales y todo se veía plano y lavado. */
+  --bg:          #eef1f6;
+  --bg-grad:     radial-gradient(1100px 520px at 18% -12%, #ffe3e6 0%, transparent 62%);
+  --surface:     #ffffff;
+  --surface-2:   #f4f7fb;
+  --surface-3:   #e8eef6;
+  --border:      #ccd6e4;
+  --border-soft: #e1e8f1;
 
-  /* Bloques: barras de gráfico, rellenos, barras de progreso. */
-  --ok-fill:      #4f9d6d;
-  --warn-fill:    #cf9440;
-  --crit-fill:    #cf5f57;
-  --info-fill:    #8a72cd;
-  --agotado-fill: #97a2b2;
-  --accent-fill:  #4e93bd;
+  /* Texto negro de verdad arriba, y los dos escalones de abajo bien oscuros:
+     los tres pasan 7:1 (AAA) sobre la tarjeta blanca. */
+  --text:        #0b0f16;
+  --text-2:      #26303f;
+  --muted:       #4f5c70;
 
-  --shadow:      0 1px 2px rgba(16,24,38,.06), 0 8px 24px rgba(16,24,38,.07);
-  --shadow-lg:   0 24px 64px rgba(16,24,38,.18);
+  /* Rojo Andreani. Manda en la navegación —pestaña activa, botón principal,
+     barra del modo TV, chips del VLM—. Los estados del stock tienen su propia
+     paleta acá abajo, que es la que hay que leer de un vistazo. */
+  --accent:      #c8102e;
+  --accent-dim:  #ffe2e6;
+  --ok:          #0e7a3c;
+  --ok-dim:      #d6f5e3;
+  --warn:        #8f4e00;
+  --warn-dim:    #ffe9c7;
+  --crit:        #c0121f;
+  --crit-dim:    #ffdfe1;
+  --info:        #5326bd;
+  --info-dim:    #e8e0ff;
+  --agotado:     #2b3442;
+  --agotado-dim: #e1e6ee;
+  --agotado-txt: #0f1620;
+  --frio:        #065f73;
+  --frio-dim:    #d2f1f9;
+  --ambiente:    #8f4e00;
+  --ambiente-dim:#ffe9c7;
+
+  /* Bloques: barras de gráfico, rellenos, barras de progreso. Más vivos que
+     el color de texto, que como bloque grande queda sucio. */
+  --ok-fill:      #17b55e;
+  --warn-fill:    #f5a524;
+  --crit-fill:    #ef3b42;
+  --info-fill:    #8b5cf6;
+  --agotado-fill: #76839a;
+  --accent-fill:  #e4002b;
+
+  /* Tres capas: el filo, el apoyo cercano y la sombra larga. Una sola capa
+     plana es lo que hacía que las tarjetas parecieran pegadas al fondo. */
+  --shadow:      0 1px 2px rgba(13,22,38,.07), 0 3px 8px rgba(13,22,38,.07),
+                 0 14px 28px -10px rgba(13,22,38,.14);
+  --shadow-lg:   0 10px 24px -8px rgba(13,22,38,.18),
+                 0 32px 64px -16px rgba(13,22,38,.28);
+}
+
+/* ---------------------------------------------------------------
+   Profundidad del tema claro.
+
+   Sobre fondo claro lo único que despega una tarjeta de la página es la
+   sombra. En oscuro no hace falta —ahí separa el contraste entre
+   superficies— así que todo esto va scoped y no toca el tema oscuro.
+   --------------------------------------------------------------- */
+[data-theme="light"] .topbar {
+  background: #fff;
+  box-shadow: 0 1px 0 var(--border-soft), 0 6px 18px -10px rgba(13,22,38,.28);
+}
+[data-theme="light"] .tabs { background: color-mix(in srgb, #fff 82%, transparent); }
+
+/* se levantan apenas al pasar por encima: da el volumen sin mover la grilla */
+[data-theme="light"] .card,
+[data-theme="light"] .kpi,
+[data-theme="light"] .zona-card,
+[data-theme="light"] .lab-card {
+  transition: box-shadow .16s, transform .16s;
+}
+[data-theme="light"] .card:hover,
+[data-theme="light"] .kpi:hover,
+[data-theme="light"] .zona-card:hover,
+[data-theme="light"] .lab-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(13,22,38,.07), 0 8px 18px rgba(13,22,38,.10),
+              0 24px 44px -14px rgba(13,22,38,.20);
+}
+
+/* los botones, apoyados sobre la página en vez de recortados contra ella */
+[data-theme="light"] .btn {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(13,22,38,.08);
+}
+[data-theme="light"] .btn:hover { background: var(--surface-2); }
+[data-theme="light"] .btn-primary {
+  background: linear-gradient(180deg, #e4002b, #c8102e);
+  border-color: #ae0c24;
+  box-shadow: 0 1px 2px rgba(150,10,30,.30), 0 6px 14px -5px rgba(200,16,46,.50);
+}
+[data-theme="light"] .btn-primary:hover {
+  background: linear-gradient(180deg, #ef1437, #d4122f);
+  border-color: #ae0c24;
+}
+[data-theme="light"] .btn[disabled] { box-shadow: none; }
+
+/* la pestaña activa, con el rojo de la marca y algo de peso */
+[data-theme="light"] .tab.is-active { font-weight: 650; }
+[data-theme="light"] .seg-btn.is-active { background: #fff; }
+
+/* los números de las tablas, negros: son el dato que se viene a leer */
+[data-theme="light"] .table td { color: var(--text); }
+[data-theme="light"] .table th { color: var(--text-2); }
+
+/* los títulos de sección eran gris claro y se perdían contra la página */
+[data-theme="light"] .section-title { color: var(--text-2); font-weight: 700; }
+[data-theme="light"] .grupo-head { border-bottom-width: 2px; }
+
+/* Las tarjetas de fuera del VLM venían con un velo encima para distinguirse.
+   El borde punteado ya las distingue; el velo sólo las ensuciaba. */
+[data-theme="light"] .zona-card.zc-externo { opacity: 1; }
+[data-theme="light"] .zchip.a-externo {
+  color: var(--text-2);
+  background: var(--surface-3);
+  border-color: var(--border);
 }
 
 * { box-sizing: border-box; }
