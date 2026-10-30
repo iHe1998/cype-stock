@@ -894,19 +894,16 @@ VLM.views = (function () {
       '<span class="muted small">' + vis.length + ' filas</span>' +
       '</div>';
 
-    html += '<div class="notice" style="margin-bottom:12px">' +
-      '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
-        '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
-      '<div>' +
-      (VLM.nube.puedeEditar() ? '' : '<strong>Modo lectura:</strong> hace falta iniciar sesión ' +
-        'con una cuenta autorizada para cambiar los valores. ') +
-      'Escribí el <strong>mínimo</strong> (cuándo rellenar) y el <strong>máximo</strong> ' +
-      '(cuánto entra) de cada artículo en su posición de picking. Se guardan y se aplican al instante.<br>' +
-      '<span class="small muted">La reserva —altura y el pasillo que abastece al VLM— no se ' +
-      'configura: de ahí se saca, no se rellena. Se ve en el detalle del artículo y en la reposición.</span><br>' +
-      '<span class="small muted">Si son muchas: Configuración › Stock y máximos › <strong>Exportar máximos</strong>, ' +
-      'completás las columnas en Excel y lo volvés a importar desde ahí. Ese mismo archivo es tu respaldo.</span>' +
-      '</div></div>';
+    /* Sin sesión los campos salen `disabled` y no hay nada que lo explique:
+       el aviso se queda sólo para eso. La explicación de qué escribir se fue;
+       quien carga máximos ya lo sabe y ocupaba media pantalla todos los días. */
+    if (!VLM.nube.puedeEditar()) {
+      html += '<div class="notice" style="margin-bottom:12px">' +
+        '<svg viewBox="0 0 24 24" class="ico" style="color:var(--accent)">' +
+          '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4h.01"/></svg>' +
+        '<div><strong>Modo lectura:</strong> hace falta iniciar sesión ' +
+        'con una cuenta autorizada para cambiar los valores.</div></div>';
+    }
 
     html += '<div class="table-wrap"><table class="table" id="posTable">' +
       '<thead><tr>' +
