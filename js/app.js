@@ -1477,9 +1477,7 @@ VLM.app = (function () {
       const estabaPendiente = stockSinSubir;
       marcarStockSinSubir(false);
       if (estabaPendiente) VLM.vigia.revisarAhora();   // que el cartel vuelva a verde ya
-      U.toast(estabaPendiente && reintento
-        ? 'Subido el stock que estaba pendiente: ya lo ven todas las PCs'
-        : 'Stock subido: lo ven todas las PCs', 'ok');
+      U.toast('Nueva actualización de stock', 'ok');
       return true;
     } catch (e) {
       /* Si la base rechazó el permiso, nube.js ya intentó renovar la sesión y,
