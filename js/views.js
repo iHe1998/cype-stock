@@ -356,9 +356,9 @@ VLM.views = (function () {
    * Si la posición está vacía no hay nada que mezclar: ahí sirve cualquiera y
    * se ordenan por vencimiento, que es como conviene sacarlas.
    *
-   * Las alturas de otra partida no se esconden —el artículo las tiene y los
-   * totales tienen que cerrar— pero van aparte y marcadas, como lo que entra
-   * después de que la posición se vacíe.
+   * Las alturas de otra partida no se listan acá: esta vista es para ir a
+   * buscar mercadería, y lo que no se puede bajar no ayuda. Siguen contando
+   * en los totales del artículo y se ven en su detalle.
    */
   function fuentesAltura(p) {
     const det = p.detalle || [];
@@ -408,30 +408,19 @@ VLM.views = (function () {
     });
 
     /* Con algo abajo, la única fuente válida es su mismo lote. Con la posición
-       vacía no hay nada que mezclar y sirve cualquiera. */
+       vacía no hay nada que mezclar y sirve cualquiera.
+
+       Las alturas de otra partida no se listan: no se pueden bajar, y
+       nombrarlas con ubicación y lote invitaba a ir a buscarlas igual. */
     const hayLoteAbajo = conLote.length > 0;
     const fuentes = hayLoteAbajo ? lotes.filter(l => l.mismo) : lotes;
-    const otros   = hayLoteAbajo ? lotes.filter(l => !l.mismo) : [];
 
-    const stockOtros = otros.reduce((s, g) => s + g.stock, 0);
-    const notaOtros = otros.length
-      ? '<div class="alt-otros">' + U.fmt(stockOtros) + ' u en ' + otros.length +
-        (otros.length === 1 ? ' lote de otra partida' : ' lotes de otras partidas') +
-        (fuentes.length
-          ? (otros.length === 1 ? ': no sirve' : ': no sirven') + ' para rellenar ésta'
-          : ', para cuando la posición se vacíe') + '. ' +
-        otros.slice(0, 2).map(g => U.esc(g.ubics[0] || '') +
-          (g.lote ? ' lote ' + U.esc(g.lote) : '')).join(' · ') +
-        (otros.length > 2 ? ' · +' + (otros.length - 2) : '') +
-        '</div>'
-      : '';
-
-    // no hay del lote que está abajo: sólo el aviso y, aparte, lo que vendría después
+    // no hay del lote que está abajo: sólo el aviso
     if (!fuentes.length) {
       return '<div class="repo-altura es-fin">' +
         '<div class="alt-head">' + chipFinDeLote() +
           '<span class="alt-u">no queda de este lote en la reserva</span>' +
-        '</div>' + notaOtros + '</div>';
+        '</div></div>';
     }
 
     const total = fuentes.reduce((s, g) => s + g.stock, 0);
@@ -462,7 +451,7 @@ VLM.views = (function () {
             '</span>' +
             (g.mismo ? '<span class="alt-mismo">mismo lote</span>' : '') +
           '</div>').join('') +
-      '</div>' + notaOtros +
+      '</div>' +
       '</div>';
   }
 
