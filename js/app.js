@@ -449,9 +449,9 @@ VLM.app = (function () {
     $('#btnDemo').addEventListener('click', cargarDemo);
     $('#btnTemplate').addEventListener('click', e => { e.preventDefault(); P.generarPlantilla(); });
     $('#btnSettings').addEventListener('click', abrirSettings);
-    $('#btnTheme').addEventListener('click', () => {
-      aplicarTema(S.state.ui.tema === 'dark' ? 'light' : 'dark');
-      render();
+    $('#btnTheme').addEventListener('click', e => {
+      // el botón es el centro del círculo: el cambio nace de donde se tocó
+      aplicarTema(S.state.ui.tema === 'dark' ? 'light' : 'dark', e.currentTarget, render);
     });
     $('#btnTV').addEventListener('click', () => {
       VLM.tv.entrar(itemsVisibles(), S.state.cfg, S.state.ui.filtroLab);
@@ -648,9 +648,111 @@ VLM.app = (function () {
     }));
   }
 
-  function aplicarTema(tema) {
-    document.documentElement.setAttribute('data-theme', tema);
-    S.setUi({ tema: tema }, true);
+  /**
+   * Cambia el tema abriendo el nuevo en círculo desde el botón.
+   *
+   * Lo hace el navegador con startViewTransition: saca una foto de la pantalla
+   * antes y después y nosotros sólo animamos el recorte de la de después. Por
+   * eso no hay que tocar ni una vista: funciona igual con los gráficos.
+   *
+   * Si el navegador no la tiene, o la persona pidió menos movimiento en su
+   * sistema, el tema cambia de golpe como siempre.
+   */
+  const TEMA_MS = 620;
+  const CURVA = 'cubic-bezier(.4, 0, .18, 1)';
+
+  /**
+   * Cambia el tema abriendo el nuevo en círculo desde el botón.
+   *
+   * `despues` es el redibujado del panel y tiene que pasar ADENTRO del cambio:
+   * los gráficos se rehacen con los colores del tema nuevo, y si eso corre por
+   * fuera el navegador aborta la transición y el cambio queda de golpe.
+   *
+   * Sin botón de origen (al abrir la página) o con «reducir movimiento»
+   * puesto en el sistema, el tema cambia de golpe y listo.
+   */
+  function aplicarTema(tema, origen, despues) {
+    const poner = () => {
+      document.documentElement.setAttribute('data-theme', tema);
+      S.setUi({ tema: tema }, true);
+      if (despues) despues();
+    };
+
+    const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!origen || quieto) { poner(); return; }
+
+    const r = origen.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    // hasta la esquina más lejos: el círculo tiene que terminar de cubrir todo
+    const radio = Math.ceil(Math.hypot(Math.max(x, innerWidth - x),
+                                       Math.max(y, innerHeight - y)));
+
+    if (document.startViewTransition && vistaAnda) temaConVista(tema, poner, x, y, radio);
+    else temaConOnda(tema, poner, x, y, radio);
+  }
+
+  /* Hay navegadores que tienen la API pero saltean la transición. La primera
+     vez que pasa queda anotado y de ahí en más se usa la onda, en vez de
+     repetir un cambio de golpe cada vez. */
+  let vistaAnda = true;
+
+  /**
+   * El camino bueno: el navegador saca una foto de antes y otra de después, y
+   * nosotros sólo animamos el recorte de la de después. Se descubre el panel
+   * nuevo de verdad, gráficos incluidos, sin tocar ni una vista.
+   */
+  function temaConVista(tema, poner, x, y, radio) {
+    /* El cambio se aplica una sola vez, venga de donde venga. Hay entornos
+       —una pestaña que no está dibujando— donde el navegador acepta la
+       transición y nunca llega a ejecutar el cambio: sin esta red el botón
+       no haría nada, que es peor que cambiar de golpe. */
+    let hecho = false;
+    const unaVez = () => { if (!hecho) { hecho = true; poner(); } };
+    setTimeout(() => {
+      if (hecho) return;
+      vistaAnda = false;        // la próxima vez, derecho a la onda
+      unaVez();
+      document.documentElement.classList.remove('cambiando-tema');
+    }, 350);
+
+    document.documentElement.classList.add('cambiando-tema');
+    const vt = document.startViewTransition(unaVez);
+    vt.ready.then(() => {
+      document.documentElement.animate(
+        { clipPath: ['circle(0px at ' + x + 'px ' + y + 'px)',
+                     'circle(' + radio + 'px at ' + x + 'px ' + y + 'px)'] },
+        { duration: TEMA_MS, easing: CURVA,
+          pseudoElement: '::view-transition-new(root)' }
+      );
+    }).catch(() => { vistaAnda = false; });   // salteada: el tema ya quedó puesto
+    vt.finished.catch(() => {}).then(() =>
+      document.documentElement.classList.remove('cambiando-tema'));
+  }
+
+  /**
+   * Para los navegadores sin transiciones de vista: una onda del color del
+   * tema que entra, que crece desde el botón y tapa la pantalla. El tema se
+   * cambia debajo mientras está tapado, así que al despejarse ya está puesto.
+   */
+  function temaConOnda(tema, poner, x, y, radio) {
+    const capa = document.createElement('div');
+    capa.className = 'tema-onda';
+    capa.style.left = x + 'px';
+    capa.style.top = y + 'px';
+    capa.style.background = tema === 'light' ? 'var(--fondo-claro)' : 'var(--fondo-oscuro)';
+    document.body.appendChild(capa);
+
+    requestAnimationFrame(() => {
+      capa.style.transition = 'width ' + TEMA_MS + 'ms ' + CURVA +
+                              ', height ' + TEMA_MS + 'ms ' + CURVA +
+                              ', opacity 200ms ease ' + TEMA_MS + 'ms';
+      capa.style.width = capa.style.height = (radio * 2) + 'px';
+      capa.style.opacity = '0';
+    });
+    // se cambia con la pantalla ya tapada, justo antes de que empiece a irse
+    setTimeout(poner, Math.round(TEMA_MS * 0.9));
+    setTimeout(() => capa.remove(), TEMA_MS + 260);
   }
 
   /* ============================================================

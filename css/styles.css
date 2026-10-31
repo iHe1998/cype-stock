@@ -4,8 +4,14 @@
    ============================================================ */
 
 :root {
+  /* Los dos fondos, nombrados una sola vez. Se declaran acá y no se vuelven a
+     tocar en el tema claro, porque la onda del cambio de tema necesita pintar
+     el color del tema que ENTRA, que es el contrario al que está puesto. */
+  --fondo-oscuro: #0a0e14;
+  --fondo-claro:  #eef1f6;
+
   /* superficie */
-  --bg:          #0a0e14;
+  --bg:          var(--fondo-oscuro);
   --bg-grad:     radial-gradient(1200px 600px at 20% -10%, #16202c 0%, transparent 60%);
   --surface:     #111823;
   --surface-2:   #17202c;
@@ -88,7 +94,7 @@
 [data-theme="light"] {
   /* Superficies: tarjeta blanca sobre página apenas gris. Antes los dos
      valores eran casi iguales y todo se veía plano y lavado. */
-  --bg:          #eef1f6;
+  --bg:          var(--fondo-claro);
   --bg-grad:     radial-gradient(1100px 520px at 18% -12%, #ffe3e6 0%, transparent 62%);
   --surface:     #ffffff;
   --surface-2:   #f4f7fb;
@@ -1544,4 +1550,31 @@ kbd {
 .vigia-chip.v-retenido, .vigia-chip.v-error {
   color: var(--crit); background: var(--crit-dim);
   border-color: color-mix(in srgb, var(--crit) 40%, transparent);
+}
+
+/* ============================================================
+   CAMBIO DE TEMA · el nuevo se abre en círculo desde el botón
+
+   El navegador saca una foto de antes y otra de después; acá sólo se apaga
+   su fundido de fábrica y se apilan, para que la de después se descubra con
+   el recorte que anima app.js. Sin esto se ven las dos mezcladas.
+   ============================================================ */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
+
+/* Mientras dura, nada más se mueve: una tarjeta animando su propia sombra
+   debajo del círculo se ve como un parpadeo. */
+.cambiando-tema .card,
+.cambiando-tema .kpi,
+.cambiando-tema .zona-card,
+.cambiando-tema .lab-card { transition: none; }
+
+/* La alternativa para navegadores sin transiciones de vista: una onda del
+   color del tema que entra. Crece desde el botón hasta tapar la pantalla. */
+.tema-onda {
+  position: fixed; z-index: 999; pointer-events: none;
+  width: 0; height: 0; border-radius: 50%;
+  transform: translate(-50%, -50%);
 }
