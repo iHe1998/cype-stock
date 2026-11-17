@@ -238,8 +238,10 @@ VLM.app = (function () {
        que entra —o sea, arriba de todo— y cuando vuelve el contenido ya se
        perdió. Cargar los últimos artículos de la lista era bajar de nuevo
        después de cada carga. */
-    const focoPrev = document.activeElement && document.activeElement.dataset
-      ? document.activeElement.dataset.k : null;
+    const activo = document.activeElement;
+    const focoPrev = activo && activo.dataset ? activo.dataset.k : null;
+    const cursorPrev = focoPrev && activo.type === 'search'
+      ? [activo.selectionStart, activo.selectionEnd] : null;
     const scrollPrev = window.scrollY;
     const tablasPrev = scrollDeTablas();
     const vistaPrev = vistaDibujada;
@@ -298,7 +300,7 @@ VLM.app = (function () {
       });
     });
 
-    if (focoPrev) restaurarFoco(el, focoPrev);
+    if (focoPrev) restaurarFoco(el, focoPrev, cursorPrev);
 
     // Volver a donde estaba, pero sólo si es la MISMA vista: al cambiar de
     // pestaña se arranca arriba, que es de donde se empieza a leer.
@@ -343,13 +345,14 @@ VLM.app = (function () {
   }
 
   /** Devuelve el cursor al mismo campo después de redibujar. */
-  function restaurarFoco(el, clave) {
+  function restaurarFoco(el, clave, cursor) {
     const n = el.querySelector('[data-k="' + clave.replace(/"/g, '\\"') + '"]');
     if (!n) return;
     // preventScroll: focus() por defecto lleva el elemento a la vista, y eso
     // pelearía con la restauración del scroll de unas líneas más abajo
     n.focus({ preventScroll: true });
-    if (n.select) n.select();
+    if (cursor) n.setSelectionRange(cursor[0], cursor[1]);
+    else if (n.select) n.select();
   }
 
   /** @param id el uid del artículo (código|propietario); tolera un código suelto */

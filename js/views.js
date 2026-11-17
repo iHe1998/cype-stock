@@ -672,7 +672,7 @@ VLM.views = (function () {
     const labs = A.porLaboratorio(items, cfg);
 
     let html = '<div class="toolbar">' +
-      '<input class="input" id="invSearch" type="search" placeholder="Buscar código, producto, ubicación…" value="' + U.esc(ui.busqueda) + '">' +
+      '<input class="input" id="invSearch" type="search" data-k="invSearch" placeholder="Buscar código, producto, ubicación…" value="' + U.esc(ui.busqueda) + '">' +
       '<select class="select" id="invLab"><option value="">Todos los laboratorios</option>' +
         labs.map(l => '<option value="' + U.esc(l.nombre) + '"' +
           (ui.filtroLab === l.nombre ? ' selected' : '') + '>' + U.esc(l.nombre) + '</option>').join('') +
@@ -703,10 +703,14 @@ VLM.views = (function () {
     el.innerHTML = html;
     pintarTabla(el, items, cfg);
 
-    $('#invSearch', el).addEventListener('input', U.debounce(e => {
-      VLM.store.setUi({ busqueda: e.target.value }, true);
-      pintarTabla(el, items, cfg);
-    }, 180));
+    const buscar = $('#invSearch', el);
+    const repintar = U.debounce(() => {
+      if (buscar.isConnected) pintarTabla(el, items, cfg);
+    }, 180);
+    buscar.addEventListener('input', () => {
+      VLM.store.setUi({ busqueda: buscar.value }, true);
+      repintar();
+    });
     $('#invLab', el).addEventListener('change', e => {
       VLM.store.setUi({ filtroLab: e.target.value || null }, true);
       pintarTabla(el, items, cfg);
@@ -852,12 +856,6 @@ VLM.views = (function () {
       f.reasignada = !compartida && !!(f.artConfig && (f.min || f.max) && f.artConfig !== f.codigo);
     });
 
-    const q = U.norm(ui.busquedaPos || '');
-    const vis = filas.filter(f => {
-      if (q && U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion).indexOf(q) === -1) return false;
-      return true;
-    });
-
     const configuradas = filas.filter(f => f.min || f.max).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
@@ -875,12 +873,12 @@ VLM.views = (function () {
       '</div>';
 
     html += '<div class="toolbar">' +
-      '<input class="input" id="posSearch" type="search" placeholder="Buscar posición o artículo…" value="' + U.esc(ui.busquedaPos || '') + '">' +
+      '<input class="input" id="posSearch" type="search" data-k="posSearch" placeholder="Buscar posición o artículo…" value="' + U.esc(ui.busquedaPos || '') + '">' +
       '<div class="spacer"></div>' +
       '<button class="btn" id="posExport">Exportar plantilla</button>' +
       '<button class="btn" id="posImport">Importar completada</button>' +
       '<input type="file" id="posFile" accept=".xlsx,.xls,.csv" hidden>' +
-      '<span class="muted small">' + vis.length + ' filas</span>' +
+      '<span class="muted small" id="posCount"></span>' +
       '</div>';
 
     /* Sin sesión los campos salen `disabled` y no hay nada que lo explique:
@@ -901,10 +899,35 @@ VLM.views = (function () {
         '<th class="no-sort t-num">Stock</th>' +
         '<th class="no-sort t-num">Mínimo</th><th class="no-sort t-num">Máximo</th>' +
         '<th class="no-sort">Estado</th>' +
-      '</tr></thead><tbody>';
+      '</tr></thead><tbody id="posBody"></tbody></table></div>';
 
+    el.innerHTML = html;
+    pintarPosiciones(el, filas, cfg);
+
+    const buscar = $('#posSearch', el);
+    const repintar = U.debounce(() => {
+      if (buscar.isConnected) pintarPosiciones(el, filas, cfg);
+    }, 180);
+    buscar.addEventListener('input', () => {
+      VLM.store.setUi({ busquedaPos: buscar.value }, true);
+      repintar();
+    });
+    $('#posExport', el).addEventListener('click', () => exportarPosiciones(filas));
+    $('#posImport', el).addEventListener('click', () => $('#posFile', el).click());
+    $('#posFile', el).addEventListener('change', e => {
+      if (e.target.files[0]) importarPosiciones(e.target.files[0]);
+    });
+  }
+
+  function pintarPosiciones(el, filas, cfg) {
+    const q = U.norm(VLM.store.state.ui.busquedaPos || '');
+    const vis = q
+      ? filas.filter(f => U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion).indexOf(q) > -1)
+      : filas;
+
+    let html = '';
     if (!vis.length) {
-      html += '<tr><td colspan="8"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
+      html = '<tr><td colspan="8"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
     } else {
       vis.forEach(f => {
         let est = '', clase = '';
@@ -938,17 +961,12 @@ VLM.views = (function () {
           '</tr>';
       });
     }
-    html += '</tbody></table></div>';
 
-    el.innerHTML = html;
+    const cuerpo = $('#posBody', el);
+    cuerpo.innerHTML = html;
+    $('#posCount', el).textContent = vis.length + ' filas';
 
-    $('#posSearch', el).addEventListener('input', U.debounce(e => {
-      VLM.store.setUi({ busquedaPos: e.target.value });
-    }, 220));
-    // al editar se re-asocia al artículo que ocupa la posición ahora
-    U.$$('.pos-inp', el).forEach(inp => {
-      // un clic selecciona lo que ya está: se carga escribiendo el número
-      // nuevo encima, sin tener que borrar antes
+    U.$$('.pos-inp', cuerpo).forEach(inp => {
       inp.addEventListener('focus', () => inp.select());
       inp.addEventListener('change', () => {
         const v = parseInt(inp.value, 10);
@@ -956,15 +974,10 @@ VLM.views = (function () {
           { [inp.dataset.campo]: isFinite(v) && v > 0 ? v : 0 }, inp.dataset.art);
       });
     });
-    U.$$('.pos-ok', el).forEach(b => b.addEventListener('click', () => {
+    U.$$('.pos-ok', cuerpo).forEach(b => b.addEventListener('click', () => {
       VLM.store.setPosicion(b.dataset.ubic, {}, b.dataset.art);
       U.toast('Confirmado para el artículo nuevo', 'ok');
     }));
-    $('#posExport', el).addEventListener('click', () => exportarPosiciones(filas));
-    $('#posImport', el).addEventListener('click', () => $('#posFile', el).click());
-    $('#posFile', el).addEventListener('change', e => {
-      if (e.target.files[0]) importarPosiciones(e.target.files[0]);
-    });
   }
 
   /**
