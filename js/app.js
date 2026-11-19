@@ -1411,11 +1411,13 @@ VLM.app = (function () {
       }
       const s = await N.bajarStock();
       if (s && s.productos && s.productos.length) {
-        const productos = s.productos.map(p => VLM.labs.clasificar(S.hidratarFechas(p), S.state.labs));
+        const productos = s.productos.map(p => S.hidratarFechas(p));
+        P.reaplicarReglas(productos, S.state.labs);
+        P.aplicarPosiciones(productos, S.state.posiciones);
         S.setProductos(productos, Object.assign({}, s.meta, {
           deNube: true, subidoPor: s.por, subidoEn: s.actualizado
         }));
-        if (!silencioso) U.toast('Traído el stock: ' + productos.length + ' productos', 'ok');
+        if (!silencioso) U.toast('Traído el stock: ' + productos.filter(p => p.ambito === 'vlm').length + ' productos', 'ok');
       } else if (!silencioso) {
         U.toast('No hay stock cargado en la base todavía');
       }
