@@ -188,11 +188,14 @@ reconocen solos por la forma de la posición:
 
 Las de tránsito, packing, staging, rotura o picking de pasillo (`SPP`, `PACK`, `STAGE`,
 `ROTDEP…`, `BIOCAM…`, `P…`, `C…`) no son numéricas, así que no hace falta listarlas: quedan
-afuera solas. Tampoco cuenta una posición escrita distinto, como `VLMVENT01` sin la A.
+afuera solas.
 
-Si a una posición numérica le falta el último dígito, la app se lo completa con un cero:
-`10501910` se lee como `105019100`. Sólo se completa cuando son 8 dígitos exactos; el
-resto se deja como viene.
+Dos errores de tipeo de SCE se corrigen al leer:
+- `VLMVENT01`, sin la A, se lee como `VLMVENTA01`: el VLM la toma como propia, así que su
+  stock se suma al de la torre.
+- Si a una posición numérica le falta el último dígito, se completa con un cero:
+  `10501910` se lee como `105019100`. Sólo cuando son 8 dígitos exactos; el resto se deja
+  como viene.
 
 ### Adentro del VLM la ubicación no distingue nada
 

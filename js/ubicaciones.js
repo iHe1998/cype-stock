@@ -7,6 +7,7 @@ VLM.ubicaciones = (function () {
   function normalizar(ubicacion) {
     const u = String(ubicacion == null ? '' : ubicacion).trim();
     if (/^\d{8}$/.test(u)) return u + '0';
+    if (/^VLMVENT\d/i.test(u)) return 'VLMVENTA' + u.slice(7);
     return u;
   }
 

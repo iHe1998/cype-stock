@@ -283,6 +283,7 @@ VLM.parser = (function () {
         const todas = (p.detalle || []).concat(p.detalleIgnorado || []);
         const activas = [], fuera = [];
         todas.forEach(d => {
+          d.ubicacion = VLM.ubicaciones.normalizar(d.ubicacion);
           const r = VLM.ubicaciones.evaluar(d.ubicacion);
           (r && r.accion === 'ignorar' ? fuera : activas).push(d);
         });
