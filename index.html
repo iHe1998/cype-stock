@@ -64,12 +64,6 @@
 
 <!-- ============ FILTRO GLOBAL ÁMBITO / CONSERVACIÓN ============ -->
 <div class="zonebar" id="zonebar" hidden>
-  <div class="seg" data-key="filtroAmbito">
-    <button class="seg-btn is-active" data-val="">Todo</button>
-    <button class="seg-btn" data-val="vlm">VLM</button>
-    <button class="seg-btn" data-val="externo">Picking</button>
-  </div>
-  <span class="zonebar-sep"></span>
   <div class="seg" data-key="filtroZona">
     <button class="seg-btn is-active" data-val="">Todas</button>
     <button class="seg-btn sg-frio" data-val="frio">❄ Cámara de frío</button>
@@ -354,9 +348,8 @@
           <header class="cfg-sec-head">
             <h3>Laboratorios</h3>
             <p>Acá se define <strong>cuáles</strong> se procesan y cómo se llaman, nada más. Si el
-              artículo está en el VLM o en Picking, y si es frío o ambiente, lo decide
-              <strong>cada SKU según sus ubicaciones</strong>: un mismo laboratorio tiene artículos
-              de los dos tipos.</p>
+              artículo es frío o ambiente lo decide <strong>cada SKU según su posición en el
+              VLM</strong>: un mismo laboratorio tiene artículos de los dos tipos.</p>
           </header>
           <div class="cfg-grupo">
             <div class="labs-editor" id="labsEditor"></div>

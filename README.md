@@ -6,7 +6,7 @@ vea de un vistazo qué hay que reponer.
 
 - 📊 Gráficos de stock por estado y por laboratorio
 - 🏭 Catálogo cerrado de **laboratorios**, con los de fuera separados y contados
-- ❄️ Separa **cámara de frío** (2-8 °C) de **ambiente**, y **dentro** de **fuera del VLM**
+- ❄️ **Sólo el VLM** (`VLMVENTA01` y `VLMVENTA02`), separado en **cámara de frío** (2-8 °C) y **ambiente**
 - 🔴 Marca las posiciones **próximas a vaciarse** por porcentaje de su capacidad
 - 📦 Dice **de qué posición de altura bajar**, cruzando artículo, lote y Atributo02
 - 📺 **Modo TV**: pantallas rotativas a gran escala
@@ -120,13 +120,15 @@ pantalla inicial podés **descargar la plantilla en `.xlsx`**.
 
 ## Laboratorios, ámbito y conservación
 
-Los productos se clasifican en dos dimensiones independientes, que se combinan
-en cuatro cuadrantes: **VLM · Frío**, **VLM · Ambiente**, **Picking · Frío**, **Picking · Ambiente**.
-La barra superior filtra por cualquiera de las dos, más un tercer filtro por
-**laboratorio**, y los tres afectan a todas las vistas — el resumen y sus gráficos
-incluidos, así que se puede mirar el panel de un solo laboratorio. El desplegable muestra
-cuántos SKU tiene cada uno y se pinta cuando hay uno elegido, para que no se lea el panel
-creyendo que se ve el depósito entero.
+El panel muestra **sólo los artículos del VLM**: los que están en `VLMVENTA01` (cámara de
+frío) o en `VLMVENTA02` (ambiente). Los que se pickean de pasillo quedan afuera con todo su
+stock: no cuentan en los KPIs, los gráficos, las listas, el modo TV ni el buscador. Siguen
+en la planilla y en la base; sólo no se muestran.
+
+La barra superior filtra por **conservación** y por **laboratorio**, y los dos afectan a
+todas las vistas — el resumen y sus gráficos incluidos, así que se puede mirar el panel de
+un solo laboratorio. El desplegable muestra cuántos SKU tiene cada uno y se pinta cuando
+hay uno elegido, para que no se lea el panel creyendo que se ve el VLM entero.
 
 ### El SKU es el que manda
 
@@ -134,8 +136,8 @@ creyendo que se ve el depósito entero.
 este orden:
 
 1. **¿El SKU aparece en alguna posición `VLMVENTA*`?** Si sí, es del VLM. Si no, es de
-   afuera. AstraZeneca tiene artículos de los dos tipos, así que preguntárselo al
-   laboratorio da la respuesta equivocada para la mitad.
+   afuera y no se muestra. AstraZeneca tiene artículos de los dos tipos, así que
+   preguntárselo al laboratorio da la respuesta equivocada para la mitad.
 2. **Recién ahí se leen sus otras ubicaciones**, y significan cosas distintas según lo
    anterior:
 
@@ -149,7 +151,7 @@ que se sirve, y en uno del VLM es con lo que se rellena la torre. Sin la distinc
 artículo del VLM mostraba un picking de pasillo que nadie usa.
 
 > **Ejemplo real.** `4002905XAR` está en `VLMVENTA02` con 120 unidades, y además tiene
-> `005023300` y `004023200`. Queda como **VLM · Ambiente**, con 120 en picking y el resto
+> `005023300` y `004023200`. Queda como **VLM · Ambiente**, con 120 en el VLM y el resto
 > como reserva — y esas dos posiciones aparecen en la lista de reposición como el lugar de
 > donde bajar la mercadería.
 
@@ -238,12 +240,10 @@ en bandejas separadas: el sistema no las distingue. Por eso, adentro del VLM el 
 es el **artículo**, no la posición — y de ahí sale el gráfico principal del resumen, que
 es stock por artículo.
 
-**Picking y altura** se separan por producto. Todos los KPIs y gráficos muestran
-**sólo el stock en posiciones de picking**: es lo que se sirve y lo que hay que vigilar.
-Si se sumara la reserva de altura, un artículo con la posición casi vacía y un pallet
-arriba se vería sano. En el export de pasillo que se usó de prueba son 64.917 unidades en
-picking contra 238.321 en altura — el 79% del total es reserva que no se pickea. Adentro
-del VLM no hay altura: todo lo que está en la torre se pickea.
+**El VLM y su reserva** se separan por producto. Todos los KPIs y gráficos muestran
+**sólo el stock adentro de la torre**: es lo que se sirve y lo que hay que vigilar. Si se
+sumara la reserva de pasillo y de altura, un artículo con la torre casi vacía y un pallet
+arriba se vería sano.
 
 La altura sigue estando donde sirve: la tabla de inventario tiene las dos columnas y la
 lista de reposición dice de qué posiciones bajar.
@@ -258,7 +258,7 @@ tener regla de zona) tapaba a las posiciones de picking.
 
 ## Posiciones: mínimo y máximo
 
-La pestaña **Posiciones** lista una fila por **posición de picking + artículo** con su
+La pestaña **Posiciones** lista una fila por **posición del VLM + artículo** con su
 stock y el **mínimo** y el **máximo** editables ahí mismo. El
 **máximo** es el que manda: de él salen los umbrales de crítico y bajo, y el porcentaje de
 llenado que muestra cada fila. Se guardan solos y se aplican al instante, sin reimportar.
@@ -266,17 +266,14 @@ llenado que muestra cada fila. Se guardan solos y se aplican al instante, sin re
 **La reserva no se configura ni se grafica.** Un mínimo y un máximo dicen cuándo rellenar
 una posición y cuánto entra; de la altura —y del pasillo que abastece al VLM— no se
 rellena nada, se saca. Esas filas no aparecen en la pestaña, que si no serían la mayoría y
-taparían las que sí hay que cargar. Un artículo que existe **sólo** en reserva tampoco
-entra en el gráfico: no tiene nada que reponer y sería una barra en cero. El resumen dice
-cuántos son, para que no desaparezcan en silencio.
+taparían las que sí hay que cargar.
 
 La reserva sigue viéndose donde sirve: en el detalle del artículo y en la lista de
 reposición, que dice de qué posición bajar la mercadería.
 
-La clave es posición **más** artículo, no la posición sola. Afuera del VLM cada posición
-de picking tiene un artículo y da lo mismo, pero adentro de la torre todos comparten
-`VLMVENTA01` o `VLMVENTA02`: con la posición sola, cargar un máximo lo cargaría para los
-cientos de artículos que viven ahí.
+La clave es posición **más** artículo, no la posición sola: adentro de la torre todos
+comparten `VLMVENTA01` o `VLMVENTA02`, y con la posición sola cargar un máximo lo cargaría
+para los cientos de artículos que viven ahí.
 
 Un artículo puede estar en varias posiciones. En ese caso **hereda el estado de su peor
 posición**, no del promedio: se repone posición por posición, y una que está por vaciarse

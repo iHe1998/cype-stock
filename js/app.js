@@ -189,15 +189,15 @@ VLM.app = (function () {
       // los que una regla de ignorar dejó sin ninguna posición no existen ni
       // para el panel ni para el buscador: se pidió que no estuvieran
       calculados = A.calcular(S.state.productos, S.state.cfg)
-        .filter(p => !P.estaIgnorado(p));
+        .filter(p => !P.estaIgnorado(p) && p.ambito === 'vlm');
     }
     return calculados;
   }
 
   /**
    * Productos que se muestran: calculados, sin los laboratorios fuera del
-   * catálogo (si así está configurado) y filtrados por ámbito, conservación
-   * y laboratorio.
+   * catálogo (si así está configurado) y filtrados por conservación y
+   * laboratorio.
    *
    * @param sinLab deja afuera el filtro de laboratorio. Lo usa la propia barra
    *   para armar su desplegable: si se filtrara, quedaría una sola opción y no
@@ -208,18 +208,9 @@ VLM.app = (function () {
     let items = itemsCalculados();
     const cfg = S.state.cfg;
 
-    /* Fuera los que no tienen ninguna posición de picking.
-
-       Son SKU que están sólo en los racks, sin lugar asignado en el piso. El
-       panel es sobre qué reponer en picking, y de esos no hay nada que
-       reponer: no se les carga máximo, así que caían todos en «sin datos» y
-       ensuciaban los gráficos y el inventario con filas que nunca van a
-       cambiar de estado. Se los sigue encontrando desde el buscador. */
-    items = items.filter(p => !p.sinPicking);
-
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
     items = A.filtrarPorZona(items, ui);
-    // el laboratorio es un filtro global como los otros dos: afecta al resumen
+    // el laboratorio es un filtro global como el de conservación: afecta al resumen
     // y a sus gráficos, no sólo a las listas
     if (!sinLab && ui.filtroLab) {
       items = items.filter(p => (p.labNombre || p.laboratorio) === ui.filtroLab);
@@ -412,10 +403,10 @@ VLM.app = (function () {
     }
     sel.classList.toggle('is-active', !!ui.filtroLab);
 
-    const total = S.state.productos.length;
+    const universo = itemsCalculados();
     const excluidos = S.state.cfg.labsNoListados === 'excluir'
-      ? S.state.productos.filter(p => !p.gestionado).length : 0;
-    let txt = items.length + ' de ' + total + ' productos';
+      ? universo.filter(p => !p.gestionado).length : 0;
+    let txt = items.length + ' de ' + universo.length + ' productos';
     if (excluidos) txt += ' · ' + excluidos + ' fuera del catálogo de laboratorios';
     $('#zoneCount').textContent = txt;
   }
@@ -431,7 +422,7 @@ VLM.app = (function () {
     const edad = Date.now() - (meta.importadoEn || 0);
     dot.className = 'dot ' + (edad > 12 * 3600e3 ? 'stale' : 'live');
     txt.innerHTML = U.esc(meta.archivo || 'datos') + ' · ' +
-      S.state.productos.length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
+      itemsCalculados().length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
   }
 
   function irA(vista) {

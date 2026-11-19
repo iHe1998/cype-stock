@@ -201,15 +201,6 @@
 /* los títulos de sección eran gris claro y se perdían contra la página */
 [data-theme="light"] .section-title { color: var(--text-2); font-weight: 700; }
 
-/* Las tarjetas de fuera del VLM venían con un velo encima para distinguirse.
-   El borde punteado ya las distingue; el velo sólo las ensuciaba. */
-[data-theme="light"] .zona-card.zc-externo { opacity: 1; }
-[data-theme="light"] .zchip.a-externo {
-  color: var(--text-2);
-  background: var(--surface-3);
-  border-color: var(--border);
-}
-
 * { box-sizing: border-box; }
 
 /* El navegador oculta lo que tiene [hidden] desde SU hoja de estilos, que pierde
@@ -388,7 +379,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .seg-btn.sg-frio.is-active { color: var(--frio); background: var(--frio-dim); }
 .seg-btn.sg-amb.is-active  { color: var(--ambiente); background: var(--ambiente-dim); }
 
-/* chips de zona y ámbito */
+/* chips de zona */
 .zchip {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 10.5px; font-weight: 650;
@@ -398,8 +389,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 }
 .zchip.z-frio     { color: var(--frio);     background: var(--frio-dim);     border-color: color-mix(in srgb, var(--frio) 30%, transparent); }
 .zchip.z-ambiente { color: var(--ambiente); background: var(--ambiente-dim); border-color: color-mix(in srgb, var(--ambiente) 30%, transparent); }
-.zchip.a-vlm      { color: var(--accent);   background: var(--accent-dim);   border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
-.zchip.a-externo  { color: var(--muted);    background: var(--surface-3);    border-color: var(--border); }
 
 /* tarjetas de cuadrante en el resumen */
 .zona-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
@@ -410,7 +399,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   box-shadow: var(--shadow);
 }
 .zona-card.zc-ambiente { border-top-color: var(--ambiente); }
-.zona-card.zc-externo { opacity: .92; border-style: dashed; }
 .zona-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .zona-card-name { font-size: 13px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
 .zona-card-nums { display: flex; gap: 18px; margin-bottom: 10px; }

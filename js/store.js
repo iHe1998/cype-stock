@@ -52,7 +52,6 @@ VLM.store = (function () {
       vista: 'dashboard',
       filtroLab: null,
       filtroEstado: null,
-      filtroAmbito: null,   // 'vlm' | 'externo' | null (todos)
       filtroZona: null,     // 'frio' | 'ambiente' | null (todas)
       busquedaPos: '',
       busqueda: '',

@@ -232,14 +232,14 @@ VLM.tv = (function () {
 
     el.innerHTML =
       '<div class="tv-kpis">' +
-        tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en picking') +
+        tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en el VLM') +
         tvKpi('A reponer YA', U.fmt(res.aReponer), res.porEstado.agotado + ' agotados', res.aReponer ? 'k-crit' : 'k-ok') +
         tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), 'bajo el ' + cfg.pctBajo + '% de su capacidad', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
         tvKpi('En altura', U.fmtCompact(res.unidadesAltura), 'reserva para rellenar') +
       '</div>' +
       '<div class="tv-split">' +
         '<div class="tv-panel"><h3>Estado del stock</h3><div class="tv-chart"><canvas id="tvChEstados"></canvas></div></div>' +
-        '<div class="tv-panel"><h3>Stock en picking por laboratorio</h3><div class="tv-chart"><canvas id="tvChLabs"></canvas></div></div>' +
+        '<div class="tv-panel"><h3>Stock en el VLM por laboratorio</h3><div class="tv-chart"><canvas id="tvChLabs"></canvas></div></div>' +
       '</div>';
 
     C.estados($('#tvChEstados', el), res, true);
@@ -309,7 +309,7 @@ VLM.tv = (function () {
     el.innerHTML =
       '<h2>' + o.titulo + '</h2>' +
       '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
-        tvKpi(o.kpiSkus, U.fmt(res.skus), U.fmtCompact(res.unidades) + ' u. en picking') +
+        tvKpi(o.kpiSkus, U.fmt(res.skus), U.fmtCompact(res.unidades) + ' u. en el VLM') +
         tvKpi('En alerta', U.fmt(res.enAlerta),
               res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
               res.enAlerta ? 'k-crit' : 'k-ok') +
@@ -339,7 +339,7 @@ VLM.tv = (function () {
   function slideLabs(el, items, cfg) {
     const labs = A.porLaboratorio(items, cfg).slice(0, 8);
     el.innerHTML =
-      '<h2>Stock en picking por laboratorio</h2>' +
+      '<h2>Stock en el VLM por laboratorio</h2>' +
       '<div class="tv-labs">' + labs.map(l => {
         const r = l.resumen;
         return '<div class="tv-lab">' +

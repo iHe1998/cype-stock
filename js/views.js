@@ -11,16 +11,6 @@ VLM.views = (function () {
 
   /* ---------- fragmentos reutilizables ---------- */
 
-  /**
-   * Artículos que están sólo en los racks, sin ninguna posición de picking.
-   * Quedan afuera del panel (ver app.itemsVisibles) pero existen, así que se
-   * dicen: si no, faltan unidades contra la planilla y no se entiende por qué.
-   */
-  function contarSoloReserva() {
-    return VLM.store.state.productos.filter(p =>
-      p.sinPicking && !VLM.parser.estaIgnorado(p)).length;
-  }
-
   function badge(estado) {
     const e = A.ESTADOS[estado] || A.ESTADOS.sd;
     return '<span class="badge b-' + estado + '">' + e.label + '</span>';
@@ -33,24 +23,16 @@ VLM.views = (function () {
     return '<span class="zchip z-' + zona + '" title="' + z.desc + '">' + z.icono + ' ' + z.corto + '</span>';
   }
 
-  /** Chip de ámbito (VLM / Picking). */
-  function achip(ambito) {
-    const a = VLM.labs.AMBITOS[ambito];
-    if (!a) return '';
-    return '<span class="zchip a-' + ambito + '" title="' + a.desc + '">' + a.corto + '</span>';
-  }
-
   /** Tarjeta de cuadrante para el resumen. */
   function zonaCard(g) {
     const r = g.resumen;
-    return '<div class="zona-card zc-' + g.zona + (g.ambito === 'externo' ? ' zc-externo' : '') + '">' +
+    return '<div class="zona-card zc-' + g.zona + '">' +
       '<div class="zona-card-top">' +
         '<div class="zona-card-name">' + g.icono + ' ' + VLM.labs.ZONAS[g.zona].label + '</div>' +
-        achip(g.ambito) +
       '</div>' +
       '<div class="zona-card-nums">' +
         '<div><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
-        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>en picking</span></div>' +
+        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>unidades</span></div>' +
         '<div class="' + (g.alerta ? 'n-alerta' : '') + '"><b>' + U.fmt(g.alerta) + '</b><span>en alerta</span></div>' +
       '</div>' +
       stackbar(r) +
@@ -101,7 +83,7 @@ VLM.views = (function () {
     /* --- KPIs --- */
     html += '<div class="kpi-grid">' +
       kpi('Productos (SKU)', U.fmt(res.skus),
-          res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades en picking') +
+          res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades en el VLM') +
       kpi('A reponer ya', U.fmt(res.aReponer),
           'por debajo del ' + cfg.pctCritico + '% · ' + res.porEstado.agotado + ' agotados',
           res.aReponer > 0 ? 'k-crit' : 'k-ok') +
@@ -121,7 +103,7 @@ VLM.views = (function () {
     html += '<h3 class="section-title">Situación del stock</h3>';
     html += '<div class="grid grid-2">' +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
-      cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
+      cardChart('Stock en el VLM por laboratorio', 'unidades', 'chLabStock', 300) +
       '</div>';
 
     /* --- posiciones sin configurar: sin máximo no hay alerta posible --- */
@@ -394,13 +376,13 @@ VLM.views = (function () {
         '<div class="repo-meta">' +
           '<span>' + U.esc(p.codigo) + '</span>' +
           '<span>' + U.esc(p.labNombre || p.laboratorio) + '</span>' +
-          '<span>' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</span>' +
+          '<span>' + zchip(p.conservacion) + '</span>' +
           (p.peorPosicion ? '<span>📍 <strong>' + U.esc(p.peorPosicion) + '</strong></span>'
             : p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
         '</div>' +
       '</div>' +
       '<div class="repo-metric"><b>' + U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock) +
-        '</b><span>en picking</span></div>' +
+        '</b><span>en el VLM</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + pct + '</b><span>de su capacidad</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
@@ -431,7 +413,7 @@ VLM.views = (function () {
 
     let html = '<div class="art-head">' +
       '<div><span class="t-code">' + U.esc(p.codigo) + '</span> ' +
-        badge(p.estado) + ' ' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</div>' +
+        badge(p.estado) + ' ' + zchip(p.conservacion) + '</div>' +
       '<div class="muted small">' + U.esc(p.labNombre || p.laboratorio) +
         (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</div>' +
       (function () {
@@ -553,14 +535,13 @@ VLM.views = (function () {
   function exportarRepo(lista, cfg) {
     if (!lista.length) { U.toast('No hay nada para exportar', 'err'); return; }
     const filas = [[
-      'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ambito', 'Ubicacion', 'Estado',
-      'Stock en picking', 'Minimo', 'Maximo', 'Porcentaje de llenado',
+      'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ubicacion', 'Estado',
+      'Stock en VLM', 'Minimo', 'Maximo', 'Porcentaje de llenado',
       'Stock en altura', 'Unidades a reponer'
     ]];
     lista.forEach(p => filas.push([
       p.codigo, p.descripcion, p.labNombre || p.laboratorio,
       VLM.labs.ZONAS[p.conservacion] ? VLM.labs.ZONAS[p.conservacion].label : '',
-      VLM.labs.AMBITOS[p.ambito] ? VLM.labs.AMBITOS[p.ambito].label : '',
       p.ubicacion,
       A.ESTADOS[p.estado].label,
       p.stockPicking !== undefined ? p.stockPicking : p.stock,
@@ -582,10 +563,9 @@ VLM.views = (function () {
     { id: 'descripcion',   label: 'Producto',  clase: 't-desc' },
     { id: 'labNombre',     label: 'Laboratorio' },
     { id: 'conservacion',  label: 'Conserv.' },
-    { id: 'ambito',        label: 'Ámbito' },
     { id: 'ubicacion',     label: 'Ubicación', clase: 't-code' },
     { id: 'stock',         label: 'Stock',     num: true },
-    { id: 'stockPicking',  label: 'Picking',   num: true },
+    { id: 'stockPicking',  label: 'VLM',       num: true },
     { id: 'stockAltura',   label: 'Altura',    num: true },
     { id: 'stockMin',      label: 'Mínimo',    num: true },
     { id: 'stockMax',      label: 'Máximo',    num: true },
@@ -615,17 +595,6 @@ VLM.views = (function () {
       '<span class="muted small" id="invCount"></span>' +
       '</div>' +
       '<div class="table-wrap"><table class="table" id="invTable"></table></div>';
-
-    /* Los de pura reserva no se listan: sin posición de picking no hay estado
-       que mostrar. Pero son stock que existe, así que se dice cuántos son y
-       dónde buscarlos, en vez de que falten y nadie sepa por qué. */
-    const soloReserva = contarSoloReserva();
-    if (soloReserva) {
-      html += '<p class="muted small" style="margin-top:10px">' +
-        U.fmt(soloReserva) + ' artículo(s) están sólo en reserva, sin posición de picking, ' +
-        'y no se listan acá: no hay nada que reponer. Se encuentran desde el buscador ' +
-        '(<kbd>Ctrl</kbd>+<kbd>K</kbd>).</p>';
-    }
 
     el.innerHTML = html;
     pintarTabla(el, items, cfg);
@@ -687,7 +656,6 @@ VLM.views = (function () {
           '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.labNombre || p.laboratorio) + '"></i> ' +
             U.esc(p.labNombre || p.laboratorio) + '</td>' +
           '<td>' + zchip(p.conservacion) + '</td>' +
-          '<td>' + achip(p.ambito) + '</td>' +
           '<td class="t-code">' + U.esc(p.ubicacion || '—') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(p.stock) + '</strong></td>' +
           '<td class="t-num">' + (p.stockPicking === undefined ? '—'
@@ -786,7 +754,7 @@ VLM.views = (function () {
     const configuradas = filas.filter(f => f.min || f.max).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-      kpi('Posiciones de picking', U.fmt(filas.length),
+      kpi('Posiciones del VLM', U.fmt(filas.length),
           enReserva ? U.fmt(enReserva) + ' de reserva, que no se configuran' : 'una fila por artículo') +
       kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
@@ -1004,7 +972,7 @@ VLM.views = (function () {
 
   return {
     dashboard, reposicion, inventario, posiciones, detalleArticulo,
-    badge, zchip, achip, kpi, stackbar, zonaCard, repoItem,
+    badge, zchip, kpi, stackbar, zonaCard, repoItem,
     exportarRepo, exportarMaximos
   };
 })();

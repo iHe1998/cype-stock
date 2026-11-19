@@ -237,13 +237,9 @@ VLM.analytics = (function () {
     });
   }
 
-  /** Aplica los filtros globales de ámbito y conservación. */
+  /** Aplica el filtro global de conservación. */
   function filtrarPorZona(items, ui) {
-    return items.filter(p => {
-      if (ui.filtroAmbito && p.ambito !== ui.filtroAmbito) return false;
-      if (ui.filtroZona && p.conservacion !== ui.filtroZona) return false;
-      return true;
-    });
+    return items.filter(p => !ui.filtroZona || p.conservacion === ui.filtroZona);
   }
 
   /** Top N por urgencia (los que hay que reponer primero). */

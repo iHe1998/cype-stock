@@ -210,15 +210,6 @@
 /* los títulos de sección eran gris claro y se perdían contra la página */
 [data-theme="light"] .section-title { color: var(--text-2); font-weight: 700; }
 
-/* Las tarjetas de fuera del VLM venían con un velo encima para distinguirse.
-   El borde punteado ya las distingue; el velo sólo las ensuciaba. */
-[data-theme="light"] .zona-card.zc-externo { opacity: 1; }
-[data-theme="light"] .zchip.a-externo {
-  color: var(--text-2);
-  background: var(--surface-3);
-  border-color: var(--border);
-}
-
 * { box-sizing: border-box; }
 
 /* El navegador oculta lo que tiene [hidden] desde SU hoja de estilos, que pierde
@@ -397,7 +388,7 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .seg-btn.sg-frio.is-active { color: var(--frio); background: var(--frio-dim); }
 .seg-btn.sg-amb.is-active  { color: var(--ambiente); background: var(--ambiente-dim); }
 
-/* chips de zona y ámbito */
+/* chips de zona */
 .zchip {
   display: inline-flex; align-items: center; gap: 4px;
   font-size: 10.5px; font-weight: 650;
@@ -407,8 +398,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 }
 .zchip.z-frio     { color: var(--frio);     background: var(--frio-dim);     border-color: color-mix(in srgb, var(--frio) 30%, transparent); }
 .zchip.z-ambiente { color: var(--ambiente); background: var(--ambiente-dim); border-color: color-mix(in srgb, var(--ambiente) 30%, transparent); }
-.zchip.a-vlm      { color: var(--accent);   background: var(--accent-dim);   border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
-.zchip.a-externo  { color: var(--muted);    background: var(--surface-3);    border-color: var(--border); }
 
 /* tarjetas de cuadrante en el resumen */
 .zona-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
@@ -419,7 +408,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
   box-shadow: var(--shadow);
 }
 .zona-card.zc-ambiente { border-top-color: var(--ambiente); }
-.zona-card.zc-externo { opacity: .92; border-style: dashed; }
 .zona-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .zona-card-name { font-size: 13px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
 .zona-card-nums { display: flex; gap: 18px; margin-bottom: 10px; }
@@ -1617,12 +1605,6 @@ kbd {
 
 <!-- ============ FILTRO GLOBAL ÁMBITO / CONSERVACIÓN ============ -->
 <div class="zonebar" id="zonebar" hidden>
-  <div class="seg" data-key="filtroAmbito">
-    <button class="seg-btn is-active" data-val="">Todo</button>
-    <button class="seg-btn" data-val="vlm">VLM</button>
-    <button class="seg-btn" data-val="externo">Picking</button>
-  </div>
-  <span class="zonebar-sep"></span>
   <div class="seg" data-key="filtroZona">
     <button class="seg-btn is-active" data-val="">Todas</button>
     <button class="seg-btn sg-frio" data-val="frio">❄ Cámara de frío</button>
@@ -1907,9 +1889,8 @@ kbd {
           <header class="cfg-sec-head">
             <h3>Laboratorios</h3>
             <p>Acá se define <strong>cuáles</strong> se procesan y cómo se llaman, nada más. Si el
-              artículo está en el VLM o en Picking, y si es frío o ambiente, lo decide
-              <strong>cada SKU según sus ubicaciones</strong>: un mismo laboratorio tiene artículos
-              de los dos tipos.</p>
+              artículo es frío o ambiente lo decide <strong>cada SKU según su posición en el
+              VLM</strong>: un mismo laboratorio tiene artículos de los dos tipos.</p>
           </header>
           <div class="cfg-grupo">
             <div class="labs-editor" id="labsEditor"></div>
@@ -2004,7 +1985,7 @@ kbd {
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 19/11/2026 18:51 (sobre c5ce637)</span>
+      <span class="muted small" id="appVersion">compilado 19/11/2026 19:14 (sobre 3304344)</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -3145,7 +3126,6 @@ VLM.store = (function () {
       vista: 'dashboard',
       filtroLab: null,
       filtroEstado: null,
-      filtroAmbito: null,   // 'vlm' | 'externo' | null (todos)
       filtroZona: null,     // 'frio' | 'ambiente' | null (todas)
       busquedaPos: '',
       busqueda: '',
@@ -5185,13 +5165,9 @@ VLM.analytics = (function () {
     });
   }
 
-  /** Aplica los filtros globales de ámbito y conservación. */
+  /** Aplica el filtro global de conservación. */
   function filtrarPorZona(items, ui) {
-    return items.filter(p => {
-      if (ui.filtroAmbito && p.ambito !== ui.filtroAmbito) return false;
-      if (ui.filtroZona && p.conservacion !== ui.filtroZona) return false;
-      return true;
-    });
+    return items.filter(p => !ui.filtroZona || p.conservacion === ui.filtroZona);
   }
 
   /** Top N por urgencia (los que hay que reponer primero). */
@@ -5398,16 +5374,6 @@ VLM.views = (function () {
 
   /* ---------- fragmentos reutilizables ---------- */
 
-  /**
-   * Artículos que están sólo en los racks, sin ninguna posición de picking.
-   * Quedan afuera del panel (ver app.itemsVisibles) pero existen, así que se
-   * dicen: si no, faltan unidades contra la planilla y no se entiende por qué.
-   */
-  function contarSoloReserva() {
-    return VLM.store.state.productos.filter(p =>
-      p.sinPicking && !VLM.parser.estaIgnorado(p)).length;
-  }
-
   function badge(estado) {
     const e = A.ESTADOS[estado] || A.ESTADOS.sd;
     return '<span class="badge b-' + estado + '">' + e.label + '</span>';
@@ -5420,24 +5386,16 @@ VLM.views = (function () {
     return '<span class="zchip z-' + zona + '" title="' + z.desc + '">' + z.icono + ' ' + z.corto + '</span>';
   }
 
-  /** Chip de ámbito (VLM / Picking). */
-  function achip(ambito) {
-    const a = VLM.labs.AMBITOS[ambito];
-    if (!a) return '';
-    return '<span class="zchip a-' + ambito + '" title="' + a.desc + '">' + a.corto + '</span>';
-  }
-
   /** Tarjeta de cuadrante para el resumen. */
   function zonaCard(g) {
     const r = g.resumen;
-    return '<div class="zona-card zc-' + g.zona + (g.ambito === 'externo' ? ' zc-externo' : '') + '">' +
+    return '<div class="zona-card zc-' + g.zona + '">' +
       '<div class="zona-card-top">' +
         '<div class="zona-card-name">' + g.icono + ' ' + VLM.labs.ZONAS[g.zona].label + '</div>' +
-        achip(g.ambito) +
       '</div>' +
       '<div class="zona-card-nums">' +
         '<div><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
-        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>en picking</span></div>' +
+        '<div><b>' + U.fmtCompact(r.unidades) + '</b><span>unidades</span></div>' +
         '<div class="' + (g.alerta ? 'n-alerta' : '') + '"><b>' + U.fmt(g.alerta) + '</b><span>en alerta</span></div>' +
       '</div>' +
       stackbar(r) +
@@ -5488,7 +5446,7 @@ VLM.views = (function () {
     /* --- KPIs --- */
     html += '<div class="kpi-grid">' +
       kpi('Productos (SKU)', U.fmt(res.skus),
-          res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades en picking') +
+          res.labs + ' laboratorios · ' + U.fmt(res.unidades) + ' unidades en el VLM') +
       kpi('A reponer ya', U.fmt(res.aReponer),
           'por debajo del ' + cfg.pctCritico + '% · ' + res.porEstado.agotado + ' agotados',
           res.aReponer > 0 ? 'k-crit' : 'k-ok') +
@@ -5508,7 +5466,7 @@ VLM.views = (function () {
     html += '<h3 class="section-title">Situación del stock</h3>';
     html += '<div class="grid grid-2">' +
       cardChart('Distribución por estado', res.skus + ' SKU', 'chEstados', 300) +
-      cardChart('Stock en picking por laboratorio', 'unidades', 'chLabStock', 300) +
+      cardChart('Stock en el VLM por laboratorio', 'unidades', 'chLabStock', 300) +
       '</div>';
 
     /* --- posiciones sin configurar: sin máximo no hay alerta posible --- */
@@ -5781,13 +5739,13 @@ VLM.views = (function () {
         '<div class="repo-meta">' +
           '<span>' + U.esc(p.codigo) + '</span>' +
           '<span>' + U.esc(p.labNombre || p.laboratorio) + '</span>' +
-          '<span>' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</span>' +
+          '<span>' + zchip(p.conservacion) + '</span>' +
           (p.peorPosicion ? '<span>📍 <strong>' + U.esc(p.peorPosicion) + '</strong></span>'
             : p.ubicacion ? '<span>📍 ' + U.esc(p.ubicacion) + '</span>' : '') +
         '</div>' +
       '</div>' +
       '<div class="repo-metric"><b>' + U.fmt(p.stockPicking !== undefined ? p.stockPicking : p.stock) +
-        '</b><span>en picking</span></div>' +
+        '</b><span>en el VLM</span></div>' +
       '<div class="repo-metric ' + (p.estado === 'agotado' ? 'm-agotado' : p.estado === 'bajo' ? 'm-warn' : 'm-crit') + '">' +
         '<b>' + pct + '</b><span>de su capacidad</span></div>' +
       '<div class="repo-metric m-accent"><b>+' + U.fmt(p.sugerido) + '</b><span>a reponer</span></div>' +
@@ -5818,7 +5776,7 @@ VLM.views = (function () {
 
     let html = '<div class="art-head">' +
       '<div><span class="t-code">' + U.esc(p.codigo) + '</span> ' +
-        badge(p.estado) + ' ' + zchip(p.conservacion) + ' ' + achip(p.ambito) + '</div>' +
+        badge(p.estado) + ' ' + zchip(p.conservacion) + '</div>' +
       '<div class="muted small">' + U.esc(p.labNombre || p.laboratorio) +
         (p.ubicacion ? ' · 📍 ' + U.esc(p.ubicacion) : '') + '</div>' +
       (function () {
@@ -5940,14 +5898,13 @@ VLM.views = (function () {
   function exportarRepo(lista, cfg) {
     if (!lista.length) { U.toast('No hay nada para exportar', 'err'); return; }
     const filas = [[
-      'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ambito', 'Ubicacion', 'Estado',
-      'Stock en picking', 'Minimo', 'Maximo', 'Porcentaje de llenado',
+      'Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ubicacion', 'Estado',
+      'Stock en VLM', 'Minimo', 'Maximo', 'Porcentaje de llenado',
       'Stock en altura', 'Unidades a reponer'
     ]];
     lista.forEach(p => filas.push([
       p.codigo, p.descripcion, p.labNombre || p.laboratorio,
       VLM.labs.ZONAS[p.conservacion] ? VLM.labs.ZONAS[p.conservacion].label : '',
-      VLM.labs.AMBITOS[p.ambito] ? VLM.labs.AMBITOS[p.ambito].label : '',
       p.ubicacion,
       A.ESTADOS[p.estado].label,
       p.stockPicking !== undefined ? p.stockPicking : p.stock,
@@ -5969,10 +5926,9 @@ VLM.views = (function () {
     { id: 'descripcion',   label: 'Producto',  clase: 't-desc' },
     { id: 'labNombre',     label: 'Laboratorio' },
     { id: 'conservacion',  label: 'Conserv.' },
-    { id: 'ambito',        label: 'Ámbito' },
     { id: 'ubicacion',     label: 'Ubicación', clase: 't-code' },
     { id: 'stock',         label: 'Stock',     num: true },
-    { id: 'stockPicking',  label: 'Picking',   num: true },
+    { id: 'stockPicking',  label: 'VLM',       num: true },
     { id: 'stockAltura',   label: 'Altura',    num: true },
     { id: 'stockMin',      label: 'Mínimo',    num: true },
     { id: 'stockMax',      label: 'Máximo',    num: true },
@@ -6002,17 +5958,6 @@ VLM.views = (function () {
       '<span class="muted small" id="invCount"></span>' +
       '</div>' +
       '<div class="table-wrap"><table class="table" id="invTable"></table></div>';
-
-    /* Los de pura reserva no se listan: sin posición de picking no hay estado
-       que mostrar. Pero son stock que existe, así que se dice cuántos son y
-       dónde buscarlos, en vez de que falten y nadie sepa por qué. */
-    const soloReserva = contarSoloReserva();
-    if (soloReserva) {
-      html += '<p class="muted small" style="margin-top:10px">' +
-        U.fmt(soloReserva) + ' artículo(s) están sólo en reserva, sin posición de picking, ' +
-        'y no se listan acá: no hay nada que reponer. Se encuentran desde el buscador ' +
-        '(<kbd>Ctrl</kbd>+<kbd>K</kbd>).</p>';
-    }
 
     el.innerHTML = html;
     pintarTabla(el, items, cfg);
@@ -6074,7 +6019,6 @@ VLM.views = (function () {
           '<td><i class="lab-swatch" style="display:inline-block;background:' + U.colorDe(p.labNombre || p.laboratorio) + '"></i> ' +
             U.esc(p.labNombre || p.laboratorio) + '</td>' +
           '<td>' + zchip(p.conservacion) + '</td>' +
-          '<td>' + achip(p.ambito) + '</td>' +
           '<td class="t-code">' + U.esc(p.ubicacion || '—') + '</td>' +
           '<td class="t-num"><strong>' + U.fmt(p.stock) + '</strong></td>' +
           '<td class="t-num">' + (p.stockPicking === undefined ? '—'
@@ -6173,7 +6117,7 @@ VLM.views = (function () {
     const configuradas = filas.filter(f => f.min || f.max).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-      kpi('Posiciones de picking', U.fmt(filas.length),
+      kpi('Posiciones del VLM', U.fmt(filas.length),
           enReserva ? U.fmt(enReserva) + ' de reserva, que no se configuran' : 'una fila por artículo') +
       kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
@@ -6391,7 +6335,7 @@ VLM.views = (function () {
 
   return {
     dashboard, reposicion, inventario, posiciones, detalleArticulo,
-    badge, zchip, achip, kpi, stackbar, zonaCard, repoItem,
+    badge, zchip, kpi, stackbar, zonaCard, repoItem,
     exportarRepo, exportarMaximos
   };
 })();
@@ -6632,14 +6576,14 @@ VLM.tv = (function () {
 
     el.innerHTML =
       '<div class="tv-kpis">' +
-        tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en picking') +
+        tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en el VLM') +
         tvKpi('A reponer YA', U.fmt(res.aReponer), res.porEstado.agotado + ' agotados', res.aReponer ? 'k-crit' : 'k-ok') +
         tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), 'bajo el ' + cfg.pctBajo + '% de su capacidad', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
         tvKpi('En altura', U.fmtCompact(res.unidadesAltura), 'reserva para rellenar') +
       '</div>' +
       '<div class="tv-split">' +
         '<div class="tv-panel"><h3>Estado del stock</h3><div class="tv-chart"><canvas id="tvChEstados"></canvas></div></div>' +
-        '<div class="tv-panel"><h3>Stock en picking por laboratorio</h3><div class="tv-chart"><canvas id="tvChLabs"></canvas></div></div>' +
+        '<div class="tv-panel"><h3>Stock en el VLM por laboratorio</h3><div class="tv-chart"><canvas id="tvChLabs"></canvas></div></div>' +
       '</div>';
 
     C.estados($('#tvChEstados', el), res, true);
@@ -6709,7 +6653,7 @@ VLM.tv = (function () {
     el.innerHTML =
       '<h2>' + o.titulo + '</h2>' +
       '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
-        tvKpi(o.kpiSkus, U.fmt(res.skus), U.fmtCompact(res.unidades) + ' u. en picking') +
+        tvKpi(o.kpiSkus, U.fmt(res.skus), U.fmtCompact(res.unidades) + ' u. en el VLM') +
         tvKpi('En alerta', U.fmt(res.enAlerta),
               res.porEstado.agotado + ' agotados · ' + res.porEstado.critico + ' críticos',
               res.enAlerta ? 'k-crit' : 'k-ok') +
@@ -6739,7 +6683,7 @@ VLM.tv = (function () {
   function slideLabs(el, items, cfg) {
     const labs = A.porLaboratorio(items, cfg).slice(0, 8);
     el.innerHTML =
-      '<h2>Stock en picking por laboratorio</h2>' +
+      '<h2>Stock en el VLM por laboratorio</h2>' +
       '<div class="tv-labs">' + labs.map(l => {
         const r = l.resumen;
         return '<div class="tv-lab">' +
@@ -6947,15 +6891,15 @@ VLM.app = (function () {
       // los que una regla de ignorar dejó sin ninguna posición no existen ni
       // para el panel ni para el buscador: se pidió que no estuvieran
       calculados = A.calcular(S.state.productos, S.state.cfg)
-        .filter(p => !P.estaIgnorado(p));
+        .filter(p => !P.estaIgnorado(p) && p.ambito === 'vlm');
     }
     return calculados;
   }
 
   /**
    * Productos que se muestran: calculados, sin los laboratorios fuera del
-   * catálogo (si así está configurado) y filtrados por ámbito, conservación
-   * y laboratorio.
+   * catálogo (si así está configurado) y filtrados por conservación y
+   * laboratorio.
    *
    * @param sinLab deja afuera el filtro de laboratorio. Lo usa la propia barra
    *   para armar su desplegable: si se filtrara, quedaría una sola opción y no
@@ -6966,18 +6910,9 @@ VLM.app = (function () {
     let items = itemsCalculados();
     const cfg = S.state.cfg;
 
-    /* Fuera los que no tienen ninguna posición de picking.
-
-       Son SKU que están sólo en los racks, sin lugar asignado en el piso. El
-       panel es sobre qué reponer en picking, y de esos no hay nada que
-       reponer: no se les carga máximo, así que caían todos en «sin datos» y
-       ensuciaban los gráficos y el inventario con filas que nunca van a
-       cambiar de estado. Se los sigue encontrando desde el buscador. */
-    items = items.filter(p => !p.sinPicking);
-
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
     items = A.filtrarPorZona(items, ui);
-    // el laboratorio es un filtro global como los otros dos: afecta al resumen
+    // el laboratorio es un filtro global como el de conservación: afecta al resumen
     // y a sus gráficos, no sólo a las listas
     if (!sinLab && ui.filtroLab) {
       items = items.filter(p => (p.labNombre || p.laboratorio) === ui.filtroLab);
@@ -7170,10 +7105,10 @@ VLM.app = (function () {
     }
     sel.classList.toggle('is-active', !!ui.filtroLab);
 
-    const total = S.state.productos.length;
+    const universo = itemsCalculados();
     const excluidos = S.state.cfg.labsNoListados === 'excluir'
-      ? S.state.productos.filter(p => !p.gestionado).length : 0;
-    let txt = items.length + ' de ' + total + ' productos';
+      ? universo.filter(p => !p.gestionado).length : 0;
+    let txt = items.length + ' de ' + universo.length + ' productos';
     if (excluidos) txt += ' · ' + excluidos + ' fuera del catálogo de laboratorios';
     $('#zoneCount').textContent = txt;
   }
@@ -7189,7 +7124,7 @@ VLM.app = (function () {
     const edad = Date.now() - (meta.importadoEn || 0);
     dot.className = 'dot ' + (edad > 12 * 3600e3 ? 'stale' : 'live');
     txt.innerHTML = U.esc(meta.archivo || 'datos') + ' · ' +
-      S.state.productos.length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
+      itemsCalculados().length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
   }
 
   function irA(vista) {
