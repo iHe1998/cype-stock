@@ -9,7 +9,6 @@ VLM.store = (function () {
   const KEY_CFG  = 'vlm.config.v1';
   const KEY_UI   = 'vlm.ui.v1';
   const KEY_LABS = 'vlm.labs.v1';
-  const KEY_UBIC = 'vlm.ubicaciones.v1';
   const KEY_POS  = 'vlm.posiciones.v1';
 
   // Versión del esquema de los datos guardados. Se sube cuando cambia la forma
@@ -45,7 +44,6 @@ VLM.store = (function () {
     },
     cfg: Object.assign({}, CFG_DEFAULT),
     labs: [],           // catálogo de laboratorios (ver labs.js)
-    reglasUbic: [],     // reglas de posición (ver ubicaciones.js)
     posiciones: {},     // UBICACION|ARTICULO -> { min, max } configurados a mano
     ui: {
       tema: 'dark',
@@ -96,16 +94,6 @@ VLM.store = (function () {
     try { localStorage.setItem(KEY_LABS, JSON.stringify(state.labs)); } catch (e) {}
   }
 
-  /* Con la versión adentro: es lo que permite saber si a una lista guardada
-     le faltan reglas porque son nuevas, o porque las borraron a propósito. */
-  function guardarReglasUbic() {
-    try {
-      localStorage.setItem(KEY_UBIC, JSON.stringify({
-        v: VLM.ubicaciones.REGLAS_V, lista: state.reglasUbic
-      }));
-    } catch (e) {}
-  }
-
   function guardarPosiciones() {
     try { localStorage.setItem(KEY_POS, JSON.stringify(state.posiciones)); } catch (e) {}
   }
@@ -135,16 +123,6 @@ VLM.store = (function () {
         ? VLM.labs.migrarCatalogo(labs) : VLM.labs.catalogoDefault();
     } catch (e) {
       state.labs = VLM.labs.catalogoDefault();
-    }
-    try {
-      // las versiones viejas guardaban el arreglo pelado, sin versión
-      const ru = JSON.parse(localStorage.getItem(KEY_UBIC) || 'null');
-      const lista = Array.isArray(ru) ? ru : (ru && ru.lista);
-      const vru = Array.isArray(ru) ? 1 : ((ru && ru.v) || 1);
-      state.reglasUbic = (lista && lista.length)
-        ? VLM.ubicaciones.migrarReglas(lista, vru) : VLM.ubicaciones.reglasDefault();
-    } catch (e) {
-      state.reglasUbic = VLM.ubicaciones.reglasDefault();
     }
     try {
       const pos = JSON.parse(localStorage.getItem(KEY_POS) || 'null');
@@ -215,17 +193,6 @@ VLM.store = (function () {
     setLabs(VLM.labs.catalogoDefault());
   }
 
-  /** Reemplaza las reglas de posición. Se reaplican sobre el stock cargado. */
-  function setReglasUbic(reglas) {
-    state.reglasUbic = reglas;
-    guardarReglasUbic();
-    emit('ubicaciones');
-  }
-
-  function resetReglasUbic() {
-    setReglasUbic(VLM.ubicaciones.reglasDefault());
-  }
-
   /**
    * Configura min/max de una posición.
    *
@@ -289,25 +256,24 @@ VLM.store = (function () {
   function limpiarPosiciones() { setPosiciones({}); }
 
   /**
-   * Lo que se comparte entre PCs además del stock y los máximos: umbrales,
-   * laboratorios y reglas de posición. Se lee y se escribe entero.
+   * Lo que se comparte entre PCs además del stock y los máximos: umbrales y
+   * laboratorios. Se lee y se escribe entero.
    */
   function configCompartida() {
-    return { cfg: state.cfg, labs: state.labs, reglas: state.reglasUbic };
+    return { cfg: state.cfg, labs: state.labs };
   }
 
   /**
    * Aplica de una vez la configuración que vino de la base.
    *
-   * Emite un solo aviso y no tres: cada uno dispara una reclasificación del
-   * stock entero y un redibujado, y hacerlo tres veces seguidas se ve como un
+   * Emite un solo aviso y no dos: cada uno dispara una reclasificación del
+   * stock entero y un redibujado, y hacerlo dos veces seguidas se ve como un
    * parpadeo cada vez que otra PC toca algo.
    */
   function setConfigCompartida(d) {
     if (!d) return;
     if (d.cfg)    { Object.assign(state.cfg, d.cfg); guardarCfg(); }
     if (d.labs && d.labs.length)     { state.labs = d.labs; guardarLabs(); }
-    if (d.reglas && d.reglas.length) { state.reglasUbic = d.reglas; guardarReglasUbic(); }
     emit('compartida');
   }
 
@@ -323,7 +289,7 @@ VLM.store = (function () {
     state, CFG_DEFAULT,
     on, emit, cargar, guardar,
     setProductos, limpiar, setCfg, setUi, setLabs, resetLabs,
-    setReglasUbic, resetReglasUbic, configCompartida, setConfigCompartida,
+    configCompartida, setConfigCompartida,
     setPosicion, setPosiciones, limpiarPosiciones, clavePos, hidratarFechas, hayDatos
   };
 })();

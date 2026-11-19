@@ -283,9 +283,8 @@ VLM.nube = (function () {
   }
 
   /* ---------------- configuración compartida ----------------
-     Reglas de posición, catálogo de laboratorios y umbrales. Deciden lo que
-     ve el panel tanto como el stock: con reglas distintas, dos PCs clasifican
-     el mismo artículo distinto y muestran números que no cierran entre sí.
+     Catálogo de laboratorios y umbrales. Deciden lo que ve el panel tanto
+     como el stock.
 
      Una sola fila, como el stock: se cambia poco y siempre entera. */
 

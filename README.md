@@ -121,9 +121,9 @@ pantalla inicial podés **descargar la plantilla en `.xlsx`**.
 ## Laboratorios, ámbito y conservación
 
 El panel muestra **sólo los artículos del VLM**: los que están en `VLMVENTA01` (cámara de
-frío) o en `VLMVENTA02` (ambiente). Los que se pickean de pasillo quedan afuera con todo su
-stock: no cuentan en los KPIs, los gráficos, las listas, el modo TV ni el buscador. Siguen
-en la planilla y en la base; sólo no se muestran.
+frío) o en `VLMVENTA02` (ambiente). Los demás quedan afuera con todo su stock: al importar
+la planilla no se guardan, así que no cuentan en los KPIs, los gráficos, las listas, el
+modo TV ni el buscador. El aviso de importación dice cuántos fueron.
 
 La barra superior filtra por **conservación** y por **laboratorio**, y los dos afectan a
 todas las vistas — el resumen y sus gráficos incluidos, así que se puede mirar el panel de
@@ -132,23 +132,13 @@ hay uno elegido, para que no se lea el panel creyendo que se ve el VLM entero.
 
 ### El SKU es el que manda
 
-**Ni el ámbito ni la conservación salen del laboratorio.** Se deciden por artículo, en
-este orden:
+**Ni el VLM ni la conservación salen del laboratorio.** Se deciden por artículo:
 
-1. **¿El SKU aparece en alguna posición `VLMVENTA*`?** Si sí, es del VLM. Si no, es de
-   afuera y no se muestra. AstraZeneca tiene artículos de los dos tipos, así que
-   preguntárselo al laboratorio da la respuesta equivocada para la mitad.
-2. **Recién ahí se leen sus otras ubicaciones**, y significan cosas distintas según lo
-   anterior:
-
-| El SKU está en… | `VLMVENTA01/02` | Nivel `100`/`150` de pasillo | Nivel `200`+ |
-|---|---|---|---|
-| **el VLM** | picking | **reserva** para rellenar la torre | reserva |
-| **pasillo** | — | picking | reserva |
-
-El nivel `100` es el caso que importa: en un artículo de pasillo es la posición desde la
-que se sirve, y en uno del VLM es con lo que se rellena la torre. Sin la distinción, un
-artículo del VLM mostraba un picking de pasillo que nadie usa.
+1. **¿El SKU aparece en alguna posición `VLMVENTA*`?** Si sí, es del VLM. Si no, queda
+   afuera. AstraZeneca tiene artículos de los dos tipos, así que preguntárselo al
+   laboratorio da la respuesta equivocada para la mitad.
+2. **Lo que tenga en posiciones de rack es su reserva**, sea del nivel que sea: es con lo
+   que se rellena la torre, y la lista de reposición dice de cuál bajar.
 
 > **Ejemplo real.** `4002905XAR` está en `VLMVENTA02` con 120 unidades, y además tiene
 > `005023300` y `004023200`. Queda como **VLM · Ambiente**, con 120 en el VLM y el resto
@@ -169,69 +159,40 @@ El matcheo es tolerante: reconoce razones sociales completas. `LAB. ROCHE S.A.Q.
 
 ### De dónde sale frío o ambiente
 
-**De la posición**, que es donde está la mercadería:
+**De la posición en el VLM**: `VLMVENTA01` es cámara de frío y `VLMVENTA02` es ambiente.
+La reserva no vota: un artículo que se sirve de `VLMVENTA01` sigue siendo frío aunque tenga
+miles de unidades guardadas en un pasillo de ambiente. Si un artículo estuviera en las dos,
+gana donde tiene más stock. Una `VLMVENTA` que no sea `01` ni `02` queda en ambiente y sale
+en el aviso de importación.
 
-1. **La columna de conservación de la planilla**, si existe. Entiende `Frío`, `Refrigerado`,
-   `2-8°C`, `Termolábil`, `Heladera`, `Ambiente`, `15-25°C`, `Seco`. En una columna llamada
-   `Cadena de frío`, un `SI`/`NO` también se interpreta bien.
-2. **La regla de la posición de picking**: `VLMVENTA01` es frío, `VLMVENTA02` es ambiente,
-   los pasillos `1xx` son cámara y los `0xx` ambiente.
-3. Si ninguna regla la define: `Ambiente`, y la posición sale listada en el aviso de
-   importación para que se note que le falta una regla.
+Si la planilla trae una columna de conservación, esa manda. Entiende `Frío`, `Refrigerado`,
+`2-8°C`, `Termolábil`, `Heladera`, `Ambiente`, `15-25°C`, `Seco`. En una columna llamada
+`Cadena de frío`, un `SI`/`NO` también se interpreta bien. El export de SCE no la trae.
 
-Para un artículo del VLM manda **su cara de picking en la torre**: su reserva de pasillo no
-vota. Uno que se sirve de `VLMVENTA01` sigue siendo frío aunque tenga miles de unidades
-guardadas en un pasillo de ambiente.
-
-Así un laboratorio aparece en los dos cuadrantes según dónde esté cada artículo, que es lo
+Así un laboratorio aparece en las dos tarjetas según dónde esté cada artículo, que es lo
 que pasa en la realidad.
 
 ---
 
-## Reglas de posición
+## Posiciones
 
-La posición dice más que el laboratorio: si se pickea o es stock de altura, si está en
-cámara o en ambiente, y si hay que ignorarla porque es una zona de tránsito.
+No hay reglas para editar. La app usa el VLM y la reserva de sus artículos, y los dos se
+reconocen solos por la forma de la posición:
 
-Las posiciones numéricas son `PPPBBBNNN`:
+| Posición | Qué es |
+|---|---|
+| `VLMVENTA01` | VLM, cámara de frío |
+| `VLMVENTA02` | VLM, ambiente |
+| Numérica de 9 dígitos (`PPPBBBNNN`) | reserva en rack de un artículo del VLM |
+| Cualquier otra | no cuenta |
 
-```
-010008100      104020250
-||| ||| |||
-||| ||| _ altura del rack: 100 y 150 se pickean
-||| |||                    200 250 300 400 500 son altura
-||| _____ posición dentro del pasillo
-________ pasillo: 1xx cámara de frío, 0xx ambiente
-```
+Las de tránsito, packing, staging, rotura o picking de pasillo (`SPP`, `PACK`, `STAGE`,
+`ROTDEP…`, `BIOCAM…`, `P…`, `C…`) no son numéricas, así que no hace falta listarlas: quedan
+afuera solas. Tampoco cuenta una posición escrita distinto, como `VLMVENT01` sin la A.
 
 Si a una posición numérica le falta el último dígito, la app se lo completa con un cero:
-`10501910` se lee como `105019100`. Sin eso el nivel se corre (`910` en vez de `100`) y una
-posición de picking termina contada como altura. Sólo se completa cuando son 8 dígitos
-exactos; el resto se deja como viene.
-
-Las reglas se evalúan **en orden** y gana la primera que coincide, así que las de ignorar
-van arriba: `PACK` tiene que resolverse antes que `P*`. El comodín `*` vale al principio,
-al final, en el medio (`103*100`) o solo (`*` = todas). Se editan en **⚙ Configuración → Reglas de posición**, que
-muestra cuántas ubicaciones del archivo cargado cubre cada regla.
-
-| Patrón | Acción | |
-|---|---|---|
-| `SPP` `PACK` `STAGE` `ACONDI` `PICKTO` `FALDEP*` `ROTORI*` `C*` | ignorar | tránsito, packing, acondicionado: no es stock ubicado |
-| `VLMVENTA01` | picking · cámara · **VLM** | adentro de la torre |
-| `VLMVENTA02` | picking · ambiente · **VLM** | adentro de la torre |
-| `VLM*` | picking · VLM | red de seguridad de la torre |
-| `BIOCAM*` | picking · cámara | picking de pasillo |
-| `P*` | picking · ambiente | |
-| `1*100` `1*150` | picking · cámara | pasillo 1xx |
-| `0*100` `0*150` | picking · ambiente | pasillo 0xx |
-| `1*` | altura · cámara | pasillos 103, 104… |
-| `0*` | altura · ambiente | pasillos 013, 014… |
-| `*` | altura | red de seguridad: lo que no encaje en nada |
-
-Las reglas se **reaplican sobre el stock ya cargado**: al editarlas, y también al abrir
-una versión de la app que trae reglas nuevas. No hace falta reimportar — cada producto
-guarda las ubicaciones de sus líneas. Lo único que no vuelve son las filas que una regla
-de ignorar descartó al importar: esas nunca se guardaron.
+`10501910` se lee como `105019100`. Sólo se completa cuando son 8 dígitos exactos; el
+resto se deja como viene.
 
 ### Adentro del VLM la ubicación no distingue nada
 
@@ -247,12 +208,6 @@ arriba se vería sano.
 
 La altura sigue estando donde sirve: la tabla de inventario tiene las dos columnas y la
 lista de reposición dice de qué posiciones bajar.
-
-La zona y el ámbito de un artículo se deciden por peso entre sus posiciones, con el
-picking valiendo doble. **Sólo votan las filas con dato explícito** — una columna de la
-planilla o una regla de posición. Las que caen al default del laboratorio no votan: es una
-suposición y no puede ganarle a un dato real. Sin eso, el stock de altura (que suele no
-tener regla de zona) tapaba a las posiciones de picking.
 
 ---
 
@@ -463,7 +418,7 @@ create table stock (
   actualizado timestamptz default now()
 );
 
--- umbrales, laboratorios y reglas de posición: también una sola fila
+-- umbrales y laboratorios: también una sola fila
 create table config (
   id          text primary key,
   datos       jsonb not null,
@@ -492,9 +447,8 @@ create policy "escribir" on config
   for all to authenticated using (true) with check (true);
 ```
 
-> `config` guarda las reglas de posición, el catálogo de laboratorios y los umbrales. No es
-> un detalle de comodidad: con reglas distintas en cada PC, la misma posición es picking acá
-> y altura allá, y dos pantallas del mismo depósito muestran números que no cierran entre sí.
+> `config` guarda el catálogo de laboratorios y los umbrales, para que todas las PCs
+> muestren lo mismo.
 
 Después, en **Authentication → Users → Add user**, se crea el usuario que va a configurar.
 
@@ -550,7 +504,7 @@ js/util.js            formateo de números y fechas, colores, helpers
 js/config.js          conexión por defecto a la base (se completa una vez)
 js/nube.js            máximos compartidos contra Supabase (REST, sin librería)
 js/labs.js            catálogo de laboratorios, ámbito y conservación
-js/ubicaciones.js     reglas de posición (ignorar / picking / altura)
+js/ubicaciones.js     qué es cada posición: VLM, reserva o nada
 js/store.js           estado global, configuración y persistencia
 js/parser.js          lectura de Excel, detección y mapeo de columnas
 js/analytics.js       cobertura, criticidad, historial de consumo y agregados

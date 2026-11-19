@@ -995,47 +995,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 @media print { .topbar, .tabs, .modal, .toast-wrap { display: none !important; } }
 
 /* ============================================================
-   EDITOR DE REGLAS DE POSICIÓN (Configuración)
-   ============================================================ */
-.reglas-editor { display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
-.reglas-head, .regla-row {
-  display: grid;
-  grid-template-columns: minmax(150px, 1.6fr) 94px 94px 112px 94px 82px;
-  gap: 6px; align-items: center;
-  /* En Configuración el nav se lleva 236px y la fila se aplastaba: el patrón
-     quedaba en 150px y "VLMVENTA01" cortado. Antes que apretarla, que corra
-     de costado — apilada en dos columnas los selects pierden el encabezado y
-     no se sabe cuál es Tipo, cuál Zona y cuál Ámbito. */
-  min-width: 710px;
-}
-.reglas-head {
-  font-size: 10.5px; font-weight: 650; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--muted); padding: 0 10px 2px;
-}
-.regla-row {
-  padding: 7px 10px;
-  background: var(--surface-2); border: 1px solid var(--border-soft);
-  border-left: 3px solid var(--ok); border-radius: var(--r-sm);
-}
-.regla-row.r-ign { border-left-color: var(--agotado); opacity: .78; }
-.regla-row input, .regla-row select {
-  height: 28px; padding: 0 7px; width: 100%;
-  font: inherit; font-size: 12px; color: var(--text);
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 4px; outline: none;
-}
-.regla-row input { font-family: var(--mono); }
-.regla-row input:focus, .regla-row select:focus { border-color: var(--accent); }
-.regla-row select[disabled] { opacity: .4; }
-.regla-nota { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
-
-@media (max-width: 760px) {
-  .reglas-editor { overflow-x: visible; }
-  .reglas-head { display: none; }
-  .regla-row { grid-template-columns: 1fr 1fr; min-width: 0; }
-}
-
-/* ============================================================
    VISTA DE POSICIONES
    ============================================================ */
 .pos-inp {
@@ -1420,40 +1379,6 @@ kbd {
   animation: slidein .2s ease-out;
 }
 .aviso-version .ico { width: 16px; height: 16px; color: var(--accent); flex: none; }
-
-/* ---------- editor de reglas: orden y reglas tapadas ---------- */
-.regla-acciones {
-  display: flex; gap: 2px; justify-content: flex-end;
-  /* Si la fila corre de costado, los botones son lo ultimo que tiene que
-     quedar afuera: se quedan pegados al borde. */
-  position: sticky; right: 0;
-  background: inherit; padding-left: 4px;
-}
-.regla-acciones .btn-icon { width: 24px; height: 24px; }
-.regla-acciones .btn-icon:disabled { opacity: .25; cursor: default; }
-.regla-sube, .regla-baja { color: var(--muted); }
-.regla-sube:hover:not(:disabled), .regla-baja:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
-/* una regla que nunca llega a aplicarse: el problema es el orden, no ella */
-.regla-row.r-tapada { opacity: .6; border-left-color: var(--warn); }
-.regla-row.r-tapada .regla-nota { color: var(--warn); }
-
-/* la descripción de la regla: parece texto, se edita al hacer clic */
-.regla-pie { display: flex; align-items: baseline; gap: 6px; margin-top: 3px; min-width: 0; }
-.regla-desc {
-  flex: 1 1 auto; min-width: 60px; width: auto;
-  height: 18px !important; padding: 0 3px !important;
-  font-size: 10.5px !important; font-family: inherit !important;
-  color: var(--text-2) !important;
-  background: none !important; border: 1px solid transparent !important;
-  border-radius: 3px;
-}
-.regla-desc::placeholder { color: var(--muted); opacity: .55; font-style: italic; }
-.regla-desc:hover { border-color: var(--border) !important; }
-.regla-desc:focus {
-  background: var(--surface) !important;
-  border-color: var(--accent) !important; color: var(--text) !important;
-}
-.regla-pie .regla-nota { margin-top: 0; flex: none; white-space: nowrap; }
 
 /* ---------- catálogo de laboratorios ---------- */
 .lab-pie { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; min-width: 0; }

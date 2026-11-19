@@ -118,9 +118,8 @@ VLM.labs = (function () {
    * la regla de la posición (VLMVENTA01 es frío, VLMVENTA02 es ambiente). El
    * laboratorio no vota: tiene artículos de los dos lados.
    *
-   * Si ninguna regla la define queda `ambiente`, pero la posición aparece en
-   * el aviso de "posiciones sin zona" para que se note que falta una regla y
-   * no pase por un dato bueno.
+   * Si no se sabe queda `ambiente`, pero la posición aparece en el aviso de
+   * "posiciones sin zona" para que no pase por un dato bueno.
    */
   function resolverZona(zonaDePlanilla) {
     if (zonaDePlanilla === 'frio' || zonaDePlanilla === 'ambiente') return zonaDePlanilla;

@@ -50,7 +50,7 @@ VLM.parser = (function () {
       alias: ['stock maximo', 'maximo', 'max', 'stock max', 'capacidad', 'cap', 'nivel maximo'] },
 
     { id: 'conservacion', label: 'Conservación', req: false, tipo: 'texto',
-      hint: 'Frío o ambiente; si falta se usa la regla de la posición',
+      hint: 'Frío o ambiente; si falta, sale de la posición del VLM',
       alias: ['conservacion', 'cadena de frio', 'cadena frio', 'temperatura', 'refrigerado',
               'termolabil', 'condicion de conservacion', 'tipo de conservacion',
               'condiciones de conservacion', 'almacenamiento', 'frio'] },
@@ -274,44 +274,16 @@ VLM.parser = (function () {
   /**
    * Clasifica cada artículo: VLM o fuera, frío o ambiente, y qué posiciones
    * suyas son picking y cuáles reserva.
-   *
-   * El orden importa: primero el SKU, después la ubicación. Que un artículo
-   * viva en la torre no lo decide su laboratorio —AstraZeneca tiene de los dos
-   * tipos— sino que aparezca en una posición del VLM. Y recién sabiendo eso se
-   * puede leer el resto de sus ubicaciones: el nivel 100 de un artículo del VLM
-   * es la reserva para rellenar la torre, mientras que el mismo nivel 100 en un
-   * artículo de pasillo es la posición desde la que se sirve.
-   *
-
-   * Sin esto, cambiar una regla —o abrir una versión nueva de la app que trae
-   * reglas nuevas— dejaba la clasificación vieja pegada hasta reimportar la
-   * planilla: el artículo seguía en la zona y el ámbito que le tocaron el día
-   * que se importó. Cada producto guarda su `detalle` con la ubicación de cada
-   * línea, así que se puede recalcular sin el archivo original.
-   *
-   * Lo único que NO se puede recuperar son las filas que una regla de ignorar
-   * descartó al importar: esas nunca se guardaron.
    */
-  function reaplicarReglas(productos, reglas, catalogo) {
-    reglas = reglas || VLM.ubicaciones.reglasDefault();
+  function reaplicarReglas(productos, catalogo) {
     catalogo = catalogo || VLM.labs.catalogoDefault();
 
     productos.forEach(p => {
-      /* --- 0. las reglas de ignorar, también acá ---
-
-         Al importar, una fila con una regla de ignorar directamente no entra.
-         Pero esta función es la que corre al EDITAR las reglas, y no miraba
-         la acción: agregar una regla para ignorar una posición no hacía nada
-         sobre el stock ya cargado. Con el stock viniendo de la base y no de
-         un Excel por día, "hasta la próxima importación" es nunca.
-
-         Las filas ignoradas no se tiran: se guardan aparte, así sacar la
-         regla las devuelve en el acto y sin reimportar. */
       if (p.detalle || p.detalleIgnorado) {
         const todas = (p.detalle || []).concat(p.detalleIgnorado || []);
         const activas = [], fuera = [];
         todas.forEach(d => {
-          const r = VLM.ubicaciones.evaluar(d.ubicacion, reglas);
+          const r = VLM.ubicaciones.evaluar(d.ubicacion);
           (r && r.accion === 'ignorar' ? fuera : activas).push(d);
         });
         p.detalle = activas;
@@ -324,14 +296,9 @@ VLM.parser = (function () {
             p.disponible = activas.reduce((s, d) => s + (d.disponible || 0), 0);
           }
         }
-        /* Si no le quedó ninguna posición, el artículo igual se conserva, con
-           el detalle vacío: queda en cero, sin picking, y así lo saltea el
-           panel igual que a los de pura reserva. Tirarlo sería más prolijo
-           pero haría falta reimportar para volver atrás, y una regla se
-           agrega justamente para probar qué pasa. */
       } else {
         // planilla sin agrupar: una fila por producto, la ubicación es la suya
-        const r = VLM.ubicaciones.evaluar(p.ubicacion, reglas);
+        const r = VLM.ubicaciones.evaluar(p.ubicacion);
         if (r && r.accion === 'ignorar') { p.ignorado = true; p.stock = 0; }
         else p.ignorado = false;
       }
@@ -347,7 +314,7 @@ VLM.parser = (function () {
       // otros que se pickean de pasillo; son el mismo laboratorio y no se
       // clasifican igual.
       const evaluadas = dets.map(d => ({
-        det: d, regla: VLM.ubicaciones.evaluar(d.ubicacion, reglas)
+        det: d, regla: VLM.ubicaciones.evaluar(d.ubicacion)
       }));
       const enVLM = evaluadas.filter(e => e.regla && e.regla.ambito === 'vlm');
       const esVLM = enVLM.length > 0;
@@ -531,17 +498,11 @@ VLM.parser = (function () {
     let descartadas = 0;
     catalogo = catalogo || VLM.labs.catalogoDefault();
     opciones = opciones || {};
-    const reglas = opciones.reglas || VLM.ubicaciones.reglasDefault();
     const cfgPosiciones = opciones.posiciones || {};
-    let ignoradas = 0, sinRegla = 0, filtradas = 0;
-    const ignoradasPorPatron = {};
+    let filtradas = 0;
     const filtradasPorValor = {};
-    // posiciones que ninguna regla ubica en frío o ambiente: quedan en ambiente
-    // por descarte, y eso hay que decirlo
     const sinZona = {};
-    // todas las posiciones que aparecen en el archivo, incluidas las ignoradas:
-    // el editor de reglas las necesita para decir cuántas cubre cada regla
-    const ubicVistas = {};
+    const articulosLeidos = {};
     // posiciones cuya configuración quedó vieja porque cambió el artículo
     const posReasignadas = {};
     const fmtFecha = detectarFormatoFecha(matriz, filaHeader, mapa.vencimiento);
@@ -584,23 +545,17 @@ VLM.parser = (function () {
       }
 
       const lab = String(get(fila, 'laboratorio') || '').trim() || 'Sin laboratorio';
+      articulosLeidos[String(codigo === null ? '' : codigo).trim() + '|' + U.norm(lab)] = true;
 
-      // --- reglas de posición: ignorar, picking o altura ---
       // se normaliza antes de todo: la posición corregida es la que se usa
       // para clasificar, para mostrar y como clave de configuración
       const ubic = VLM.ubicaciones.normalizar(get(fila, 'ubicacion') || '');
-      if (ubic) ubicVistas[ubic] = 1;
-      const regla = VLM.ubicaciones.evaluar(ubic, reglas);
-      if (regla && regla.accion === 'ignorar') {
-        ignoradas++;
-        ignoradasPorPatron[regla.patron] = (ignoradasPorPatron[regla.patron] || 0) + 1;
-        continue;
-      }
-      if (ubic && !regla) sinRegla++;
+      const regla = VLM.ubicaciones.evaluar(ubic);
+      if (regla && regla.accion === 'ignorar') continue;
 
       // la columna de la planilla manda sobre la regla de posición
       const zonaCol = VLM.labs.parsearConservacion(get(fila, 'conservacion'), headerCons);
-      if (!zonaCol && !(regla && regla.zona) && ubic) sinZona[ubic] = (sinZona[ubic] || 0) + 1;
+      if (!zonaCol && regla && regla.ambito === 'vlm' && !regla.zona) sinZona[ubic] = (sinZona[ubic] || 0) + 1;
       const zonaFila = zonaCol ||
                        (regla && regla.zona) || null;
 
@@ -652,9 +607,13 @@ VLM.parser = (function () {
     const filasLeidas = productos.length;
     let lista = agrupado ? agrupar(productos) : productos;
     // VLM o fuera, frío o ambiente, picking o reserva: se decide por artículo,
-    // una vez que están todas sus ubicaciones juntas. Es la misma función que
-    // corre al editar las reglas, así que importar y reclasificar dan igual.
-    reaplicarReglas(lista, reglas, catalogo);
+    // una vez que están todas sus ubicaciones juntas.
+    reaplicarReglas(lista, catalogo);
+    const agrupados = lista.length;
+    lista = lista.filter(p => p.ambito === 'vlm');
+    const delVLM = {};
+    lista.forEach(p => { delVLM[String(p.codigo) + '|' + U.norm(p.laboratorio)] = true; });
+    const fueraDelVLM = Object.keys(articulosLeidos).filter(k => !delVLM[k]).length;
     // el mínimo y el máximo se resuelven al final, desde el detalle por
     // posición: es la misma función que corre al editarlos sin reimportar
     aplicarPosiciones(lista, cfgPosiciones);
@@ -670,20 +629,11 @@ VLM.parser = (function () {
 
     if (!productos.length) avisos.push('No se pudo leer ninguna fila válida. Revisá la fila de encabezados y el mapeo.');
     if (descartadas > 0)   avisos.push(descartadas + ' fila(s) omitidas por estar vacías o sin stock numérico.');
-    if (ignoradas) {
-      const detalle = Object.keys(ignoradasPorPatron)
-        .sort((a,b) => ignoradasPorPatron[b] - ignoradasPorPatron[a])
-        .slice(0, 5).map(k => k + ' (' + ignoradasPorPatron[k] + ')').join(', ');
-      avisos.push(ignoradas + ' fila(s) ignoradas por reglas de posición: ' + detalle + '.');
-    }
-    if (sinRegla) {
-      avisos.push(sinRegla + ' fila(s) con posiciones que ninguna regla cubre.');
-    }
     const zonasFaltantes = Object.keys(sinZona);
     if (zonasFaltantes.length) {
-      avisos.push(zonasFaltantes.length + ' posición(es) sin frío ni ambiente definido (' +
+      avisos.push(zonasFaltantes.length + ' posición(es) del VLM sin frío ni ambiente definido (' +
         zonasFaltantes.slice(0, 4).join(', ') + (zonasFaltantes.length > 4 ? '…' : '') +
-        '): quedan en Ambiente por descarte. Agregales una regla con zona.');
+        '): quedan en Ambiente.');
     }
     if (filtradas) {
       const porQue = Object.keys(filtradasPorValor)
@@ -699,15 +649,15 @@ VLM.parser = (function () {
     }
     if (agrupado) {
       avisos.push('La planilla trae varias filas por artículo: se agruparon ' + filasLeidas +
-                  ' filas en ' + lista.length + ' productos, sumando las cantidades.');
+                  ' filas en ' + agrupados + ' productos, sumando las cantidades.');
     } else if (repetidos) {
       avisos.push('Hay códigos repetidos y la agrupación está desactivada: cada fila cuenta como un producto aparte.');
     }
+    if (fueraDelVLM) {
+      avisos.push(fueraDelVLM + ' artículo(s) que no están en el VLM quedaron afuera.');
+    }
     if (fmtFecha === 'mdy') {
       avisos.push('Las fechas se leyeron como mes/día/año (formato de EE.UU.).');
-    }
-    if (mapa.conservacion === undefined) {
-      avisos.push('Sin columna de conservación: frío o ambiente salen de la regla de cada posición.');
     }
     if (nombresNoListados.length) {
       avisos.push(nombresNoListados.length + ' laboratorio(s) fuera del catálogo: ' +
@@ -716,8 +666,7 @@ VLM.parser = (function () {
     }
     return { productos: lista, descartadas, avisos, noListados, nombresNoListados,
              repetidos, agrupado, filasLeidas, formatoFecha: fmtFecha,
-             ignoradas, sinRegla, ignoradasPorPatron, filtradas, filtradasPorValor, sinZona,
-             ubicacionesVistas: Object.keys(ubicVistas), posReasignadas };
+             filtradas, filtradasPorValor, sinZona, fueraDelVLM, posReasignadas };
   }
 
   /* ------------------------------------------------------------
@@ -727,10 +676,10 @@ VLM.parser = (function () {
     const headers = ['Codigo', 'Descripcion', 'Laboratorio', 'Conservacion', 'Ubicacion', 'Stock',
                      'Stock Minimo', 'Stock Maximo', 'Lote', 'Vencimiento'];
     const filas = [
-      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'B01-C01', 140,  60, 320, 'AZ4411', '2027-08-31'],
-      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'CF-B1',     4,  10,  40, 'RO8801', '2027-05-31'],
-      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'CF-D1',     8,  15,  60, 'AM9901', '2027-06-30'],
-      ['BS-601', 'Bioyetin 4000 UI x6 amp',  'BIOSIDUS ARGENTINA', 'Frio',     'DEP-F2',   96,  40, 200, 'BS1101', '2027-04-30']
+      ['AZ-101', 'Tagrisso 80mg x30 comp',   'ASTRAZENECA',        'Ambiente', 'VLMVENTA02', 140,  60, 320, 'AZ4411', '2027-08-31'],
+      ['RO-201', 'Herceptin 440mg vial',     'ROCHE',              'Frio',     'VLMVENTA01',   4,  10,  40, 'RO8801', '2027-05-31'],
+      ['AM-401', 'Neulasta 6mg jeringa',     'AMGEN',              'Frio',     'VLMVENTA01',   8,  15,  60, 'AM9901', '2027-06-30'],
+      ['SA-303', 'Plavix 75mg x28 comp',     'SANOFI AVENTIS',     'Ambiente', 'VLMVENTA02', 520, 150, 700, 'SA2210', '2028-06-30']
     ];
     const ws = XLSX.utils.aoa_to_sheet([headers].concat(filas));
     ws['!cols'] = [{ wch: 10 }, { wch: 32 }, { wch: 20 }, { wch: 13 }, { wch: 11 }, { wch: 8 },
@@ -774,13 +723,6 @@ VLM.parser = (function () {
     return !!det && det.tipo !== 'altura';
   }
 
-  /**
-   * ¿Una regla de ignorar se llevó todas las posiciones de este artículo?
-   *
-   * Sigue guardado —con sus filas en `detalleIgnorado`— para que sacar la
-   * regla lo devuelva sin reimportar, pero para el panel y para el buscador
-   * no existe: se pidió expresamente que no esté.
-   */
   function estaIgnorado(p) {
     if (!p) return false;
     if (p.ignorado) return true;

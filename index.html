@@ -221,10 +221,6 @@
         </button>
 
         <span class="cfg-nav-tit">Clasificación</span>
-        <button type="button" class="cfg-nav-item" data-sec="reglas">
-          <svg viewBox="0 0 24 24" class="ico"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="7" cy="17" r="2"/></svg>
-          <span>Reglas de posición</span>
-        </button>
         <button type="button" class="cfg-nav-item" data-sec="labs">
           <svg viewBox="0 0 24 24" class="ico"><path d="M10 3h4M10 3v6l-5.2 9.4A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-2.6L14 9V3"/><path d="M7.5 15h9"/></svg>
           <span>Laboratorios</span>
@@ -324,25 +320,6 @@
           </div>
         </section>
 
-        <!-- ---------- reglas ---------- -->
-        <section class="cfg-sec" data-sec="reglas" hidden>
-          <header class="cfg-sec-head">
-            <h3>Reglas de posición</h3>
-            <p>Se evalúan <strong>en orden</strong> y gana la primera que coincide, así que las de
-              ignorar van arriba: <code>PACK</code> tiene que resolverse antes que <code>P*</code>.
-              Comodín <code>*</code> al principio, al final o solo (<code>*</code> = todas).</p>
-          </header>
-          <div class="cfg-grupo">
-            <div class="reglas-editor" id="reglasEditor"></div>
-            <div class="cfg-actions">
-              <button class="btn" id="btnAddRegla">+ Agregar regla</button>
-              <button class="btn" id="btnResetReglas">Restaurar reglas originales</button>
-            </div>
-            <p class="cfg-ayuda">Los cambios se aplican al instante sobre el stock cargado, salvo
-              las filas que una regla de ignorar ya descartó: esas vuelven al reimportar.</p>
-          </div>
-        </section>
-
         <!-- ---------- laboratorios ---------- -->
         <section class="cfg-sec" data-sec="labs" hidden>
           <header class="cfg-sec-head">
@@ -374,7 +351,7 @@
           <div class="cfg-grupo">
             <h4>En la base, compartido</h4>
             <p class="cfg-ayuda">Todo viaja solo: el stock al importar la planilla, y los máximos,
-              los umbrales, los laboratorios y las reglas de posición apenas se cambian. La
+              los umbrales y los laboratorios apenas se cambian. La
               pantalla se refresca sola cada dos minutos y medio, así que lo que se toca acá lo ven
               las demás PCs sin que nadie recargue nada. Lo único que queda en cada PC es el tema
               claro/oscuro y en qué pestaña está parada. Estos botones son para forzarlo a mano.</p>
@@ -432,8 +409,8 @@
             <h4>Borrar el stock de esta PC</h4>
             <p class="cfg-ayuda">Vacía la pantalla acá y nada más: el stock sigue en la base y
               <strong>vuelve solo</strong> en el próximo refresco. Sirve para destrabar una PC que
-              quedó con datos raros, no para dar de baja el stock. Los umbrales, las reglas, los
-              laboratorios y los máximos no se tocan.</p>
+              quedó con datos raros, no para dar de baja el stock. Los umbrales, los laboratorios
+              y los máximos no se tocan.</p>
             <div class="cfg-actions">
               <button class="btn btn-danger" id="btnClearData">Borrar datos de esta PC</button>
             </div>

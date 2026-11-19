@@ -281,7 +281,7 @@ VLM.vigia = (function () {
     Object.keys(MAPEO).forEach(campo => { mapa[campo] = cab.indexOf(MAPEO[campo]); });
 
     const res = P.normalizar(matriz, fh, mapa, S.state.cfg, S.state.labs,
-      { agrupar: true, reglas: S.state.reglasUbic, posiciones: S.state.posiciones });
+      { agrupar: true, posiciones: S.state.posiciones });
 
     if (!res.productos.length) {
       rechazar(file);
@@ -293,7 +293,7 @@ VLM.vigia = (function () {
        error —la vista con otro filtro, un propietario solo— y subirla dejaría
        a todas las pantallas mostrando medio depósito. Se retiene hasta que
        alguien confirme. */
-    const antes = S.state.productos.length;
+    const antes = S.state.productos.filter(p => p.ambito === 'vlm').length;
     if (!forzar && antes >= 20 && res.productos.length < antes * 0.5) {
       retenido = { file: file, n: res.productos.length, antes: antes };
       poner('retenido', file.name + ' trae ' + U.fmt(res.productos.length) +
