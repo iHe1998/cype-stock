@@ -257,6 +257,7 @@ VLM.app = (function () {
     const items = itemsVisibles();
     sincronizarZonebar(items, itemsVisibles(true));
 
+    if (!$('#view-' + S.state.ui.vista)) S.state.ui.vista = 'dashboard';
     const vista = S.state.ui.vista;
     $$('.tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === vista));
     const el = $('#view-' + vista);
@@ -270,7 +271,6 @@ VLM.app = (function () {
     }
     try {
       if (vista === 'dashboard') V.dashboard(el, items, cfg);
-      else if (vista === 'labs')  V.laboratorios(el, items, cfg);
       else if (vista === 'repo')  V.reposicion(el, items, cfg);
       else if (vista === 'inv')   V.inventario(el, items, cfg);
       else if (vista === 'pos')   V.posiciones(el, items, cfg);
@@ -282,11 +282,6 @@ VLM.app = (function () {
 
     // botones "ir a otra vista" dentro de las vistas
     $$('[data-goto]', el).forEach(b => b.addEventListener('click', () => irA(b.dataset.goto)));
-
-    // clic en tarjeta de laboratorio -> filtrar reposición
-    $$('.lab-card', el).forEach(c => c.addEventListener('click', () => {
-      S.setUi({ filtroLab: c.dataset.lab, filtroEstado: null, vista: 'repo' });
-    }));
 
     // clic en un artículo -> detalle (es el único lugar donde se ve el
     // disponible: en los gráficos y los estados manda el físico)

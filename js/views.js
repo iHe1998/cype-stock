@@ -40,16 +40,6 @@ VLM.views = (function () {
     return '<span class="zchip a-' + ambito + '" title="' + a.desc + '">' + a.corto + '</span>';
   }
 
-  /** Encabezado de un cuadrante ámbito × conservación. */
-  function grupoHead(g) {
-    const r = g.resumen;
-    return '<div class="grupo-head g-' + g.zona + '">' +
-      '<h3><span class="g-ico">' + g.icono + '</span>' + U.esc(g.label) + '</h3>' +
-      '<span class="g-meta">' + r.skus + ' SKU · ' + U.fmtCompact(r.unidades) + ' u. en picking' +
-        (g.alerta ? ' · <strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : '') +
-      '</span></div>';
-  }
-
   /** Tarjeta de cuadrante para el resumen. */
   function zonaCard(g) {
     const r = g.resumen;
@@ -169,70 +159,7 @@ VLM.views = (function () {
   }
 
   /* ============================================================
-     VISTA 2 · LABORATORIOS
-     ============================================================ */
-  function laboratorios(el, items, cfg) {
-    const labs = A.porLaboratorio(items, cfg);
-    const grupos = A.porGrupo(items, cfg);
-
-    let html = '<div class="toolbar">' +
-      '<input class="input" id="labSearch" type="search" placeholder="Buscar laboratorio…" ' +
-      'value="' + U.esc(VLM.store.state.ui.busqueda) + '">' +
-      '<span class="muted small">' + labs.length + ' laboratorios · ' + items.length + ' SKU</span>' +
-      '</div>';
-
-    html += '<div style="margin-bottom:18px">' +
-      cardChart('Estados por laboratorio', 'cantidad de SKU', 'chLabEstados', 340) +
-      '</div>';
-
-    // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Picking·Frío, Picking·Ambiente
-    html += '<div id="labGrid">' + grupos.map(g =>
-      grupoHead(g) +
-      '<div class="lab-grid">' + g.labs.map(l => labCard(l, cfg, g.zona)).join('') + '</div>'
-    ).join('') + '</div>';
-
-    el.innerHTML = html;
-    C.estadosPorLab($('#chLabEstados', el), labs);
-
-    const buscar = $('#labSearch', el);
-    buscar.addEventListener('input', U.debounce(() => {
-      const q = U.norm(buscar.value);
-      U.$$('#labGrid .lab-card', el).forEach(card => {
-        card.hidden = q ? U.norm(card.dataset.lab).indexOf(q) === -1 : false;
-      });
-      // ocultar el encabezado de los cuadrantes que quedaron vacíos
-      U.$$('#labGrid .grupo-head', el).forEach(head => {
-        const grid = head.nextElementSibling;
-        const visibles = grid ? U.$$('.lab-card', grid).filter(c => !c.hidden).length : 0;
-        head.hidden = visibles === 0;
-        if (grid) grid.hidden = visibles === 0;
-      });
-    }, 150));
-  }
-
-  function labCard(l, cfg, zona) {
-    const r = l.resumen;
-    return '<div class="card lab-card" data-lab="' + U.esc(l.nombre) + '">' +
-      '<div class="lab-top">' +
-        '<div class="lab-name"><i class="lab-swatch" style="background:' + l.color + '"></i>' + U.esc(l.nombre) + '</div>' +
-        (zona ? zchip(zona) : '') +
-        (l.criticos > 0 ? badge('critico') : (r.porEstado.bajo > 0 ? badge('bajo') : badge('ok'))) +
-      '</div>' +
-      '<div class="lab-stats">' +
-        '<div class="lab-stat"><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
-        '<div class="lab-stat"><b>' + U.fmtCompact(r.unidades) + '</b><span>en picking</span></div>' +
-        '<div class="lab-stat ' + (l.criticos ? 's-crit' : (r.porEstado.bajo ? 's-warn' : '')) + '">' +
-          '<b>' + U.fmt(r.enAlerta) + '</b><span>en alerta</span></div>' +
-      '</div>' +
-      stackbar(r) +
-      '<div class="lab-legend">' +
-        '<span>' + U.fmtCompact(r.unidadesAltura) + ' en altura</span>' +
-      '</div>' +
-      '</div>';
-  }
-
-  /* ============================================================
-     VISTA 3 · REPOSICIÓN
+     VISTA 2 · REPOSICIÓN
      ============================================================ */
   function reposicion(el, items, cfg) {
     const ui = VLM.store.state.ui;
@@ -648,7 +575,7 @@ VLM.views = (function () {
   }
 
   /* ============================================================
-     VISTA 4 · INVENTARIO
+     VISTA 3 · INVENTARIO
      ============================================================ */
   const COLUMNAS = [
     { id: 'codigo',        label: 'Código',    clase: 't-code' },
@@ -803,7 +730,7 @@ VLM.views = (function () {
   }
 
   /* ============================================================
-     VISTA 5 · POSICIONES
+     VISTA 4 · POSICIONES
      Una fila por posición física, con su mínimo y su máximo editables.
      Las posiciones ignoradas por reglas no llegan hasta acá: la app ya las
      descartó al importar, y en esta pantalla sólo serían ruido.
@@ -1076,8 +1003,8 @@ VLM.views = (function () {
   }
 
   return {
-    dashboard, laboratorios, reposicion, inventario, posiciones, detalleArticulo,
-    badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem,
+    dashboard, reposicion, inventario, posiciones, detalleArticulo,
+    badge, zchip, achip, kpi, stackbar, zonaCard, repoItem,
     exportarRepo, exportarMaximos
   };
 })();

@@ -164,41 +164,8 @@ VLM.charts = (function () {
     });
   }
 
-  /* ------------------------------------------------------------
-     6. Estados apilados por laboratorio
-     ------------------------------------------------------------ */
-  function estadosPorLab(canvas, labs, tv) {
-    const t = tema();
-    const top = labs.slice(0, tv ? 8 : 12);
-    const claves = ['agotado', 'critico', 'bajo', 'ok', 'exceso', 'sd'];
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.x.stacked = true;
-    o.scales.y.stacked = true;
-    o.scales.y.grid.display = false;
-    o.scales.x.ticks.precision = 0;
-    o.plugins.legend = {
-      display: true, position: 'top',
-      labels: { color: t.muted, font: { size: tv ? 16 : 11 }, boxWidth: 9, boxHeight: 9, usePointStyle: true, pointStyle: 'circle', padding: 12 }
-    };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(l => l.nombre),
-        datasets: claves.map(k => ({
-          label: A.ESTADOS[k].label,
-          data: top.map(l => l.resumen.porEstado[k] || 0),
-          backgroundColor: colorEstado(k, t),
-          borderRadius: 3,
-          barThickness: tv ? 24 : 15
-        })).filter(ds => ds.data.some(v => v > 0))
-      },
-      options: o
-    });
-  }
-
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, estados, estadosPorLab
+    stockPorLab, estados
   };
 })();

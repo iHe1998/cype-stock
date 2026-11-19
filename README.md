@@ -4,7 +4,7 @@ Panel web para visualizar el **stock de una torre de picking vertical (VLM)** a 
 planilla Excel. Pensado para quedar proyectado en un televisor del depósito y que el equipo
 vea de un vistazo qué hay que reponer.
 
-- 📊 Gráficos de stock, picking vs altura y estado por laboratorio
+- 📊 Gráficos de stock por estado y por laboratorio
 - 🏭 Catálogo cerrado de **laboratorios**, con los de fuera separados y contados
 - ❄️ Separa **cámara de frío** (2-8 °C) de **ambiente**, y **dentro** de **fuera del VLM**
 - 🔴 Marca las posiciones **próximas a vaciarse** por porcentaje de su capacidad
@@ -245,9 +245,8 @@ arriba se vería sano. En el export de pasillo que se usó de prueba son 64.917 
 picking contra 238.321 en altura — el 79% del total es reserva que no se pickea. Adentro
 del VLM no hay altura: todo lo que está en la torre se pickea.
 
-La altura sigue estando donde sirve: la tabla de inventario tiene las dos columnas, el
-gráfico "Picking vs altura" muestra el reparto por laboratorio, y la lista de reposición
-dice de qué posiciones bajar.
+La altura sigue estando donde sirve: la tabla de inventario tiene las dos columnas y la
+lista de reposición dice de qué posiciones bajar.
 
 La zona y el ámbito de un artículo se deciden por peso entre sus posiciones, con el
 picking valiendo doble. **Sólo votan las filas con dato explícito** — una columna de la
@@ -559,7 +558,7 @@ js/store.js           estado global, configuración y persistencia
 js/parser.js          lectura de Excel, detección y mapeo de columnas
 js/analytics.js       cobertura, criticidad, historial de consumo y agregados
 js/charts.js          gráficos (Chart.js)
-js/views.js           las cinco vistas
+js/views.js           las cuatro vistas
 js/tv.js              modo televisor
 js/app.js             arranque, navegación, asistente de importación
 lib/                  SheetJS y Chart.js (ver lib/README.md)

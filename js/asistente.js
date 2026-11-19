@@ -56,7 +56,6 @@ VLM.asistente = (function () {
 
   const VISTA = {
     dashboard: ['resumen', 'tablero'],
-    labs:      ['laboratorios'],
     repo:      ['reposicion', 'reposiciones'],
     inv:       ['inventario'],
     pos:       ['posiciones']

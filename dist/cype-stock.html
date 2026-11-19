@@ -171,14 +171,12 @@
 /* se levantan apenas al pasar por encima: da el volumen sin mover la grilla */
 [data-theme="light"] .card,
 [data-theme="light"] .kpi,
-[data-theme="light"] .zona-card,
-[data-theme="light"] .lab-card {
+[data-theme="light"] .zona-card {
   transition: box-shadow .16s, transform .16s;
 }
 [data-theme="light"] .card:hover,
 [data-theme="light"] .kpi:hover,
-[data-theme="light"] .zona-card:hover,
-[data-theme="light"] .lab-card:hover {
+[data-theme="light"] .zona-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(13,22,38,.07), 0 8px 18px rgba(13,22,38,.10),
               0 24px 44px -14px rgba(13,22,38,.20);
@@ -211,7 +209,6 @@
 
 /* los títulos de sección eran gris claro y se perdían contra la página */
 [data-theme="light"] .section-title { color: var(--text-2); font-weight: 700; }
-[data-theme="light"] .grupo-head { border-bottom-width: 2px; }
 
 /* Las tarjetas de fuera del VLM venían con un velo encima para distinguirse.
    El borde punteado ya las distingue; el velo sólo las ensuciaba. */
@@ -412,19 +409,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .zchip.z-ambiente { color: var(--ambiente); background: var(--ambiente-dim); border-color: color-mix(in srgb, var(--ambiente) 30%, transparent); }
 .zchip.a-vlm      { color: var(--accent);   background: var(--accent-dim);   border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 .zchip.a-externo  { color: var(--muted);    background: var(--surface-3);    border-color: var(--border); }
-
-/* encabezado de grupo (VLM · Cámara de frío) */
-.grupo-head {
-  display: flex; align-items: center; gap: 10px;
-  margin: 26px 0 12px; padding-bottom: 8px;
-  border-bottom: 2px solid var(--border);
-}
-.grupo-head:first-child { margin-top: 0; }
-.grupo-head h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
-.grupo-head .g-ico { font-size: 17px; }
-.grupo-head.g-frio { border-bottom-color: color-mix(in srgb, var(--frio) 45%, transparent); }
-.grupo-head.g-ambiente { border-bottom-color: color-mix(in srgb, var(--ambiente) 45%, transparent); }
-.grupo-head .g-meta { font-size: 12px; color: var(--muted); }
 
 /* tarjetas de cuadrante en el resumen */
 .zona-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
@@ -662,17 +646,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* ============================================================
    LABORATORIOS
    ============================================================ */
-.lab-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
-.lab-card { padding: 16px 17px; cursor: pointer; transition: border-color .13s, transform .1s; }
-.lab-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.lab-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-.lab-name { font-size: 15px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
 .lab-swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.lab-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 13px; }
-.lab-stat b { display: block; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.lab-stat span { font-size: 11px; color: var(--muted); }
-.lab-stat.s-crit b { color: var(--crit); }
-.lab-stat.s-warn b { color: var(--warn); }
 .stackbar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: var(--surface-3); }
 .stackbar > i { display: block; height: 100%; }
 .sb-ok { background: var(--ok-fill); }
@@ -681,8 +655,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .sb-agotado { background: var(--agotado-fill); }
 .sb-exceso { background: var(--info-fill); }
 .sb-sd { background: var(--surface-3); }
-.lab-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 9px; font-size: 11.5px; color: var(--muted); }
-.lab-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
 
 /* ============================================================
    REPOSICIÓN
@@ -1577,8 +1549,7 @@ kbd {
    debajo del círculo se ve como un parpadeo. */
 .cambiando-tema .card,
 .cambiando-tema .kpi,
-.cambiando-tema .zona-card,
-.cambiando-tema .lab-card { transition: none; }
+.cambiando-tema .zona-card { transition: none; }
 
 /* La alternativa para navegadores sin transiciones de vista: una onda del
    color del tema que entra. Crece desde el botón hasta tapar la pantalla. */
@@ -1639,7 +1610,6 @@ kbd {
 <!-- ============ NAV ============ -->
 <nav class="tabs" id="tabs">
   <button class="tab is-active" data-view="dashboard">Resumen</button>
-  <button class="tab" data-view="labs">Laboratorios</button>
   <button class="tab" data-view="repo">Reposición</button>
   <button class="tab" data-view="inv">Inventario</button>
   <button class="tab" data-view="pos">Posiciones</button>
@@ -1691,7 +1661,6 @@ kbd {
 
   <!-- Views -->
   <section id="view-dashboard" class="view" hidden></section>
-  <section id="view-labs" class="view" hidden></section>
   <section id="view-repo" class="view" hidden></section>
   <section id="view-inv" class="view" hidden></section>
   <section id="view-pos" class="view" hidden></section>
@@ -2035,7 +2004,7 @@ kbd {
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 17/11/2026 19:13 (sobre bc79f1e)</span>
+      <span class="muted small" id="appVersion">compilado 19/11/2026 18:51 (sobre c5ce637)</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -4311,7 +4280,6 @@ VLM.asistente = (function () {
 
   const VISTA = {
     dashboard: ['resumen', 'tablero'],
-    labs:      ['laboratorios'],
     repo:      ['reposicion', 'reposiciones'],
     inv:       ['inventario'],
     pos:       ['posiciones']
@@ -5409,42 +5377,9 @@ VLM.charts = (function () {
     });
   }
 
-  /* ------------------------------------------------------------
-     6. Estados apilados por laboratorio
-     ------------------------------------------------------------ */
-  function estadosPorLab(canvas, labs, tv) {
-    const t = tema();
-    const top = labs.slice(0, tv ? 8 : 12);
-    const claves = ['agotado', 'critico', 'bajo', 'ok', 'exceso', 'sd'];
-    const o = base(t, tv);
-    o.indexAxis = 'y';
-    o.scales.x.stacked = true;
-    o.scales.y.stacked = true;
-    o.scales.y.grid.display = false;
-    o.scales.x.ticks.precision = 0;
-    o.plugins.legend = {
-      display: true, position: 'top',
-      labels: { color: t.muted, font: { size: tv ? 16 : 11 }, boxWidth: 9, boxHeight: 9, usePointStyle: true, pointStyle: 'circle', padding: 12 }
-    };
-    return montar(canvas, {
-      type: 'bar',
-      data: {
-        labels: top.map(l => l.nombre),
-        datasets: claves.map(k => ({
-          label: A.ESTADOS[k].label,
-          data: top.map(l => l.resumen.porEstado[k] || 0),
-          backgroundColor: colorEstado(k, t),
-          borderRadius: 3,
-          barThickness: tv ? 24 : 15
-        })).filter(ds => ds.data.some(v => v > 0))
-      },
-      options: o
-    });
-  }
-
   return {
     montar, destruirTodos, tema, colorEstado,
-    stockPorLab, estados, estadosPorLab
+    stockPorLab, estados
   };
 })();
 
@@ -5490,16 +5425,6 @@ VLM.views = (function () {
     const a = VLM.labs.AMBITOS[ambito];
     if (!a) return '';
     return '<span class="zchip a-' + ambito + '" title="' + a.desc + '">' + a.corto + '</span>';
-  }
-
-  /** Encabezado de un cuadrante ámbito × conservación. */
-  function grupoHead(g) {
-    const r = g.resumen;
-    return '<div class="grupo-head g-' + g.zona + '">' +
-      '<h3><span class="g-ico">' + g.icono + '</span>' + U.esc(g.label) + '</h3>' +
-      '<span class="g-meta">' + r.skus + ' SKU · ' + U.fmtCompact(r.unidades) + ' u. en picking' +
-        (g.alerta ? ' · <strong style="color:var(--crit)">' + g.alerta + ' en alerta</strong>' : '') +
-      '</span></div>';
   }
 
   /** Tarjeta de cuadrante para el resumen. */
@@ -5621,70 +5546,7 @@ VLM.views = (function () {
   }
 
   /* ============================================================
-     VISTA 2 · LABORATORIOS
-     ============================================================ */
-  function laboratorios(el, items, cfg) {
-    const labs = A.porLaboratorio(items, cfg);
-    const grupos = A.porGrupo(items, cfg);
-
-    let html = '<div class="toolbar">' +
-      '<input class="input" id="labSearch" type="search" placeholder="Buscar laboratorio…" ' +
-      'value="' + U.esc(VLM.store.state.ui.busqueda) + '">' +
-      '<span class="muted small">' + labs.length + ' laboratorios · ' + items.length + ' SKU</span>' +
-      '</div>';
-
-    html += '<div style="margin-bottom:18px">' +
-      cardChart('Estados por laboratorio', 'cantidad de SKU', 'chLabEstados', 340) +
-      '</div>';
-
-    // agrupado por cuadrante: VLM·Frío, VLM·Ambiente, Picking·Frío, Picking·Ambiente
-    html += '<div id="labGrid">' + grupos.map(g =>
-      grupoHead(g) +
-      '<div class="lab-grid">' + g.labs.map(l => labCard(l, cfg, g.zona)).join('') + '</div>'
-    ).join('') + '</div>';
-
-    el.innerHTML = html;
-    C.estadosPorLab($('#chLabEstados', el), labs);
-
-    const buscar = $('#labSearch', el);
-    buscar.addEventListener('input', U.debounce(() => {
-      const q = U.norm(buscar.value);
-      U.$$('#labGrid .lab-card', el).forEach(card => {
-        card.hidden = q ? U.norm(card.dataset.lab).indexOf(q) === -1 : false;
-      });
-      // ocultar el encabezado de los cuadrantes que quedaron vacíos
-      U.$$('#labGrid .grupo-head', el).forEach(head => {
-        const grid = head.nextElementSibling;
-        const visibles = grid ? U.$$('.lab-card', grid).filter(c => !c.hidden).length : 0;
-        head.hidden = visibles === 0;
-        if (grid) grid.hidden = visibles === 0;
-      });
-    }, 150));
-  }
-
-  function labCard(l, cfg, zona) {
-    const r = l.resumen;
-    return '<div class="card lab-card" data-lab="' + U.esc(l.nombre) + '">' +
-      '<div class="lab-top">' +
-        '<div class="lab-name"><i class="lab-swatch" style="background:' + l.color + '"></i>' + U.esc(l.nombre) + '</div>' +
-        (zona ? zchip(zona) : '') +
-        (l.criticos > 0 ? badge('critico') : (r.porEstado.bajo > 0 ? badge('bajo') : badge('ok'))) +
-      '</div>' +
-      '<div class="lab-stats">' +
-        '<div class="lab-stat"><b>' + U.fmt(r.skus) + '</b><span>SKU</span></div>' +
-        '<div class="lab-stat"><b>' + U.fmtCompact(r.unidades) + '</b><span>en picking</span></div>' +
-        '<div class="lab-stat ' + (l.criticos ? 's-crit' : (r.porEstado.bajo ? 's-warn' : '')) + '">' +
-          '<b>' + U.fmt(r.enAlerta) + '</b><span>en alerta</span></div>' +
-      '</div>' +
-      stackbar(r) +
-      '<div class="lab-legend">' +
-        '<span>' + U.fmtCompact(r.unidadesAltura) + ' en altura</span>' +
-      '</div>' +
-      '</div>';
-  }
-
-  /* ============================================================
-     VISTA 3 · REPOSICIÓN
+     VISTA 2 · REPOSICIÓN
      ============================================================ */
   function reposicion(el, items, cfg) {
     const ui = VLM.store.state.ui;
@@ -6100,7 +5962,7 @@ VLM.views = (function () {
   }
 
   /* ============================================================
-     VISTA 4 · INVENTARIO
+     VISTA 3 · INVENTARIO
      ============================================================ */
   const COLUMNAS = [
     { id: 'codigo',        label: 'Código',    clase: 't-code' },
@@ -6255,7 +6117,7 @@ VLM.views = (function () {
   }
 
   /* ============================================================
-     VISTA 5 · POSICIONES
+     VISTA 4 · POSICIONES
      Una fila por posición física, con su mínimo y su máximo editables.
      Las posiciones ignoradas por reglas no llegan hasta acá: la app ya las
      descartó al importar, y en esta pantalla sólo serían ruido.
@@ -6528,8 +6390,8 @@ VLM.views = (function () {
   }
 
   return {
-    dashboard, laboratorios, reposicion, inventario, posiciones, detalleArticulo,
-    badge, zchip, achip, kpi, stackbar, grupoHead, zonaCard, repoItem,
+    dashboard, reposicion, inventario, posiciones, detalleArticulo,
+    badge, zchip, achip, kpi, stackbar, zonaCard, repoItem,
     exportarRepo, exportarMaximos
   };
 })();
@@ -7153,6 +7015,7 @@ VLM.app = (function () {
     const items = itemsVisibles();
     sincronizarZonebar(items, itemsVisibles(true));
 
+    if (!$('#view-' + S.state.ui.vista)) S.state.ui.vista = 'dashboard';
     const vista = S.state.ui.vista;
     $$('.tab').forEach(t => t.classList.toggle('is-active', t.dataset.view === vista));
     const el = $('#view-' + vista);
@@ -7166,7 +7029,6 @@ VLM.app = (function () {
     }
     try {
       if (vista === 'dashboard') V.dashboard(el, items, cfg);
-      else if (vista === 'labs')  V.laboratorios(el, items, cfg);
       else if (vista === 'repo')  V.reposicion(el, items, cfg);
       else if (vista === 'inv')   V.inventario(el, items, cfg);
       else if (vista === 'pos')   V.posiciones(el, items, cfg);
@@ -7178,11 +7040,6 @@ VLM.app = (function () {
 
     // botones "ir a otra vista" dentro de las vistas
     $$('[data-goto]', el).forEach(b => b.addEventListener('click', () => irA(b.dataset.goto)));
-
-    // clic en tarjeta de laboratorio -> filtrar reposición
-    $$('.lab-card', el).forEach(c => c.addEventListener('click', () => {
-      S.setUi({ filtroLab: c.dataset.lab, filtroEstado: null, vista: 'repo' });
-    }));
 
     // clic en un artículo -> detalle (es el único lugar donde se ve el
     // disponible: en los gráficos y los estados manda el físico)

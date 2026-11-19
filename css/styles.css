@@ -162,14 +162,12 @@
 /* se levantan apenas al pasar por encima: da el volumen sin mover la grilla */
 [data-theme="light"] .card,
 [data-theme="light"] .kpi,
-[data-theme="light"] .zona-card,
-[data-theme="light"] .lab-card {
+[data-theme="light"] .zona-card {
   transition: box-shadow .16s, transform .16s;
 }
 [data-theme="light"] .card:hover,
 [data-theme="light"] .kpi:hover,
-[data-theme="light"] .zona-card:hover,
-[data-theme="light"] .lab-card:hover {
+[data-theme="light"] .zona-card:hover {
   transform: translateY(-1px);
   box-shadow: 0 2px 4px rgba(13,22,38,.07), 0 8px 18px rgba(13,22,38,.10),
               0 24px 44px -14px rgba(13,22,38,.20);
@@ -202,7 +200,6 @@
 
 /* los títulos de sección eran gris claro y se perdían contra la página */
 [data-theme="light"] .section-title { color: var(--text-2); font-weight: 700; }
-[data-theme="light"] .grupo-head { border-bottom-width: 2px; }
 
 /* Las tarjetas de fuera del VLM venían con un velo encima para distinguirse.
    El borde punteado ya las distingue; el velo sólo las ensuciaba. */
@@ -403,19 +400,6 @@ code { font-family: var(--mono); font-size: .92em; background: var(--surface-3);
 .zchip.z-ambiente { color: var(--ambiente); background: var(--ambiente-dim); border-color: color-mix(in srgb, var(--ambiente) 30%, transparent); }
 .zchip.a-vlm      { color: var(--accent);   background: var(--accent-dim);   border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 .zchip.a-externo  { color: var(--muted);    background: var(--surface-3);    border-color: var(--border); }
-
-/* encabezado de grupo (VLM · Cámara de frío) */
-.grupo-head {
-  display: flex; align-items: center; gap: 10px;
-  margin: 26px 0 12px; padding-bottom: 8px;
-  border-bottom: 2px solid var(--border);
-}
-.grupo-head:first-child { margin-top: 0; }
-.grupo-head h3 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
-.grupo-head .g-ico { font-size: 17px; }
-.grupo-head.g-frio { border-bottom-color: color-mix(in srgb, var(--frio) 45%, transparent); }
-.grupo-head.g-ambiente { border-bottom-color: color-mix(in srgb, var(--ambiente) 45%, transparent); }
-.grupo-head .g-meta { font-size: 12px; color: var(--muted); }
 
 /* tarjetas de cuadrante en el resumen */
 .zona-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
@@ -653,17 +637,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 /* ============================================================
    LABORATORIOS
    ============================================================ */
-.lab-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); }
-.lab-card { padding: 16px 17px; cursor: pointer; transition: border-color .13s, transform .1s; }
-.lab-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.lab-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-.lab-name { font-size: 15px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
 .lab-swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.lab-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 13px; }
-.lab-stat b { display: block; font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-.lab-stat span { font-size: 11px; color: var(--muted); }
-.lab-stat.s-crit b { color: var(--crit); }
-.lab-stat.s-warn b { color: var(--warn); }
 .stackbar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; background: var(--surface-3); }
 .stackbar > i { display: block; height: 100%; }
 .sb-ok { background: var(--ok-fill); }
@@ -672,8 +646,6 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .sb-agotado { background: var(--agotado-fill); }
 .sb-exceso { background: var(--info-fill); }
 .sb-sd { background: var(--surface-3); }
-.lab-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 9px; font-size: 11.5px; color: var(--muted); }
-.lab-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
 
 /* ============================================================
    REPOSICIÓN
@@ -1568,8 +1540,7 @@ kbd {
    debajo del círculo se ve como un parpadeo. */
 .cambiando-tema .card,
 .cambiando-tema .kpi,
-.cambiando-tema .zona-card,
-.cambiando-tema .lab-card { transition: none; }
+.cambiando-tema .zona-card { transition: none; }
 
 /* La alternativa para navegadores sin transiciones de vista: una onda del
    color del tema que entra. Crece desde el botón hasta tapar la pantalla. */
