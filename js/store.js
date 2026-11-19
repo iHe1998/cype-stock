@@ -30,7 +30,8 @@ VLM.store = (function () {
     // qué hacer con laboratorios que no están en el catálogo:
     // 'excluir' los deja fuera de KPIs y vistas (pero se informa cuántos son),
     // 'incluir' los muestra como no gestionados.
-    labsNoListados: 'excluir'
+    labsNoListados: 'excluir',
+    ocultos: {}
   };
 
   const state = {

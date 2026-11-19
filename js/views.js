@@ -706,6 +706,7 @@ VLM.views = (function () {
   function posiciones(el, items, cfg) {
     const ui = VLM.store.state.ui;
     const cfgPos = VLM.store.state.posiciones;
+    const ocultos = cfg.ocultos || {};
 
     /* UNA fila por POSICIÓN + ARTÍCULO.
        Afuera del VLM cada posición de picking tiene un solo artículo y la
@@ -731,7 +732,9 @@ VLM.views = (function () {
             arts: [{ codigo: p.codigo, descripcion: p.descripcion }],
             codigo: p.codigo, descripcion: p.descripcion, paquete: p.paquete,
             stock: 0, min: c.min || 0, max: c.max || 0,
-            artConfig: c.articulo || null
+            artConfig: c.articulo || null,
+            uid: p.uid, lotes: A.lotesEnVLM(p),
+            oculto: A.estaOculto(p, ocultos), marca: ocultos[p.uid] || null
           };
         }
         porSlot[k].stock += d.stock;
@@ -752,6 +755,7 @@ VLM.views = (function () {
     });
 
     const configuradas = filas.filter(f => f.min || f.max).length;
+    const ocultas = filas.filter(f => f.oculto).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
       kpi('Posiciones del VLM', U.fmt(filas.length),
@@ -759,16 +763,16 @@ VLM.views = (function () {
       kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
-      kpi('Para rellenar', U.fmt(filas.filter(f => !f.reasignada &&
+      kpi('Para rellenar', U.fmt(filas.filter(f => !f.reasignada && !f.oculto &&
             ['critico','bajo','agotado'].indexOf(estadoPosicion(f, cfg)) > -1).length),
           'bajo el ' + cfg.pctBajo + '% de su capacidad', 'k-crit') +
-      kpi('Cambiaron de artículo', U.fmt(filas.filter(f => f.reasignada).length),
-          'el mín/máx guardado no se aplica',
-          filas.some(f => f.reasignada) ? 'k-warn' : 'k-ok') +
+      kpi('Ocultos', U.fmt(ocultas), 'no cuentan en el panel', ocultas ? 'k-warn' : '') +
       '</div>';
 
     html += '<div class="toolbar">' +
       '<input class="input" id="posSearch" type="search" data-k="posSearch" placeholder="Buscar posición o artículo…" value="' + U.esc(ui.busquedaPos || '') + '">' +
+      (ocultas ? '<button class="chip' + (ui.posSoloOcultos ? ' is-active' : '') + '" id="posSoloOcultos">' +
+        'Sólo ocultos · ' + ocultas + '</button>' : '') +
       '<div class="spacer"></div>' +
       '<button class="btn" id="posExport">Exportar plantilla</button>' +
       '<button class="btn" id="posImport">Importar completada</button>' +
@@ -789,6 +793,7 @@ VLM.views = (function () {
 
     html += '<div class="table-wrap"><table class="table" id="posTable">' +
       '<thead><tr>' +
+        '<th class="no-sort pos-ver" title="Se muestra en el panel">Ver</th>' +
         '<th class="no-sort">Posición</th><th class="no-sort">Zona</th>' +
         '<th class="no-sort">Artículo</th><th class="no-sort">Paquete</th>' +
         '<th class="no-sort t-num">Stock</th>' +
@@ -807,6 +812,12 @@ VLM.views = (function () {
       VLM.store.setUi({ busquedaPos: buscar.value }, true);
       repintar();
     });
+    const soloOcultos = $('#posSoloOcultos', el);
+    if (soloOcultos) soloOcultos.addEventListener('click', () => {
+      VLM.store.setUi({ posSoloOcultos: !VLM.store.state.ui.posSoloOcultos }, true);
+      soloOcultos.classList.toggle('is-active', !!VLM.store.state.ui.posSoloOcultos);
+      pintarPosiciones(el, filas, cfg);
+    });
     $('#posExport', el).addEventListener('click', () => exportarPosiciones(filas));
     $('#posImport', el).addEventListener('click', () => $('#posFile', el).click());
     $('#posFile', el).addEventListener('change', e => {
@@ -815,18 +826,32 @@ VLM.views = (function () {
   }
 
   function pintarPosiciones(el, filas, cfg) {
-    const q = U.norm(VLM.store.state.ui.busquedaPos || '');
-    const vis = q
-      ? filas.filter(f => U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion).indexOf(q) > -1)
-      : filas;
+    const ui = VLM.store.state.ui;
+    const q = U.norm(ui.busquedaPos || '');
+    const solo = ui.posSoloOcultos && filas.some(f => f.oculto);
+    const vis = filas.filter(f => (!solo || f.oculto) &&
+      (!q || U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion).indexOf(q) > -1));
+    const trabado = !VLM.nube.puedeEditar();
 
     let html = '';
     if (!vis.length) {
-      html = '<tr><td colspan="8"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
+      html = '<tr><td colspan="9"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
     } else {
       vis.forEach(f => {
         let est = '', clase = '';
-        if (f.reasignada) {
+        if (f.oculto) {
+          clase = 'row-oculta';
+          est = '<div class="pos-oculto">' +
+            '<span class="badge b-oculto">Oculto</span>' +
+            (f.marca && f.marca.desde ? '<span class="pos-desde">desde el ' + U.fmtFechaCorta(f.marca.desde) + '</span>' : '') +
+            '</div>' +
+            '<input class="pos-nota" type="text" maxlength="80" ' +
+              'placeholder="Motivo: fin de lote, devolución, rotura…" ' +
+              (trabado ? 'disabled ' : '') +
+              'data-k="' + U.esc('nota|' + f.clave) + '" data-oculto="' + U.esc(f.uid) + '" ' +
+              'value="' + U.esc((f.marca && f.marca.nota) || '') + '">';
+        }
+        else if (f.reasignada) {
           est = '<span class="badge b-bajo">Revisar</span>' +
                 '<button class="btn btn-icon pos-ok" data-ubic="' + U.esc(f.ubicacion) + '" ' +
                 'data-art="' + U.esc(f.codigo) + '" ' +
@@ -845,6 +870,10 @@ VLM.views = (function () {
           }
         }
         html += '<tr class="' + clase + '">' +
+          '<td class="pos-ver"><input type="checkbox"' + (f.oculto ? '' : ' checked') +
+            (trabado ? ' disabled' : '') +
+            ' title="' + (f.oculto ? 'Oculto: no cuenta en el panel' : 'Se muestra en el panel') + '"' +
+            ' data-k="' + U.esc('ver|' + f.clave) + '" data-oculto="' + U.esc(f.uid) + '"></td>' +
           '<td class="t-code"><strong>' + U.esc(f.ubicacion) + '</strong></td>' +
           '<td>' + zchip(f.zona) + '</td>' +
           '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
@@ -852,7 +881,7 @@ VLM.views = (function () {
           celdaPaquete(f.paquete) +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
           celdaInp(f, 'min') + celdaInp(f, 'max') +
-          '<td>' + est + '</td>' +
+          '<td class="pos-est">' + est + '</td>' +
           '</tr>';
       });
     }
@@ -860,6 +889,19 @@ VLM.views = (function () {
     const cuerpo = $('#posBody', el);
     cuerpo.innerHTML = html;
     $('#posCount', el).textContent = vis.length + ' filas';
+
+    U.$$('.pos-ver input', cuerpo).forEach(chk => chk.addEventListener('change', () => {
+      const f = filas.filter(x => x.uid === chk.dataset.oculto)[0];
+      if (!f) return;
+      if (chk.checked) { guardarOculto(filas, f.uid, null); return; }
+      guardarOculto(filas, f.uid, { lotes: f.lotes, desde: Date.now(), nota: '' });
+      const nota = U.$$('.pos-nota', el).filter(n => n.dataset.oculto === f.uid)[0];
+      if (nota) nota.focus();
+    }));
+    U.$$('.pos-nota', cuerpo).forEach(inp => inp.addEventListener('change', () => {
+      if (!(VLM.store.state.cfg.ocultos || {})[inp.dataset.oculto]) return;
+      guardarOculto(filas, inp.dataset.oculto, { nota: inp.value.trim() });
+    }));
 
     U.$$('.pos-inp', cuerpo).forEach(inp => {
       inp.addEventListener('focus', () => inp.select());
@@ -873,6 +915,14 @@ VLM.views = (function () {
       VLM.store.setPosicion(b.dataset.ubic, {}, b.dataset.art);
       U.toast('Confirmado para el artículo nuevo', 'ok');
     }));
+  }
+
+  function guardarOculto(filas, uid, cambio) {
+    const o = Object.assign({}, VLM.store.state.cfg.ocultos || {});
+    filas.forEach(f => { if (o[f.uid] && !f.oculto) delete o[f.uid]; });
+    if (cambio) o[uid] = Object.assign({}, o[uid], cambio);
+    else delete o[uid];
+    VLM.store.setCfg({ ocultos: o });
   }
 
   /**

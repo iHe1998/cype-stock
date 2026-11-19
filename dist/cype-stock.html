@@ -1024,6 +1024,22 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 .pos-ok { width: 24px; height: 24px; margin-left: 6px; vertical-align: middle; color: var(--ok); }
 .pos-ok:hover { background: var(--ok-dim); border-color: var(--ok); }
 .pos-pct { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 4px; }
+#posTable .pos-ver { width: 1%; text-align: center; padding-left: 10px; padding-right: 4px; }
+.pos-ver input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
+.pos-ver input:disabled { opacity: .5; cursor: not-allowed; }
+.row-oculta td { opacity: .5; }
+.row-oculta td.pos-ver, .row-oculta td.pos-est { opacity: 1; }
+.b-oculto { color: var(--muted); background: var(--surface-3); border-color: var(--border); }
+.pos-oculto { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.pos-desde { font-size: 11px; color: var(--muted); }
+.pos-nota {
+  display: block; width: 100%; min-width: 210px; height: 26px; margin-top: 5px; padding: 0 7px;
+  font: inherit; font-size: 12px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; outline: none;
+}
+.pos-nota:focus { border-color: var(--accent); background: var(--surface); }
+.pos-nota::placeholder { color: var(--muted); font-style: italic; }
+.pos-nota:disabled { opacity: .6; cursor: not-allowed; }
 
 /* ---------- detalle de artículo ---------- */
 .art-head { display: flex; flex-direction: column; gap: 6px; }
@@ -1817,7 +1833,7 @@ kbd {
           <div class="cfg-grupo">
             <h4>En la base, compartido</h4>
             <p class="cfg-ayuda">Todo viaja solo: el stock al importar la planilla, y los máximos,
-              los umbrales y los laboratorios apenas se cambian. La
+              los umbrales, los laboratorios y los artículos ocultos apenas se cambian. La
               pantalla se refresca sola cada dos minutos y medio, así que lo que se toca acá lo ven
               las demás PCs sin que nadie recargue nada. Lo único que queda en cada PC es el tema
               claro/oscuro y en qué pestaña está parada. Estos botones son para forzarlo a mano.</p>
@@ -1875,8 +1891,8 @@ kbd {
             <h4>Borrar el stock de esta PC</h4>
             <p class="cfg-ayuda">Vacía la pantalla acá y nada más: el stock sigue en la base y
               <strong>vuelve solo</strong> en el próximo refresco. Sirve para destrabar una PC que
-              quedó con datos raros, no para dar de baja el stock. Los umbrales, los laboratorios
-              y los máximos no se tocan.</p>
+              quedó con datos raros, no para dar de baja el stock. Los umbrales, los laboratorios,
+              los máximos y los artículos ocultos no se tocan.</p>
             <div class="cfg-actions">
               <button class="btn btn-danger" id="btnClearData">Borrar datos de esta PC</button>
             </div>
@@ -1887,7 +1903,7 @@ kbd {
     </div>
 
     <footer class="modal-foot">
-      <span class="muted small" id="appVersion">compilado 19/11/2026 20:24 (sobre e0afc6e)</span>
+      <span class="muted small" id="appVersion">compilado 19/11/2026 20:39 (sobre 2140d9c)</span>
       <div class="spacer"></div>
       <button class="btn btn-primary" data-close>Listo</button>
     </footer>
@@ -2809,7 +2825,8 @@ VLM.store = (function () {
     // qué hacer con laboratorios que no están en el catálogo:
     // 'excluir' los deja fuera de KPIs y vistas (pero se informa cuántos son),
     // 'incluir' los muestra como no gestionados.
-    labsNoListados: 'excluir'
+    labsNoListados: 'excluir',
+    ocultos: {}
   };
 
   const state = {
@@ -4792,10 +4809,27 @@ VLM.analytics = (function () {
       .slice(0, n || 10);
   }
 
+  function lotesEnVLM(p) {
+    const lotes = [];
+    (p.detalle || []).forEach(d => {
+      if (d.tipo !== 'picking' || !(d.stock > 0)) return;
+      const k = (d.lote || '') + '|' + (d.lote2 || '');
+      if (lotes.indexOf(k) === -1) lotes.push(k);
+    });
+    return lotes;
+  }
+
+  function estaOculto(p, ocultos) {
+    const marca = ocultos && ocultos[p.uid];
+    if (!marca) return false;
+    const guardados = marca.lotes || [];
+    return lotesEnVLM(p).every(l => guardados.indexOf(l) > -1);
+  }
+
   return {
     ESTADOS, ORDEN_ESTADOS,
     calcular, estadoDeNivel, resumen, porLaboratorio, porGrupo, filtrarPorZona,
-    topUrgentes
+    topUrgentes, lotesEnVLM, estaOculto
   };
 })();
 
@@ -5683,6 +5717,7 @@ VLM.views = (function () {
   function posiciones(el, items, cfg) {
     const ui = VLM.store.state.ui;
     const cfgPos = VLM.store.state.posiciones;
+    const ocultos = cfg.ocultos || {};
 
     /* UNA fila por POSICIÓN + ARTÍCULO.
        Afuera del VLM cada posición de picking tiene un solo artículo y la
@@ -5708,7 +5743,9 @@ VLM.views = (function () {
             arts: [{ codigo: p.codigo, descripcion: p.descripcion }],
             codigo: p.codigo, descripcion: p.descripcion, paquete: p.paquete,
             stock: 0, min: c.min || 0, max: c.max || 0,
-            artConfig: c.articulo || null
+            artConfig: c.articulo || null,
+            uid: p.uid, lotes: A.lotesEnVLM(p),
+            oculto: A.estaOculto(p, ocultos), marca: ocultos[p.uid] || null
           };
         }
         porSlot[k].stock += d.stock;
@@ -5729,6 +5766,7 @@ VLM.views = (function () {
     });
 
     const configuradas = filas.filter(f => f.min || f.max).length;
+    const ocultas = filas.filter(f => f.oculto).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
       kpi('Posiciones del VLM', U.fmt(filas.length),
@@ -5736,16 +5774,16 @@ VLM.views = (function () {
       kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
           filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
-      kpi('Para rellenar', U.fmt(filas.filter(f => !f.reasignada &&
+      kpi('Para rellenar', U.fmt(filas.filter(f => !f.reasignada && !f.oculto &&
             ['critico','bajo','agotado'].indexOf(estadoPosicion(f, cfg)) > -1).length),
           'bajo el ' + cfg.pctBajo + '% de su capacidad', 'k-crit') +
-      kpi('Cambiaron de artículo', U.fmt(filas.filter(f => f.reasignada).length),
-          'el mín/máx guardado no se aplica',
-          filas.some(f => f.reasignada) ? 'k-warn' : 'k-ok') +
+      kpi('Ocultos', U.fmt(ocultas), 'no cuentan en el panel', ocultas ? 'k-warn' : '') +
       '</div>';
 
     html += '<div class="toolbar">' +
       '<input class="input" id="posSearch" type="search" data-k="posSearch" placeholder="Buscar posición o artículo…" value="' + U.esc(ui.busquedaPos || '') + '">' +
+      (ocultas ? '<button class="chip' + (ui.posSoloOcultos ? ' is-active' : '') + '" id="posSoloOcultos">' +
+        'Sólo ocultos · ' + ocultas + '</button>' : '') +
       '<div class="spacer"></div>' +
       '<button class="btn" id="posExport">Exportar plantilla</button>' +
       '<button class="btn" id="posImport">Importar completada</button>' +
@@ -5766,6 +5804,7 @@ VLM.views = (function () {
 
     html += '<div class="table-wrap"><table class="table" id="posTable">' +
       '<thead><tr>' +
+        '<th class="no-sort pos-ver" title="Se muestra en el panel">Ver</th>' +
         '<th class="no-sort">Posición</th><th class="no-sort">Zona</th>' +
         '<th class="no-sort">Artículo</th><th class="no-sort">Paquete</th>' +
         '<th class="no-sort t-num">Stock</th>' +
@@ -5784,6 +5823,12 @@ VLM.views = (function () {
       VLM.store.setUi({ busquedaPos: buscar.value }, true);
       repintar();
     });
+    const soloOcultos = $('#posSoloOcultos', el);
+    if (soloOcultos) soloOcultos.addEventListener('click', () => {
+      VLM.store.setUi({ posSoloOcultos: !VLM.store.state.ui.posSoloOcultos }, true);
+      soloOcultos.classList.toggle('is-active', !!VLM.store.state.ui.posSoloOcultos);
+      pintarPosiciones(el, filas, cfg);
+    });
     $('#posExport', el).addEventListener('click', () => exportarPosiciones(filas));
     $('#posImport', el).addEventListener('click', () => $('#posFile', el).click());
     $('#posFile', el).addEventListener('change', e => {
@@ -5792,18 +5837,32 @@ VLM.views = (function () {
   }
 
   function pintarPosiciones(el, filas, cfg) {
-    const q = U.norm(VLM.store.state.ui.busquedaPos || '');
-    const vis = q
-      ? filas.filter(f => U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion).indexOf(q) > -1)
-      : filas;
+    const ui = VLM.store.state.ui;
+    const q = U.norm(ui.busquedaPos || '');
+    const solo = ui.posSoloOcultos && filas.some(f => f.oculto);
+    const vis = filas.filter(f => (!solo || f.oculto) &&
+      (!q || U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion).indexOf(q) > -1));
+    const trabado = !VLM.nube.puedeEditar();
 
     let html = '';
     if (!vis.length) {
-      html = '<tr><td colspan="8"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
+      html = '<tr><td colspan="9"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
     } else {
       vis.forEach(f => {
         let est = '', clase = '';
-        if (f.reasignada) {
+        if (f.oculto) {
+          clase = 'row-oculta';
+          est = '<div class="pos-oculto">' +
+            '<span class="badge b-oculto">Oculto</span>' +
+            (f.marca && f.marca.desde ? '<span class="pos-desde">desde el ' + U.fmtFechaCorta(f.marca.desde) + '</span>' : '') +
+            '</div>' +
+            '<input class="pos-nota" type="text" maxlength="80" ' +
+              'placeholder="Motivo: fin de lote, devolución, rotura…" ' +
+              (trabado ? 'disabled ' : '') +
+              'data-k="' + U.esc('nota|' + f.clave) + '" data-oculto="' + U.esc(f.uid) + '" ' +
+              'value="' + U.esc((f.marca && f.marca.nota) || '') + '">';
+        }
+        else if (f.reasignada) {
           est = '<span class="badge b-bajo">Revisar</span>' +
                 '<button class="btn btn-icon pos-ok" data-ubic="' + U.esc(f.ubicacion) + '" ' +
                 'data-art="' + U.esc(f.codigo) + '" ' +
@@ -5822,6 +5881,10 @@ VLM.views = (function () {
           }
         }
         html += '<tr class="' + clase + '">' +
+          '<td class="pos-ver"><input type="checkbox"' + (f.oculto ? '' : ' checked') +
+            (trabado ? ' disabled' : '') +
+            ' title="' + (f.oculto ? 'Oculto: no cuenta en el panel' : 'Se muestra en el panel') + '"' +
+            ' data-k="' + U.esc('ver|' + f.clave) + '" data-oculto="' + U.esc(f.uid) + '"></td>' +
           '<td class="t-code"><strong>' + U.esc(f.ubicacion) + '</strong></td>' +
           '<td>' + zchip(f.zona) + '</td>' +
           '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
@@ -5829,7 +5892,7 @@ VLM.views = (function () {
           celdaPaquete(f.paquete) +
           '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
           celdaInp(f, 'min') + celdaInp(f, 'max') +
-          '<td>' + est + '</td>' +
+          '<td class="pos-est">' + est + '</td>' +
           '</tr>';
       });
     }
@@ -5837,6 +5900,19 @@ VLM.views = (function () {
     const cuerpo = $('#posBody', el);
     cuerpo.innerHTML = html;
     $('#posCount', el).textContent = vis.length + ' filas';
+
+    U.$$('.pos-ver input', cuerpo).forEach(chk => chk.addEventListener('change', () => {
+      const f = filas.filter(x => x.uid === chk.dataset.oculto)[0];
+      if (!f) return;
+      if (chk.checked) { guardarOculto(filas, f.uid, null); return; }
+      guardarOculto(filas, f.uid, { lotes: f.lotes, desde: Date.now(), nota: '' });
+      const nota = U.$$('.pos-nota', el).filter(n => n.dataset.oculto === f.uid)[0];
+      if (nota) nota.focus();
+    }));
+    U.$$('.pos-nota', cuerpo).forEach(inp => inp.addEventListener('change', () => {
+      if (!(VLM.store.state.cfg.ocultos || {})[inp.dataset.oculto]) return;
+      guardarOculto(filas, inp.dataset.oculto, { nota: inp.value.trim() });
+    }));
 
     U.$$('.pos-inp', cuerpo).forEach(inp => {
       inp.addEventListener('focus', () => inp.select());
@@ -5850,6 +5926,14 @@ VLM.views = (function () {
       VLM.store.setPosicion(b.dataset.ubic, {}, b.dataset.art);
       U.toast('Confirmado para el artículo nuevo', 'ok');
     }));
+  }
+
+  function guardarOculto(filas, uid, cambio) {
+    const o = Object.assign({}, VLM.store.state.cfg.ocultos || {});
+    filas.forEach(f => { if (o[f.uid] && !f.oculto) delete o[f.uid]; });
+    if (cambio) o[uid] = Object.assign({}, o[uid], cambio);
+    else delete o[uid];
+    VLM.store.setCfg({ ocultos: o });
   }
 
   /**
@@ -6488,14 +6572,16 @@ VLM.app = (function () {
    * El asistente busca sobre esto: pedirle un SKU y que no aparezca porque
    * la pantalla estaba filtrada por frío sería desconcertante.
    */
-  function itemsCalculados() {
+  function itemsCalculados(conOcultos) {
     if (!calculados) {
       // los que una regla de ignorar dejó sin ninguna posición no existen ni
       // para el panel ni para el buscador: se pidió que no estuvieran
       calculados = A.calcular(S.state.productos, S.state.cfg)
         .filter(p => !P.estaIgnorado(p) && p.ambito === 'vlm');
     }
-    return calculados;
+    if (conOcultos) return calculados;
+    const ocultos = S.state.cfg.ocultos || {};
+    return calculados.filter(p => !A.estaOculto(p, ocultos));
   }
 
   /**
@@ -6507,9 +6593,9 @@ VLM.app = (function () {
    *   para armar su desplegable: si se filtrara, quedaría una sola opción y no
    *   habría cómo volver.
    */
-  function itemsVisibles(sinLab) {
+  function itemsVisibles(sinLab, conOcultos) {
     const ui = S.state.ui;
-    let items = itemsCalculados();
+    let items = itemsCalculados(conOcultos);
     const cfg = S.state.cfg;
 
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
@@ -6559,16 +6645,17 @@ VLM.app = (function () {
     if (!el) return;
     el.hidden = false;
 
-    if (!items.length) {
+    const lista = vista === 'pos' ? itemsVisibles(false, true) : items;
+    if (!lista.length) {
       el.innerHTML = '<div class="no-results"><strong>Ningún producto coincide con el filtro</strong><br>' +
-        '<span class="small">Probá con “Todo”, “Todas” y “Todos los laboratorios” en la barra de arriba.</span></div>';
+        '<span class="small">Probá con “Todas” y “Todos los laboratorios” en la barra de arriba.</span></div>';
       return;
     }
     try {
       if (vista === 'dashboard') V.dashboard(el, items, cfg);
       else if (vista === 'repo')  V.reposicion(el, items, cfg);
       else if (vista === 'inv')   V.inventario(el, items, cfg);
-      else if (vista === 'pos')   V.posiciones(el, items, cfg);
+      else if (vista === 'pos')   V.posiciones(el, lista, cfg);
     } catch (e) {
       console.error(e);
       el.innerHTML = '<div class="no-results"><strong>Error al dibujar la vista</strong><br>' +
@@ -6707,11 +6794,13 @@ VLM.app = (function () {
     }
     sel.classList.toggle('is-active', !!ui.filtroLab);
 
-    const universo = itemsCalculados();
+    const universo = itemsCalculados(true);
     const excluidos = S.state.cfg.labsNoListados === 'excluir'
       ? universo.filter(p => !p.gestionado).length : 0;
+    const ocultos = universo.length - itemsCalculados().length;
     let txt = items.length + ' de ' + universo.length + ' productos';
     if (excluidos) txt += ' · ' + excluidos + ' fuera del catálogo de laboratorios';
+    if (ocultos) txt += ' · ' + ocultos + (ocultos === 1 ? ' oculto' : ' ocultos') + ' a mano';
     $('#zoneCount').textContent = txt;
   }
 
@@ -6726,7 +6815,7 @@ VLM.app = (function () {
     const edad = Date.now() - (meta.importadoEn || 0);
     dot.className = 'dot ' + (edad > 12 * 3600e3 ? 'stale' : 'live');
     txt.innerHTML = U.esc(meta.archivo || 'datos') + ' · ' +
-      itemsCalculados().length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
+      itemsCalculados(true).length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
   }
 
   function irA(vista) {
@@ -8115,7 +8204,7 @@ VLM.app = (function () {
 
     $('#btnExportMax').addEventListener('click', () => {
       if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
-      V.exportarMaximos(itemsCalculados());
+      V.exportarMaximos(itemsCalculados(true));
     });
 
     $('#btnImportMax').addEventListener('click', () => $('#fileMax').click());

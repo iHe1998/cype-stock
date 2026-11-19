@@ -172,14 +172,16 @@ VLM.app = (function () {
    * El asistente busca sobre esto: pedirle un SKU y que no aparezca porque
    * la pantalla estaba filtrada por frío sería desconcertante.
    */
-  function itemsCalculados() {
+  function itemsCalculados(conOcultos) {
     if (!calculados) {
       // los que una regla de ignorar dejó sin ninguna posición no existen ni
       // para el panel ni para el buscador: se pidió que no estuvieran
       calculados = A.calcular(S.state.productos, S.state.cfg)
         .filter(p => !P.estaIgnorado(p) && p.ambito === 'vlm');
     }
-    return calculados;
+    if (conOcultos) return calculados;
+    const ocultos = S.state.cfg.ocultos || {};
+    return calculados.filter(p => !A.estaOculto(p, ocultos));
   }
 
   /**
@@ -191,9 +193,9 @@ VLM.app = (function () {
    *   para armar su desplegable: si se filtrara, quedaría una sola opción y no
    *   habría cómo volver.
    */
-  function itemsVisibles(sinLab) {
+  function itemsVisibles(sinLab, conOcultos) {
     const ui = S.state.ui;
-    let items = itemsCalculados();
+    let items = itemsCalculados(conOcultos);
     const cfg = S.state.cfg;
 
     if (cfg.labsNoListados === 'excluir') items = items.filter(p => p.gestionado);
@@ -243,16 +245,17 @@ VLM.app = (function () {
     if (!el) return;
     el.hidden = false;
 
-    if (!items.length) {
+    const lista = vista === 'pos' ? itemsVisibles(false, true) : items;
+    if (!lista.length) {
       el.innerHTML = '<div class="no-results"><strong>Ningún producto coincide con el filtro</strong><br>' +
-        '<span class="small">Probá con “Todo”, “Todas” y “Todos los laboratorios” en la barra de arriba.</span></div>';
+        '<span class="small">Probá con “Todas” y “Todos los laboratorios” en la barra de arriba.</span></div>';
       return;
     }
     try {
       if (vista === 'dashboard') V.dashboard(el, items, cfg);
       else if (vista === 'repo')  V.reposicion(el, items, cfg);
       else if (vista === 'inv')   V.inventario(el, items, cfg);
-      else if (vista === 'pos')   V.posiciones(el, items, cfg);
+      else if (vista === 'pos')   V.posiciones(el, lista, cfg);
     } catch (e) {
       console.error(e);
       el.innerHTML = '<div class="no-results"><strong>Error al dibujar la vista</strong><br>' +
@@ -391,11 +394,13 @@ VLM.app = (function () {
     }
     sel.classList.toggle('is-active', !!ui.filtroLab);
 
-    const universo = itemsCalculados();
+    const universo = itemsCalculados(true);
     const excluidos = S.state.cfg.labsNoListados === 'excluir'
       ? universo.filter(p => !p.gestionado).length : 0;
+    const ocultos = universo.length - itemsCalculados().length;
     let txt = items.length + ' de ' + universo.length + ' productos';
     if (excluidos) txt += ' · ' + excluidos + ' fuera del catálogo de laboratorios';
+    if (ocultos) txt += ' · ' + ocultos + (ocultos === 1 ? ' oculto' : ' ocultos') + ' a mano';
     $('#zoneCount').textContent = txt;
   }
 
@@ -410,7 +415,7 @@ VLM.app = (function () {
     const edad = Date.now() - (meta.importadoEn || 0);
     dot.className = 'dot ' + (edad > 12 * 3600e3 ? 'stale' : 'live');
     txt.innerHTML = U.esc(meta.archivo || 'datos') + ' · ' +
-      itemsCalculados().length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
+      itemsCalculados(true).length + ' productos · <strong>' + U.hace(meta.importadoEn) + '</strong>';
   }
 
   function irA(vista) {
@@ -1799,7 +1804,7 @@ VLM.app = (function () {
 
     $('#btnExportMax').addEventListener('click', () => {
       if (!S.hayDatos()) { U.toast('No hay datos cargados', 'err'); return; }
-      V.exportarMaximos(itemsCalculados());
+      V.exportarMaximos(itemsCalculados(true));
     });
 
     $('#btnImportMax').addEventListener('click', () => $('#fileMax').click());

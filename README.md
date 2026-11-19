@@ -279,6 +279,19 @@ artículo directamente no tiene reserva, aclarando que no hay de dónde sacar.
 No aplica si la posición está vacía —ahí no hay ningún lote que se esté terminando— ni si
 la planilla no trae columna de lote, porque no habría con qué comparar.
 
+### Ocultar un artículo
+
+Hay artículos que figuran críticos y no importan: el resto de un lote que volvió por una
+devolución o una rotura. La primera columna de **Posiciones**, `Ver`, los saca del panel:
+destildada, el artículo deja de contar en el resumen, la reposición, el inventario, el
+modo TV y el buscador. En Posiciones sigue apareciendo, atenuado, con un campo para anotar
+el motivo, y se vuelve a mostrar tildándola de nuevo. **Sólo ocultos** lista los que están
+escondidos, y la barra de arriba dice cuántos son.
+
+La marca vale **para los lotes que hay hoy en la torre**. Si entra un lote nuevo, el
+artículo vuelve a aparecer solo: un fin de lote no puede tapar para siempre un faltante de
+verdad. Se comparte con todas las PCs, como los máximos, y hace falta sesión para cambiarla.
+
 Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con una fila por
 posición y artículo, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve
 con **Importar completada**. Las columnas `Posicion` y `Articulo` son las que arman la

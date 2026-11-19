@@ -250,9 +250,26 @@ VLM.analytics = (function () {
       .slice(0, n || 10);
   }
 
+  function lotesEnVLM(p) {
+    const lotes = [];
+    (p.detalle || []).forEach(d => {
+      if (d.tipo !== 'picking' || !(d.stock > 0)) return;
+      const k = (d.lote || '') + '|' + (d.lote2 || '');
+      if (lotes.indexOf(k) === -1) lotes.push(k);
+    });
+    return lotes;
+  }
+
+  function estaOculto(p, ocultos) {
+    const marca = ocultos && ocultos[p.uid];
+    if (!marca) return false;
+    const guardados = marca.lotes || [];
+    return lotesEnVLM(p).every(l => guardados.indexOf(l) > -1);
+  }
+
   return {
     ESTADOS, ORDEN_ESTADOS,
     calcular, estadoDeNivel, resumen, porLaboratorio, porGrupo, filtrarPorZona,
-    topUrgentes
+    topUrgentes, lotesEnVLM, estaOculto
   };
 })();
