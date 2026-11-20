@@ -708,12 +708,7 @@ VLM.views = (function () {
     const cfgPos = VLM.store.state.posiciones;
     const ocultos = cfg.ocultos || {};
 
-    /* UNA fila por POSICIÓN + ARTÍCULO.
-       Afuera del VLM cada posición de picking tiene un solo artículo y la
-       fila es la posición de siempre. Adentro de la torre, en cambio, todos
-       comparten VLMVENTA01/02, así que la fila es el artículo dentro de esa
-       posición: es lo único que se puede configurar por separado. */
-    const porSlot = {}, artsPorUbic = {};
+    const porLote = {}, artsPorUbic = {};
     let enReserva = 0;
     items.forEach(p => {
       (p.detalle || []).forEach(d => {
@@ -723,26 +718,37 @@ VLM.views = (function () {
         if (!VLM.parser.esConfigurable(d)) { enReserva++; return; }
         const u = d.ubicacion.toUpperCase();
         const k = u + '|' + String(p.codigo).toUpperCase();
+        const lote = A.claveLote(d);
         if (!artsPorUbic[u]) artsPorUbic[u] = {};
         artsPorUbic[u][p.codigo] = 1;
-        if (!porSlot[k]) {
+        if (!porLote[k + '|' + lote]) {
           const c = cfgPos[k] || cfgPos[u] || {};
-          porSlot[k] = {
-            clave: k, ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
-            arts: [{ codigo: p.codigo, descripcion: p.descripcion }],
+          porLote[k + '|' + lote] = {
+            clave: k, claveLote: p.uid + '#' + lote,
+            ubicacion: d.ubicacion, tipo: d.tipo || 'picking', zona: d.zona,
             codigo: p.codigo, descripcion: p.descripcion, paquete: p.paquete,
+            lote: d.lote || '', lote2: d.lote2 || '', vencimiento: d.vencimiento || null,
             stock: 0, min: c.min || 0, max: c.max || 0,
             artConfig: c.articulo || null,
-            uid: p.uid, lotes: A.lotesEnVLM(p),
-            oculto: A.estaOculto(p, ocultos), marca: ocultos[p.uid] || null
+            uid: p.uid, oculto: A.loteOculto(ocultos, p.uid, d),
+            marca: A.marcaDeLote(ocultos, p.uid, d)
           };
         }
-        porSlot[k].stock += d.stock;
+        porLote[k + '|' + lote].stock += d.stock;
       });
     });
-    const filas = Object.keys(porSlot).map(k => porSlot[k])
+    const filas = Object.keys(porLote).map(k => porLote[k])
       .sort((a, b) => a.ubicacion.localeCompare(b.ubicacion, 'es') ||
-                      a.codigo.localeCompare(b.codigo, 'es'));
+                      a.codigo.localeCompare(b.codigo, 'es') ||
+                      (a.vencimiento && b.vencimiento ? a.vencimiento - b.vencimiento : 0) ||
+                      a.lote.localeCompare(b.lote, 'es'));
+
+    const grupos = {};
+    filas.forEach(f => {
+      const g = grupos[f.clave] || (grupos[f.clave] = { visible: 0, lotes: 0, ocultos: 0 });
+      g.lotes++;
+      if (f.oculto) g.ocultos++; else g.visible += f.stock;
+    });
 
     /* En picking es normal que al agotarse un artículo la posición se le dé a
        otro. Ahí el mín/máx guardado es del artículo anterior y no sirve: no se
@@ -752,25 +758,29 @@ VLM.views = (function () {
       const compartida = Object.keys(artsPorUbic[f.ubicacion.toUpperCase()] || {}).length > 1;
       f.compartida = compartida;
       f.reasignada = !compartida && !!(f.artConfig && (f.min || f.max) && f.artConfig !== f.codigo);
+      f.stockGrupo = grupos[f.clave].visible;
+      f.grupoOculto = grupos[f.clave].ocultos === grupos[f.clave].lotes;
     });
 
-    const configuradas = filas.filter(f => f.min || f.max).length;
+    const cabezas = filas.filter((f, i) => i === 0 || filas[i - 1].clave !== f.clave);
+    const configuradas = cabezas.filter(f => f.min || f.max).length;
     const ocultas = filas.filter(f => f.oculto).length;
 
     let html = '<div class="kpi-grid" style="margin-bottom:16px">' +
-      kpi('Posiciones del VLM', U.fmt(filas.length),
-          enReserva ? U.fmt(enReserva) + ' de reserva, que no se configuran' : 'una fila por artículo') +
-      kpi('Con máximo cargado', U.fmt(filas.filter(f => f.max).length),
-          filas.length ? Math.round(configuradas / filas.length * 100) + '% del total' : '',
+      kpi('Posiciones del VLM', U.fmt(cabezas.length),
+          U.fmt(filas.length) + (filas.length === 1 ? ' lote' : ' lotes') +
+          (enReserva ? ' · ' + U.fmt(enReserva) + ' de reserva, que no se configuran' : '')) +
+      kpi('Con máximo cargado', U.fmt(cabezas.filter(f => f.max).length),
+          cabezas.length ? Math.round(configuradas / cabezas.length * 100) + '% del total' : '',
           configuradas ? 'k-ok' : 'k-warn') +
-      kpi('Para rellenar', U.fmt(filas.filter(f => !f.reasignada && !f.oculto &&
+      kpi('Para rellenar', U.fmt(cabezas.filter(f => !f.reasignada && !f.grupoOculto &&
             ['critico','bajo','agotado'].indexOf(estadoPosicion(f, cfg)) > -1).length),
           'bajo el ' + cfg.pctBajo + '% de su capacidad', 'k-crit') +
-      kpi('Ocultos', U.fmt(ocultas), 'no cuentan en el panel', ocultas ? 'k-warn' : '') +
+      kpi('Lotes ocultos', U.fmt(ocultas), 'no cuentan en el panel', ocultas ? 'k-warn' : '') +
       '</div>';
 
     html += '<div class="toolbar">' +
-      '<input class="input" id="posSearch" type="search" data-k="posSearch" placeholder="Buscar posición o artículo…" value="' + U.esc(ui.busquedaPos || '') + '">' +
+      '<input class="input" id="posSearch" type="search" data-k="posSearch" placeholder="Buscar posición, artículo o lote…" value="' + U.esc(ui.busquedaPos || '') + '">' +
       (ocultas ? '<button class="chip' + (ui.posSoloOcultos ? ' is-active' : '') + '" id="posSoloOcultos">' +
         'Sólo ocultos · ' + ocultas + '</button>' : '') +
       '<div class="spacer"></div>' +
@@ -795,7 +805,7 @@ VLM.views = (function () {
       '<thead><tr>' +
         '<th class="no-sort pos-ver" title="Se muestra en el panel">Ver</th>' +
         '<th class="no-sort">Posición</th><th class="no-sort">Zona</th>' +
-        '<th class="no-sort">Artículo</th><th class="no-sort">Paquete</th>' +
+        '<th class="no-sort">Artículo</th><th class="no-sort">Lote</th><th class="no-sort">Paquete</th>' +
         '<th class="no-sort t-num">Stock</th>' +
         '<th class="no-sort t-num">Mínimo</th><th class="no-sort t-num">Máximo</th>' +
         '<th class="no-sort">Estado</th>' +
@@ -830,26 +840,19 @@ VLM.views = (function () {
     const q = U.norm(ui.busquedaPos || '');
     const solo = ui.posSoloOcultos && filas.some(f => f.oculto);
     const vis = filas.filter(f => (!solo || f.oculto) &&
-      (!q || U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion).indexOf(q) > -1));
+      (!q || U.norm(f.ubicacion + ' ' + f.codigo + ' ' + f.descripcion + ' ' + f.lote + ' ' + f.lote2).indexOf(q) > -1));
     const trabado = !VLM.nube.puedeEditar();
 
     let html = '';
     if (!vis.length) {
-      html = '<tr><td colspan="9"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
+      html = '<tr><td colspan="10"><div class="no-results">Sin posiciones para ese filtro</div></td></tr>';
     } else {
-      vis.forEach(f => {
+      vis.forEach((f, i) => {
+        const cabeza = i === 0 || vis[i - 1].clave !== f.clave;
         let est = '', clase = '';
-        if (f.oculto) {
-          clase = 'row-oculta';
-          est = '<div class="pos-oculto">' +
-            '<span class="badge b-oculto">Oculto</span>' +
-            (f.marca && f.marca.desde ? '<span class="pos-desde">desde el ' + U.fmtFechaCorta(f.marca.desde) + '</span>' : '') +
-            '</div>' +
-            '<input class="pos-nota" type="text" maxlength="80" ' +
-              'placeholder="Motivo: fin de lote, devolución, rotura…" ' +
-              (trabado ? 'disabled ' : '') +
-              'data-k="' + U.esc('nota|' + f.clave) + '" data-oculto="' + U.esc(f.uid) + '" ' +
-              'value="' + U.esc((f.marca && f.marca.nota) || '') + '">';
+        if (f.grupoOculto) {
+          est = '<span class="badge b-oculto">Oculto</span>';
+          clase = 'grupo-oculto';
         }
         else if (f.reasignada) {
           est = '<span class="badge b-bajo">Revisar</span>' +
@@ -864,24 +867,27 @@ VLM.views = (function () {
           if (e === 'sd') est = '<span class="badge b-sd">Sin cargar</span>';
           else {
             est = badge(e) + (f.max ? ' <span class="pos-pct">' +
-              Math.round(f.stock / f.max * 100) + '%</span>' : '');
+              Math.round(f.stockGrupo / f.max * 100) + '%</span>' : '');
             if (e === 'critico' || e === 'agotado') clase = 'row-critico';
             else if (e === 'bajo') clase = 'row-bajo';
           }
         }
-        html += '<tr class="' + clase + '">' +
+        if (!cabeza) clase += ' pos-sigue';
+        if (f.oculto) clase += ' row-oculta';
+        html += '<tr class="' + clase.trim() + '">' +
           '<td class="pos-ver"><input type="checkbox"' + (f.oculto ? '' : ' checked') +
             (trabado ? ' disabled' : '') +
-            ' title="' + (f.oculto ? 'Oculto: no cuenta en el panel' : 'Se muestra en el panel') + '"' +
-            ' data-k="' + U.esc('ver|' + f.clave) + '" data-oculto="' + U.esc(f.uid) + '"></td>' +
+            ' title="' + (f.oculto ? 'Lote oculto: no cuenta en el panel' : 'Se muestra en el panel') + '"' +
+            ' data-k="' + U.esc('ver|' + f.claveLote) + '" data-oculto="' + U.esc(f.claveLote) + '"></td>' +
           '<td class="t-code"><strong>' + U.esc(f.ubicacion) + '</strong></td>' +
-          '<td>' + zchip(f.zona) + '</td>' +
+          '<td>' + (cabeza ? zchip(f.zona) : '') + '</td>' +
           '<td class="t-desc"><span class="t-code">' + U.esc(f.codigo) + '</span>' +
             (f.descripcion && f.descripcion !== f.codigo ? ' ' + U.esc(f.descripcion) : '') + '</td>' +
-          celdaPaquete(f.paquete) +
-          '<td class="t-num"><strong>' + U.fmt(f.stock) + '</strong></td>' +
-          celdaInp(f, 'min') + celdaInp(f, 'max') +
-          '<td class="pos-est">' + est + '</td>' +
+          celdaLote(f, trabado) +
+          (cabeza ? celdaPaquete(f.paquete) : '<td></td>') +
+          '<td class="t-num pos-stock"><strong>' + U.fmt(f.stock) + '</strong></td>' +
+          (cabeza ? celdaInp(f, 'min') + celdaInp(f, 'max') : '<td></td><td></td>') +
+          '<td class="pos-est">' + (cabeza ? est : '') + '</td>' +
           '</tr>';
       });
     }
@@ -891,15 +897,15 @@ VLM.views = (function () {
     $('#posCount', el).textContent = vis.length + ' filas';
 
     U.$$('.pos-ver input', cuerpo).forEach(chk => chk.addEventListener('change', () => {
-      const f = filas.filter(x => x.uid === chk.dataset.oculto)[0];
-      if (!f) return;
-      if (chk.checked) { guardarOculto(filas, f.uid, null); return; }
-      guardarOculto(filas, f.uid, { lotes: f.lotes, desde: Date.now(), nota: '' });
-      const nota = U.$$('.pos-nota', el).filter(n => n.dataset.oculto === f.uid)[0];
+      const clave = chk.dataset.oculto;
+      if (chk.checked) { guardarOculto(filas, clave, null); return; }
+      guardarOculto(filas, clave, { desde: Date.now(), nota: '' });
+      const nota = U.$$('.pos-nota', el).filter(n => n.dataset.oculto === clave)[0];
       if (nota) nota.focus();
     }));
     U.$$('.pos-nota', cuerpo).forEach(inp => inp.addEventListener('change', () => {
-      if (!(VLM.store.state.cfg.ocultos || {})[inp.dataset.oculto]) return;
+      const f = filas.filter(x => x.claveLote === inp.dataset.oculto)[0];
+      if (!f || !f.oculto) return;
       guardarOculto(filas, inp.dataset.oculto, { nota: inp.value.trim() });
     }));
 
@@ -917,12 +923,40 @@ VLM.views = (function () {
     }));
   }
 
-  function guardarOculto(filas, uid, cambio) {
+  function guardarOculto(filas, clave, cambio) {
     const o = Object.assign({}, VLM.store.state.cfg.ocultos || {});
-    filas.forEach(f => { if (o[f.uid] && !f.oculto) delete o[f.uid]; });
-    if (cambio) o[uid] = Object.assign({}, o[uid], cambio);
-    else delete o[uid];
+    const uids = {}, lotes = {};
+    filas.forEach(f => { uids[f.uid] = true; lotes[f.claveLote] = true; });
+    Object.keys(o).forEach(k => {
+      const m = o[k] || {};
+      if (Array.isArray(m.lotes)) {
+        if (!uids[k]) return;
+        m.lotes.forEach(l => { if (lotes[k + '#' + l]) o[k + '#' + l] = { desde: m.desde, nota: m.nota || '' }; });
+        delete o[k];
+        return;
+      }
+      if (uids[k.slice(0, k.lastIndexOf('#'))] && !lotes[k]) delete o[k];
+    });
+    if (cambio) o[clave] = Object.assign({}, o[clave], cambio);
+    else delete o[clave];
     VLM.store.setCfg({ ocultos: o });
+  }
+
+  function celdaLote(f, trabado) {
+    const sub = [f.lote2, f.vencimiento ? 'vence ' + U.fmtFecha(f.vencimiento) : '']
+      .filter(Boolean).join(' · ');
+    let html = '<td class="pos-lote"><span class="pos-lote-num t-code">' + U.esc(f.lote || '—') + '</span>' +
+      (sub ? '<span class="pos-lote-sub">' + U.esc(sub) + '</span>' : '');
+    if (f.oculto) {
+      html += '<span class="pos-desde">Oculto' +
+          (f.marca && f.marca.desde ? ' desde el ' + U.fmtFechaCorta(f.marca.desde) : '') + '</span>' +
+        '<input class="pos-nota" type="text" maxlength="80" ' +
+          'placeholder="Motivo: fin de lote, devolución, rotura…" ' +
+          (trabado ? 'disabled ' : '') +
+          'data-k="' + U.esc('nota|' + f.claveLote) + '" data-oculto="' + U.esc(f.claveLote) + '" ' +
+          'value="' + U.esc((f.marca && f.marca.nota) || '') + '">';
+    }
+    return html + '</td>';
   }
 
   /**
@@ -946,7 +980,7 @@ VLM.views = (function () {
    * porcentaje de la capacidad. Sin máximo se cae al mínimo.
    */
   function estadoPosicion(f, cfg) {
-    return A.estadoDeNivel(f.stock, f.min, f.max, cfg);
+    return A.estadoDeNivel(f.stockGrupo, f.min, f.max, cfg);
   }
 
   /**
@@ -954,7 +988,13 @@ VLM.views = (function () {
    * En CSV, Excel lee "010004100" como número y le come el cero de adelante:
    * al reimportarlo la configuración no matchearía ninguna posición.
    */
-  function exportarPosiciones(filas) {
+  function exportarPosiciones(filasPorLote) {
+    const filas = [], vistas = {};
+    filasPorLote.forEach(f => {
+      if (vistas[f.clave]) { vistas[f.clave].stock += f.stock; return; }
+      vistas[f.clave] = Object.assign({}, f);
+      filas.push(vistas[f.clave]);
+    });
     const out = [['Posicion', 'Zona', 'Articulo', 'Descripcion', 'Paquete', 'Stock', 'Minimo', 'Maximo']];
     filas.forEach(f => out.push([
       f.ubicacion, f.zona || '',

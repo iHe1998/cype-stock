@@ -176,12 +176,31 @@ VLM.app = (function () {
     if (!calculados) {
       // los que una regla de ignorar dejó sin ninguna posición no existen ni
       // para el panel ni para el buscador: se pidió que no estuvieran
-      calculados = A.calcular(S.state.productos, S.state.cfg)
+      const listos = lista => A.calcular(lista, S.state.cfg)
         .filter(p => !P.estaIgnorado(p) && p.ambito === 'vlm');
+      calculados = { todos: listos(S.state.productos), visibles: listos(sinLotesOcultos(S.state.productos)) };
     }
-    if (conOcultos) return calculados;
+    return conOcultos ? calculados.todos : calculados.visibles;
+  }
+
+  function sinLotesOcultos(productos) {
     const ocultos = S.state.cfg.ocultos || {};
-    return calculados.filter(p => !A.estaOculto(p, ocultos));
+    if (!Object.keys(ocultos).length) return productos;
+    const tocados = [];
+    const salida = productos.map(p => {
+      const det = p.detalle || [];
+      const quedan = det.filter(d => !(d.tipo === 'picking' && A.loteOculto(ocultos, p.uid, d)));
+      if (quedan.length === det.length) return p;
+      if (!quedan.some(d => d.tipo === 'picking')) return null;
+      const copia = Object.assign({}, p, { detalle: quedan });
+      tocados.push(copia);
+      return copia;
+    }).filter(Boolean);
+    if (tocados.length) {
+      P.reaplicarReglas(tocados, S.state.labs);
+      P.aplicarPosiciones(tocados, S.state.posiciones);
+    }
+    return salida;
   }
 
   /**
@@ -397,10 +416,14 @@ VLM.app = (function () {
     const universo = itemsCalculados(true);
     const excluidos = S.state.cfg.labsNoListados === 'excluir'
       ? universo.filter(p => !p.gestionado).length : 0;
-    const ocultos = universo.length - itemsCalculados().length;
+    const marcas = S.state.cfg.ocultos || {};
+    let ocultos = 0;
+    universo.forEach(p => (p.detalle || []).forEach(d => {
+      if (d.tipo === 'picking' && A.loteOculto(marcas, p.uid, d)) ocultos++;
+    }));
     let txt = items.length + ' de ' + universo.length + ' productos';
     if (excluidos) txt += ' · ' + excluidos + ' fuera del catálogo de laboratorios';
-    if (ocultos) txt += ' · ' + ocultos + (ocultos === 1 ? ' oculto' : ' ocultos') + ' a mano';
+    if (ocultos) txt += ' · ' + ocultos + (ocultos === 1 ? ' lote oculto' : ' lotes ocultos') + ' a mano';
     $('#zoneCount').textContent = txt;
   }
 

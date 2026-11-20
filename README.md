@@ -216,10 +216,12 @@ lista de reposición dice de qué posiciones bajar.
 
 ## Posiciones: mínimo y máximo
 
-La pestaña **Posiciones** lista una fila por **posición del VLM + artículo** con su
-stock y el **mínimo** y el **máximo** editables ahí mismo. El
-**máximo** es el que manda: de él salen los umbrales de crítico y bajo, y el porcentaje de
-llenado que muestra cada fila. Se guardan solos y se aplican al instante, sin reimportar.
+La pestaña **Posiciones** lista una fila por **lote** de cada artículo del VLM, con el
+Lote, el Atributo 02 y el vencimiento, y el stock de ese lote. El **mínimo** y el
+**máximo** son del artículo —lo que entra no depende del lote— y se editan en su primera
+fila; las de los otros lotes van debajo, con el artículo atenuado. El **máximo** es el que
+manda: de él salen los umbrales de crítico y bajo, y el porcentaje de llenado del
+artículo, que suma sus lotes. Se guardan solos y se aplican al instante, sin reimportar.
 
 **La reserva no se configura ni se grafica.** Un mínimo y un máximo dicen cuándo rellenar
 una posición y cuánto entra; de la altura —y del pasillo que abastece al VLM— no se
@@ -279,18 +281,21 @@ artículo directamente no tiene reserva, aclarando que no hay de dónde sacar.
 No aplica si la posición está vacía —ahí no hay ningún lote que se esté terminando— ni si
 la planilla no trae columna de lote, porque no habría con qué comparar.
 
-### Ocultar un artículo
+### Ocultar un lote
 
-Hay artículos que figuran críticos y no importan: el resto de un lote que volvió por una
-devolución o una rotura. La primera columna de **Posiciones**, `Ver`, los saca del panel:
-destildada, el artículo deja de contar en el resumen, la reposición, el inventario, el
-modo TV y el buscador. En Posiciones sigue apareciendo, atenuado, con un campo para anotar
-el motivo, y se vuelve a mostrar tildándola de nuevo. **Sólo ocultos** lista los que están
-escondidos, y la barra de arriba dice cuántos son.
+Hay lotes que figuran y no importan: el resto que volvió por una devolución o una rotura,
+al lado del lote que se está usando. La primera columna de **Posiciones**, `Ver`, es por
+lote: destildada, las unidades de ese lote dejan de contar en el resumen, la reposición, el
+inventario, el modo TV y el buscador. El artículo sigue con sus otros lotes, y su estado se
+calcula sólo con ellos; si se ocultan todos, el artículo sale del panel.
 
-La marca vale **para los lotes que hay hoy en la torre**. Si entra un lote nuevo, el
-artículo vuelve a aparecer solo: un fin de lote no puede tapar para siempre un faltante de
-verdad. Se comparte con todas las PCs, como los máximos, y hace falta sesión para cambiarla.
+En Posiciones el lote sigue apareciendo, con el stock tachado y un campo para anotar el
+motivo, y se vuelve a mostrar tildándolo de nuevo. **Sólo ocultos** lista los escondidos, y
+la barra de arriba dice cuántos son.
+
+Un lote nuevo es una fila nueva, así que entra visible: un resto oculto no puede tapar un
+faltante de verdad. La marca se comparte con todas las PCs, como los máximos, y hace falta
+sesión para cambiarla.
 
 Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con una fila por
 posición y artículo, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve

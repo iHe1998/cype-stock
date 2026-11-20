@@ -1018,11 +1018,15 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; marg
 #posTable .pos-ver { width: 1%; text-align: center; padding-left: 10px; padding-right: 4px; }
 .pos-ver input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; vertical-align: middle; }
 .pos-ver input:disabled { opacity: .5; cursor: not-allowed; }
-.row-oculta td { opacity: .5; }
-.row-oculta td.pos-ver, .row-oculta td.pos-est { opacity: 1; }
+.pos-lote { min-width: 130px; }
+.pos-lote-num { display: block; font-size: 12px; }
+.pos-lote-sub { display: block; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.pos-sigue td.t-code strong, .pos-sigue td.t-desc { opacity: .4; }
+.row-oculta .pos-lote-num, .row-oculta .pos-lote-sub, .row-oculta .pos-stock { opacity: .5; }
+.row-oculta .pos-stock strong { text-decoration: line-through; }
+.grupo-oculto td.t-code, .grupo-oculto td.t-desc, .grupo-oculto td.t-paq { opacity: .5; }
 .b-oculto { color: var(--muted); background: var(--surface-3); border-color: var(--border); }
-.pos-oculto { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.pos-desde { font-size: 11px; color: var(--muted); }
+.pos-desde { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--muted); }
 .pos-nota {
   display: block; width: 100%; min-width: 210px; height: 26px; margin-top: 5px; padding: 0 7px;
   font: inherit; font-size: 12px; color: var(--text);
