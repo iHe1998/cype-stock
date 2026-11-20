@@ -231,11 +231,10 @@ VLM.tv = (function () {
     const res = A.resumen(items, cfg);
 
     el.innerHTML =
-      '<div class="tv-kpis">' +
+      '<div class="tv-kpis" style="grid-template-columns:repeat(3,1fr)">' +
         tvKpi('Productos', U.fmt(res.skus), res.labs + ' laboratorios · ' + U.fmtCompact(res.unidades) + ' u. en el VLM') +
         tvKpi('A reponer YA', U.fmt(res.aReponer), res.porEstado.agotado + ' agotados', res.aReponer ? 'k-crit' : 'k-ok') +
         tvKpi('Próximos a vaciarse', U.fmt(res.porEstado.bajo), 'bajo el ' + cfg.pctBajo + '% de su capacidad', res.porEstado.bajo ? 'k-warn' : 'k-ok') +
-        tvKpi('En altura', U.fmtCompact(res.unidadesAltura), 'reserva para rellenar') +
       '</div>' +
       '<div class="tv-split">' +
         '<div class="tv-panel"><h3>Estado del stock</h3><div class="tv-chart"><canvas id="tvChEstados"></canvas></div></div>' +
