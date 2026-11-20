@@ -217,11 +217,24 @@ lista de reposición dice de qué posiciones bajar.
 ## Posiciones: mínimo y máximo
 
 La pestaña **Posiciones** lista una fila por **lote** de cada artículo del VLM, con el
-Lote, el Atributo 02 y el vencimiento, y el stock de ese lote. El **mínimo** y el
-**máximo** son del artículo —lo que entra no depende del lote— y se editan en su primera
-fila; las de los otros lotes van debajo, con el artículo atenuado. El **máximo** es el que
-manda: de él salen los umbrales de crítico y bajo, y el porcentaje de llenado del
-artículo, que suma sus lotes. Se guardan solos y se aplican al instante, sin reimportar.
+Lote, el Atributo 02 y el vencimiento, y el stock de ese lote. Cada fila tiene su
+**mínimo** y su **máximo**, editables ahí mismo. El **máximo** es el que manda: de él salen
+los umbrales de crítico y bajo, y el porcentaje de llenado. Se guardan solos y se aplican
+al instante, sin reimportar.
+
+### Artículos con varios lotes
+
+Con un solo lote, el mínimo y el máximo son **del artículo**: valen para el lote que esté y
+siguen valiendo cuando entra otro. Con varios, **cada lote tiene los suyos** y su propio
+estado, y el artículo toma el estado de su peor lote.
+
+Cuando aparece un segundo lote, el que tiene más stock sigue con el máximo que tenía el
+artículo —se ve en cursiva— y los demás arrancan sin cargar. Así un resto de devolución no
+aparece crítico contra la capacidad de todo el artículo sin que nadie lo decida. Al
+escribir un número en un lote, ese lote pasa a tener el suyo.
+
+El buscador no cambia máximos de artículos con varios lotes, porque no sabría a cuál: pide
+hacerlo en Posiciones.
 
 **La reserva no se configura ni se grafica.** Un mínimo y un máximo dicen cuándo rellenar
 una posición y cuánto entra; de la altura —y del pasillo que abastece al VLM— no se
@@ -298,9 +311,11 @@ faltante de verdad. La marca se comparte con todas las PCs, como los máximos, y
 sesión para cambiarla.
 
 Para cargar muchas de golpe: **Exportar plantilla** baja un `.xlsx` con una fila por
-posición y artículo, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve
-con **Importar completada**. Las columnas `Posicion` y `Articulo` son las que arman la
-clave: no hay que tocarlas.
+lote, se completan las columnas `Mínimo` y `Máximo` en Excel y se vuelve con **Importar
+completada**. Las columnas `Posicion`, `Articulo`, `Lote` y `Atributo 02` son las que arman
+la clave: no hay que tocarlas. Un artículo con una sola fila guarda el número para el
+artículo; uno con varias, uno por lote. El respaldo de **⚙ Configuración → Exportar
+máximos** sigue la misma regla.
 
 > Es `.xlsx` y no CSV a propósito. En CSV, Excel lee `010004100` como número y le come el
 > cero de adelante; al reimportarlo la configuración no matchearía ninguna posición. En el

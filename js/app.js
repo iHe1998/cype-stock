@@ -994,23 +994,34 @@ VLM.app = (function () {
                         'como las que salen de «Exportar máximos»');
       }
 
-      const mapa = Object.assign({}, S.state.posiciones);
+      const iLote = cab.indexOf('lote'), iLote2 = cab.indexOf('atributo 02');
+      const texto = (f, i) => i < 0 ? '' : String(f[i] == null ? '' : f[i]).trim();
+      const leidas = [];
       let puestos = 0, borrados = 0, ignoradas = 0;
       for (let i = 1; i < matriz.length; i++) {
         const f = matriz[i] || [];
-        const ubic = String(f[iUbic] == null ? '' : f[iUbic]).trim();
-        const cod  = String(f[iCod]  == null ? '' : f[iCod]).trim();
+        const ubic = texto(f, iUbic);
+        const cod  = texto(f, iCod);
         if (!ubic || !cod) { ignoradas++; continue; }
-        const min = iMin < 0 ? 0 : (U.toNum(f[iMin]) || 0);
-        const max = iMax < 0 ? 0 : (U.toNum(f[iMax]) || 0);
-        const k = S.clavePos(ubic, cod);
-        if (!min && !max) {
-          if (mapa[k]) { delete mapa[k]; borrados++; }
-          continue;
-        }
-        mapa[k] = { ubicacion: ubic.toUpperCase(), articulo: cod, min: min, max: max };
-        puestos++;
+        leidas.push({
+          ubic: ubic, art: cod,
+          lote: texto(f, iLote) + '|' + texto(f, iLote2),
+          conLote: iLote > -1 || iLote2 > -1,
+          min: iMin < 0 ? 0 : (U.toNum(f[iMin]) || 0),
+          max: iMax < 0 ? 0 : (U.toNum(f[iMax]) || 0)
+        });
       }
+
+      const mapa = Object.assign({}, S.state.posiciones);
+      V.clavesDeImportacion(leidas).forEach(f => {
+        if (!f.min && !f.max) {
+          if (mapa[f.clave]) { delete mapa[f.clave]; borrados++; }
+          return;
+        }
+        mapa[f.clave] = { ubicacion: f.ubic.toUpperCase(), articulo: f.art, min: f.min, max: f.max,
+                          lote: f.lote || undefined };
+        puestos++;
+      });
 
       if (!puestos && !borrados) { U.toast('El archivo no trae ningún máximo', 'err'); return; }
       // Lo que borra no se ve hasta que pasó: mejor decirlo antes.

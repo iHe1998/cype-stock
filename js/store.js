@@ -203,13 +203,14 @@ VLM.store = (function () {
    * grande que de una chica. Al cambiar el ocupante la configuración queda
    * marcada para revisar en vez de aplicarse a ciegas.
    */
-  function setPosicion(ubicacion, cfg, articulo) {
-    const k = clavePos(ubicacion, articulo);
+  function setPosicion(ubicacion, cfg, articulo, lote) {
+    const k = clavePos(ubicacion, articulo, lote);
     if (!k) return;
     const actual = state.posiciones[k] || {};
     const nueva = Object.assign({}, actual, cfg);
     nueva.ubicacion = String(ubicacion).trim().toUpperCase();
     if (articulo) nueva.articulo = String(articulo);
+    if (lote) nueva.lote = String(lote);
     if (!nueva.min && !nueva.max) delete state.posiciones[k];
     else state.posiciones[k] = nueva;
     guardarPosiciones();
@@ -224,11 +225,12 @@ VLM.store = (function () {
    * VLMVENTA02: con la posición sola, cargar un máximo lo cargaría para los
    * cientos de artículos que viven ahí.
    */
-  function clavePos(ubicacion, articulo) {
+  function clavePos(ubicacion, articulo, lote) {
     const u = String(ubicacion == null ? '' : ubicacion).trim().toUpperCase();
     if (!u) return '';
     const a = String(articulo == null ? '' : articulo).trim().toUpperCase();
-    return a ? u + '|' + a : u;
+    if (!a) return u;
+    return lote ? u + '|' + a + '|' + lote : u + '|' + a;
   }
 
   /**

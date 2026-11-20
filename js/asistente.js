@@ -275,6 +275,17 @@ VLM.asistente = (function () {
                problema: 'Ese artículo no tiene posiciones de picking: todo su stock es reserva, ' +
                          'y la reserva no lleva mínimo ni máximo.' };
     }
+    const cfgPos = VLM.store.state.posiciones;
+    const prefijos = posiciones.map(x =>
+      String(x.ubicacion).toUpperCase() + '|' + String(p.codigo).toUpperCase() + '|');
+    const lotes = new Set((p.detalle || []).filter(d => VLM.parser.esConfigurable(d))
+      .map(d => VLM.analytics.claveLote(d)));
+    if (lotes.size > 1 || Object.keys(cfgPos).some(k => prefijos.some(x => k.indexOf(x) === 0))) {
+      return { accion: 'cambio', campo, valor, producto: p,
+               entendido: base + ' a ' + (p.descripcion || p.codigo),
+               problema: 'Este artículo lleva el mínimo y el máximo por lote: cambialos en la ' +
+                         'pestaña Posiciones, en la fila de cada lote.' };
+    }
     return { accion: 'cambio', campo, valor, producto: p, posiciones,
              entendido: base + ' a ' + (p.descripcion || p.codigo) };
   }

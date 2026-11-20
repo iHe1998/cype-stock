@@ -229,9 +229,9 @@ VLM.parser = (function () {
    * stock por ubicación, así que editar un máximo se refleja al toque sin
    * volver a importar.
    *
-   * Los mínimos y máximos se SUMAN entre las posiciones del artículo, una vez
-   * por ubicación aunque tenga varios lotes. Y sólo cuentan las posiciones que
-   * siguen con el mismo artículo con el que se configuraron.
+   * Los mínimos y máximos se SUMAN entre las posiciones del artículo. Y sólo
+   * cuentan las posiciones que siguen con el mismo artículo con el que se
+   * configuraron.
    */
   function aplicarPosiciones(productos, cfgPosiciones) {
     cfgPosiciones = cfgPosiciones || {};
@@ -239,6 +239,7 @@ VLM.parser = (function () {
       const dets = (p.detalle && p.detalle.length)
         ? p.detalle
         : [{ ubicacion: p.ubicacion, stock: p.stock }];
+      const cod = String(p.codigo).toUpperCase();
 
       // Una entrada por posición configurada, con su propio stock, mínimo y
       // máximo. El estado del artículo sale de la PEOR de ellas, no de la
@@ -248,16 +249,28 @@ VLM.parser = (function () {
       dets.forEach(d => {
         const u = String(d.ubicacion || '').trim().toUpperCase();
         if (!u) return;
-        // primero la configuración de ESTE artículo en esta posición; si no
-        // hay, la de la posición sola (formato viejo, una posición un artículo)
-        const c = cfgPosiciones[u + '|' + String(p.codigo).toUpperCase()] || cfgPosiciones[u];
-        if (!c) return;
-        if (c.articulo && c.articulo !== p.codigo) return;   // se reasignó
-        if (!porUbic[u]) porUbic[u] = { ubicacion: d.ubicacion, stock: 0, min: c.min || 0, max: c.max || 0 };
-        porUbic[u].stock += d.stock;
+        const lote = (d.lote || '') + '|' + (d.lote2 || '');
+        const g = porUbic[u] || (porUbic[u] = { ubicacion: d.ubicacion, lotes: {} });
+        const l = g.lotes[lote] || (g.lotes[lote] = { lote: lote, stock: 0, vencimiento: d.vencimiento || null });
+        l.stock += d.stock || 0;
       });
 
-      const lista = Object.keys(porUbic).map(k => porUbic[k]);
+      const lista = [];
+      Object.keys(porUbic).forEach(u => {
+        const g = porUbic[u];
+        const lotes = Object.keys(g.lotes).map(k => g.lotes[k]);
+        // primero la configuración de ESTE artículo en esta posición; si no
+        // hay, la de la posición sola (formato viejo, una posición un artículo)
+        const general = cfgPosiciones[u + '|' + cod] || cfgPosiciones[u];
+        const generalVale = !!general && !(general.articulo && general.articulo !== p.codigo);
+        const principal = lotePrincipal(lotes);
+        lotes.forEach(l => {
+          const c = cfgPosiciones[u + '|' + cod + '|' + l.lote] ||
+                    (l === principal && generalVale ? general : null);
+          if (!c) return;
+          lista.push({ ubicacion: g.ubicacion, lote: l.lote, stock: l.stock, min: c.min || 0, max: c.max || 0 });
+        });
+      });
       const hay = lista.length > 0;
 
       p.posConfig      = lista;
@@ -269,6 +282,13 @@ VLM.parser = (function () {
       p.stockRef = hay ? p.stockPosConfig : p.stock;
     });
     return productos;
+  }
+
+  function lotePrincipal(lotes) {
+    return lotes.slice().sort((a, b) =>
+      (b.stock - a.stock) ||
+      ((a.vencimiento ? +new Date(a.vencimiento) : Infinity) - (b.vencimiento ? +new Date(b.vencimiento) : Infinity)) ||
+      String(a.lote).localeCompare(String(b.lote)))[0] || null;
   }
 
   /**
@@ -733,6 +753,6 @@ VLM.parser = (function () {
   return {
     CAMPOS, leerArchivo, hojaAMatriz, detectarFilaEncabezado,
     autoMapear, normalizar, generarPlantilla, esConfigurable, estaIgnorado, uidDe,
-    detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, reaplicarReglas
+    detectarFormatoFecha, hayRepetidos, agrupar, aplicarPosiciones, lotePrincipal, reaplicarReglas
   };
 })();
